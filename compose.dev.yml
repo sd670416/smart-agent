@@ -1,0 +1,43 @@
+services:
+  mysql:
+    image: mysql:8.4.6
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-smart_agent_root_dev}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-smart_agent}
+      MYSQL_USER: ${MYSQL_USER:-smart_agent}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-smart_agent_dev}
+    ports:
+      - "127.0.0.1:3307:3306"
+    volumes:
+      - smart-agent-mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p$$MYSQL_ROOT_PASSWORD"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7.4.5-alpine
+    ports:
+      - "127.0.0.1:6380:6379"
+    volumes:
+      - smart-agent-redis-data:/data
+    command: ["redis-server", "--appendonly", "yes"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  qdrant:
+    image: qdrant/qdrant:v1.18.2
+    ports:
+      - "127.0.0.1:6333:6333"
+      - "127.0.0.1:6334:6334"
+    volumes:
+      - smart-agent-qdrant-data:/qdrant/storage
+
+volumes:
+  smart-agent-mysql-data:
+  smart-agent-redis-data:
+  smart-agent-qdrant-data:
