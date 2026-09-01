@@ -5,5 +5,5 @@ import java.util.Optional;
 public interface AgentRunRepository {
     AgentRun save(AgentRun run);
 
-    Optional<AgentRun> findById(String id);
+    Optional<AgentRun> findByIdAndTenantIdAndUserId(String tenantId, String userId, String id);
 }

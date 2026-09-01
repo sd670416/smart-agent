@@ -60,11 +60,15 @@ public class Conversation {
     }
 
     public static Conversation create(String tenantId, String userId, String title) {
-        return new Conversation(UUID.randomUUID().toString(), tenantId, userId, title);
+        return new Conversation(UUID.randomUUID().toString(), requireText(tenantId, "tenantId"),
+                requireText(userId, "userId"), requireText(title, "title"));
     }
 
     public Message append(Message.Role role, String content) {
-        Message message = Message.create(this, messages.size() + 1L, role, content);
+        if (role == null) {
+            throw new IllegalArgumentException("role must not be null");
+        }
+        Message message = Message.create(this, messages.size() + 1L, role, requireText(content, "content"));
         messages.add(message);
         updatedAt = Instant.now();
         return message;
@@ -104,5 +108,12 @@ public class Conversation {
     @PreUpdate
     void updateTimestamp() {
         updatedAt = Instant.now();
+    }
+
+    private static String requireText(String value, String fieldName) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException(fieldName + " must not be blank");
+        }
+        return value;
     }
 }

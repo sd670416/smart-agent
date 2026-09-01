@@ -1,13 +1,12 @@
 package com.smart.agent.conversation;
 
 import jakarta.persistence.EntityManager;
-import jakarta.persistence.EntityManagerFactory;
 import java.util.Optional;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Repository;
 
 @Repository
-@ConditionalOnBean(EntityManagerFactory.class)
+@ConditionalOnProperty(prefix = "agent.persistence", name = "enabled", havingValue = "true", matchIfMissing = true)
 public class JpaConversationRepository implements ConversationRepository {
 
     private final EntityManager entityManager;
@@ -29,7 +28,13 @@ public class JpaConversationRepository implements ConversationRepository {
     }
 
     @Override
-    public Optional<Conversation> findById(String id) {
-        return Optional.ofNullable(entityManager.find(Conversation.class, id));
+    public Optional<Conversation> findByIdAndTenantIdAndUserId(String tenantId, String userId, String id) {
+        return entityManager.createQuery("select distinct c from Conversation c left join fetch c.messages "
+                        + "where c.id = :id and c.tenantId = :tenantId and c.userId = :userId", Conversation.class)
+                .setParameter("id", id)
+                .setParameter("tenantId", tenantId)
+                .setParameter("userId", userId)
+                .getResultStream()
+                .findFirst();
     }
 }

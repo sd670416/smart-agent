@@ -1,13 +1,12 @@
 package com.smart.agent.run;
 
 import jakarta.persistence.EntityManager;
-import jakarta.persistence.EntityManagerFactory;
 import java.util.Optional;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Repository;
 
 @Repository
-@ConditionalOnBean(EntityManagerFactory.class)
+@ConditionalOnProperty(prefix = "agent.persistence", name = "enabled", havingValue = "true", matchIfMissing = true)
 public class JpaAgentRunRepository implements AgentRunRepository {
 
     private final EntityManager entityManager;
@@ -29,7 +28,13 @@ public class JpaAgentRunRepository implements AgentRunRepository {
     }
 
     @Override
-    public Optional<AgentRun> findById(String id) {
-        return Optional.ofNullable(entityManager.find(AgentRun.class, id));
+    public Optional<AgentRun> findByIdAndTenantIdAndUserId(String tenantId, String userId, String id) {
+        return entityManager.createQuery("select r from AgentRun r where r.id = :id and r.tenantId = :tenantId and r.userId = :userId",
+                        AgentRun.class)
+                .setParameter("id", id)
+                .setParameter("tenantId", tenantId)
+                .setParameter("userId", userId)
+                .getResultStream()
+                .findFirst();
     }
 }

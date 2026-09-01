@@ -76,7 +76,8 @@ public class AgentRun {
     }
 
     public static AgentRun start(String tenantId, String userId, String conversationId) {
-        return new AgentRun(tenantId, userId, conversationId);
+        return new AgentRun(requireText(tenantId, "tenantId"), requireText(userId, "userId"),
+                requireText(conversationId, "conversationId"));
     }
 
     public void transition(AgentRunStatus next) {
@@ -121,5 +122,12 @@ public class AgentRun {
     @PreUpdate
     void updateTimestamp() {
         updatedAt = Instant.now();
+    }
+
+    private static String requireText(String value, String fieldName) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException(fieldName + " must not be blank");
+        }
+        return value;
     }
 }

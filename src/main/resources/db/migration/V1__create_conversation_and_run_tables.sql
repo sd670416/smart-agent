@@ -7,6 +7,7 @@ CREATE TABLE ai_conversation (
     update_time datetime(3) NOT NULL,
     version bigint NOT NULL DEFAULT 0,
     PRIMARY KEY (id),
+    UNIQUE KEY uq_ai_conversation_id_tenant_user (id, tenant_id, user_id),
     KEY idx_ai_conversation_tenant_user_update (tenant_id, user_id, update_time)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -14,6 +15,7 @@ CREATE TABLE ai_message (
     id varchar(36) NOT NULL,
     conversation_id varchar(36) NOT NULL,
     tenant_id varchar(36) NOT NULL,
+    user_id varchar(36) NOT NULL,
     role varchar(32) NOT NULL,
     content LONGTEXT NOT NULL,
     sequence_no bigint NOT NULL,
@@ -22,7 +24,8 @@ CREATE TABLE ai_message (
     version bigint NOT NULL DEFAULT 0,
     PRIMARY KEY (id),
     UNIQUE KEY uq_ai_message_conversation_sequence (conversation_id, sequence_no),
-    CONSTRAINT fk_ai_message_conversation FOREIGN KEY (conversation_id) REFERENCES ai_conversation (id)
+    CONSTRAINT fk_ai_message_conversation FOREIGN KEY (conversation_id, tenant_id, user_id)
+        REFERENCES ai_conversation (id, tenant_id, user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE ai_run (
@@ -35,9 +38,11 @@ CREATE TABLE ai_run (
     update_time datetime(3) NOT NULL,
     version bigint NOT NULL DEFAULT 0,
     PRIMARY KEY (id),
+    UNIQUE KEY uq_ai_run_id_tenant (id, tenant_id),
     KEY idx_ai_run_tenant_user_update (tenant_id, user_id, update_time),
     KEY idx_ai_run_conversation (conversation_id),
-    CONSTRAINT fk_ai_run_conversation FOREIGN KEY (conversation_id) REFERENCES ai_conversation (id)
+    CONSTRAINT fk_ai_run_conversation FOREIGN KEY (conversation_id, tenant_id, user_id)
+        REFERENCES ai_conversation (id, tenant_id, user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE ai_run_step (
@@ -56,5 +61,5 @@ CREATE TABLE ai_run_step (
     version bigint NOT NULL DEFAULT 0,
     PRIMARY KEY (id),
     UNIQUE KEY uq_ai_run_step_run_sequence (run_id, step_no),
-    CONSTRAINT fk_ai_run_step_run FOREIGN KEY (run_id) REFERENCES ai_run (id)
+    CONSTRAINT fk_ai_run_step_run FOREIGN KEY (run_id, tenant_id) REFERENCES ai_run (id, tenant_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

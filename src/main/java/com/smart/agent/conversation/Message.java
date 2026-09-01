@@ -37,6 +37,9 @@ public class Message {
     @Column(name = "tenant_id", nullable = false, length = 36, updatable = false)
     private String tenantId;
 
+    @Column(name = "user_id", nullable = false, length = 36, updatable = false)
+    private String userId;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 32)
     private Role role;
@@ -64,6 +67,7 @@ public class Message {
         this.id = UUID.randomUUID().toString();
         this.conversation = conversation;
         this.tenantId = conversation.tenantId();
+        this.userId = conversation.userId();
         this.sequence = sequence;
         this.role = role;
         this.content = content;

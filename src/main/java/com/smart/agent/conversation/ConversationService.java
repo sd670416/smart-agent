@@ -1,12 +1,11 @@
 package com.smart.agent.conversation;
 
-import jakarta.persistence.EntityManagerFactory;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-@ConditionalOnBean(EntityManagerFactory.class)
+@ConditionalOnProperty(prefix = "agent.persistence", name = "enabled", havingValue = "true", matchIfMissing = true)
 public class ConversationService {
 
     private final ConversationRepository conversationRepository;
@@ -21,11 +20,19 @@ public class ConversationService {
     }
 
     @Transactional
-    public Message appendMessage(String conversationId, Message.Role role, String content) {
-        Conversation conversation = conversationRepository.findById(conversationId)
+    public Message appendMessage(String tenantId, String userId, String conversationId, Message.Role role, String content) {
+        Conversation conversation = conversationRepository.findByIdAndTenantIdAndUserId(
+                        requireText(tenantId, "tenantId"), requireText(userId, "userId"), requireText(conversationId, "conversationId"))
                 .orElseThrow(() -> new IllegalArgumentException("Conversation not found: " + conversationId));
         Message message = conversation.append(role, content);
         conversationRepository.save(conversation);
         return message;
+    }
+
+    private static String requireText(String value, String fieldName) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException(fieldName + " must not be blank");
+        }
+        return value;
     }
 }

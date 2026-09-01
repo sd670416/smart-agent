@@ -21,6 +21,8 @@ management:
       exposure:
         include: health,info,prometheus
 agent:
+  persistence:
+    enabled: ${AGENT_PERSISTENCE_ENABLED:true}
   qdrant:
     host: ${AGENT_QDRANT_HOST:localhost}
     grpc-port: ${AGENT_QDRANT_GRPC_PORT:6334}
