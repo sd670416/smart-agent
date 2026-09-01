@@ -7,7 +7,7 @@ services:
       MYSQL_USER: ${MYSQL_USER:-smart_agent}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:-smart_agent_dev}
     ports:
-      - "127.0.0.1:3307:3306"
+      - "${AGENT_DOCKER_BIND_HOST:-127.0.0.1}:3307:3306"
     volumes:
       - smart-agent-mysql-data:/var/lib/mysql
     healthcheck:
@@ -19,7 +19,7 @@ services:
   redis:
     image: redis:7.4.5-alpine
     ports:
-      - "127.0.0.1:6380:6379"
+      - "${AGENT_DOCKER_BIND_HOST:-127.0.0.1}:6380:6379"
     volumes:
       - smart-agent-redis-data:/data
     command: ["redis-server", "--appendonly", "yes"]
@@ -32,8 +32,8 @@ services:
   qdrant:
     image: qdrant/qdrant:v1.18.2
     ports:
-      - "127.0.0.1:6333:6333"
-      - "127.0.0.1:6334:6334"
+      - "${AGENT_DOCKER_BIND_HOST:-127.0.0.1}:6333:6333"
+      - "${AGENT_DOCKER_BIND_HOST:-127.0.0.1}:6334:6334"
     volumes:
       - smart-agent-qdrant-data:/qdrant/storage
 
