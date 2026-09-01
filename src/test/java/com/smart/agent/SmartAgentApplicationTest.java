@@ -5,7 +5,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 
 @SpringBootTest(properties = {
         "spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration",
-        "agent.persistence.enabled=false"
+        "agent.persistence.enabled=false",
+        "AGENT_LOCAL_CONTEXT_SECRET=test-only-context-secret"
 })
 class SmartAgentApplicationTest {
     @Test
