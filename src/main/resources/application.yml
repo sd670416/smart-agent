@@ -24,9 +24,15 @@ agent:
   persistence:
     enabled: ${AGENT_PERSISTENCE_ENABLED:true}
   qdrant:
+    enabled: ${AGENT_QDRANT_ENABLED:false}
     host: ${AGENT_QDRANT_HOST:localhost}
     grpc-port: ${AGENT_QDRANT_GRPC_PORT:6334}
     api-key: ${AGENT_QDRANT_API_KEY:}
+    tls: ${AGENT_QDRANT_TLS:false}
+    collection-name: ${AGENT_QDRANT_COLLECTION:agent_knowledge_dev}
+    vector-dimension: ${AGENT_QDRANT_VECTOR_DIMENSION:64}
+  embedding:
+    mode: ${AGENT_EMBEDDING_MODE:local-hash}
   model:
     mode: ${AGENT_MODEL_MODE:local}
     base-url: ${AGENT_MODEL_BASE_URL:http://localhost:11434/v1}
