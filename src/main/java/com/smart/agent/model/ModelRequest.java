@@ -2,6 +2,7 @@ package com.smart.agent.model;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 
 public record ModelRequest(
         String runId,
@@ -29,9 +30,14 @@ public record ModelRequest(
     }
 
     public record ConversationMessage(String role, String content) {
+        private static final Set<String> ALLOWED_ROLES = Set.of("user", "assistant");
+
         public ConversationMessage {
             requireText(role, "role");
             requireText(content, "content");
+            if (!ALLOWED_ROLES.contains(role)) {
+                throw new IllegalArgumentException("role must be user or assistant");
+            }
         }
     }
 
