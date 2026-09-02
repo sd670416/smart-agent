@@ -44,3 +44,6 @@ Worktree: F:/project/gongcheng/agent/.worktrees/phase1-agent-backend
 - Task 4: Ruling: the required `ToolExecutor.execute(String, Object, AgentUserContext)` contract carries no `runId`, so Task 4 records only a safe structured execution summary through `AgentRunService` without inventing a run association; Task 8 will persist the summary against its real run ID — this preserves the published Task 4 interface, but persistent per-run tool audit is deferred until orchestration exists.
 - Task 4: fix round 1/5 complete — 1 Important finding addressed, 0 open; commits `e75b5bb..d8b2a04`; scoped re-review clean.
 - Task 4: complete — commits `197393b..d8b2a04`; focused tests 12/12 and full non-Docker suite 43/43 passed; MySQL integration test remains opt-in/skipped; review clean.
+- Task 5: minor (deferred): `ModelRequest` permits an empty conversation while `LocalDeterministicModelGateway` immediately reads the last message; final review should decide whether to reject it at construction or return a stable failure event.
+- Task 5: fix round 1/5 complete — 2 Critical and 3 Important findings addressed, 0 open; commits `1d5e5db..27a1dc5`; scoped re-review clean.
+- Task 5: complete — commits `d025320..27a1dc5`; model gateway tests 17/17 and full non-Docker suite 61/61 passed; one existing MySQL/Testcontainers test skipped; review clean with one deferred minor.
