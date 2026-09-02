@@ -1,0 +1,62 @@
+package com.smart.agent.model;
+
+import java.util.List;
+import java.util.Objects;
+
+public record ModelRequest(
+        String runId,
+        String systemInstructionVersion,
+        List<ConversationMessage> redactedConversationMessages,
+        List<AllowedToolSpecification> allowedToolSpecifications,
+        List<RetrievedEvidence> retrievedEvidence) {
+
+    public ModelRequest {
+        requireText(runId, "runId");
+        requireText(systemInstructionVersion, "systemInstructionVersion");
+        redactedConversationMessages = List.copyOf(redactedConversationMessages);
+        allowedToolSpecifications = List.copyOf(allowedToolSpecifications);
+        retrievedEvidence = List.copyOf(retrievedEvidence);
+    }
+
+    public static ModelRequest userQuestion(String runId, String question, List<String> toolKeys) {
+        requireText(question, "question");
+        return new ModelRequest(
+                runId,
+                "v1",
+                List.of(new ConversationMessage("user", question)),
+                toolKeys.stream().map(AllowedToolSpecification::forKey).toList(),
+                List.of());
+    }
+
+    public record ConversationMessage(String role, String content) {
+        public ConversationMessage {
+            requireText(role, "role");
+            requireText(content, "content");
+        }
+    }
+
+    public record AllowedToolSpecification(String key, String description, String argumentsSchemaJson) {
+        public AllowedToolSpecification {
+            requireText(key, "key");
+            requireText(description, "description");
+            requireText(argumentsSchemaJson, "argumentsSchemaJson");
+        }
+
+        static AllowedToolSpecification forKey(String key) {
+            return new AllowedToolSpecification(key, key, "{\"type\":\"object\"}");
+        }
+    }
+
+    public record RetrievedEvidence(String sourceId, String content) {
+        public RetrievedEvidence {
+            requireText(sourceId, "sourceId");
+            requireText(content, "content");
+        }
+    }
+
+    private static void requireText(String value, String field) {
+        if (Objects.requireNonNull(value, field).isBlank()) {
+            throw new IllegalArgumentException(field + " must not be blank");
+        }
+    }
+}
