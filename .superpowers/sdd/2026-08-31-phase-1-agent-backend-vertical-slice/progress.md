@@ -41,3 +41,6 @@ Worktree: F:/project/gongcheng/agent/.worktrees/phase1-agent-backend
 - Task 2: fix round 1/5 complete — all 4 findings addressed, 0 open; commit `a428069`; scoped re-review clean.
 - Task 2: complete — commits `a99bbf6..a428069`; 13 non-Docker tests passed. Opt-in `PersistenceMySqlIT` is present but deferred until LAN Docker coordinates are configured.
 - Task 3: complete — trusted engineering user context, HMAC local verifier, authentication/trace filters, stable 401 errors, and cleanup guarantees implemented; focused security tests 20/20 and full non-Docker suite 33/33 passed. LAN Docker-backed integration remains deferred.
+- Task 4: Ruling: the required `ToolExecutor.execute(String, Object, AgentUserContext)` contract carries no `runId`, so Task 4 records only a safe structured execution summary through `AgentRunService` without inventing a run association; Task 8 will persist the summary against its real run ID — this preserves the published Task 4 interface, but persistent per-run tool audit is deferred until orchestration exists.
+- Task 4: fix round 1/5 complete — 1 Important finding addressed, 0 open; commits `e75b5bb..d8b2a04`; scoped re-review clean.
+- Task 4: complete — commits `197393b..d8b2a04`; focused tests 12/12 and full non-Docker suite 43/43 passed; MySQL integration test remains opt-in/skipped; review clean.
