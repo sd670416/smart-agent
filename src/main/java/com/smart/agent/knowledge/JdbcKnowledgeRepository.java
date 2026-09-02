@@ -1,6 +1,7 @@
 package com.smart.agent.knowledge;
 
 import java.util.List;
+import java.util.Collection;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -43,6 +44,41 @@ public class JdbcKnowledgeRepository implements KnowledgeRepository {
                         + "finished_time = CURRENT_TIMESTAMP(3), update_time = CURRENT_TIMESTAMP(3), version = version + 1 "
                         + "WHERE document_id = ? AND deleted = b'0'",
                 failureCode, documentId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<KnowledgeChunkMetadata> findPublishedChunks(String tenantId, Collection<String> chunkIds) {
+        if (tenantId == null || tenantId.isBlank() || chunkIds == null || chunkIds.isEmpty()) {
+            return List.of();
+        }
+        List<String> ids = chunkIds.stream().filter(id -> id != null && !id.isBlank()).distinct().toList();
+        if (ids.isEmpty()) {
+            return List.of();
+        }
+        String placeholders = String.join(", ", java.util.Collections.nCopies(ids.size(), "?"));
+        List<Object> parameters = new java.util.ArrayList<>();
+        parameters.add(tenantId);
+        parameters.addAll(ids);
+        return jdbcTemplate.query("SELECT c.id, c.document_id, c.document_version_id, c.tenant_id, d.space_id, "
+                        + "d.project_id, d.title, c.page_number, c.section_title, c.content "
+                        + "FROM ai_document_chunk c "
+                        + "JOIN ai_document d ON d.id = c.document_id AND d.tenant_id = c.tenant_id "
+                        + "JOIN ai_document_version v ON v.id = c.document_version_id "
+                        + "AND v.document_id = c.document_id AND v.tenant_id = c.tenant_id "
+                        + "JOIN ai_knowledge_space s ON s.id = d.space_id AND s.tenant_id = d.tenant_id "
+                        + "WHERE c.tenant_id = ? AND c.id IN (" + placeholders + ") "
+                        + "AND c.deleted = b'0' AND c.status = 'published' "
+                        + "AND d.deleted = b'0' AND d.status = 'published' "
+                        + "AND v.deleted = b'0' AND v.status = 'published' "
+                        + "AND s.deleted = b'0' AND s.status = 'active'",
+                (resultSet, rowNumber) -> new KnowledgeChunkMetadata(
+                        resultSet.getString("id"), resultSet.getString("document_id"),
+                        resultSet.getString("document_version_id"), resultSet.getString("tenant_id"),
+                        resultSet.getString("space_id"), resultSet.getString("project_id"), resultSet.getString("title"),
+                        resultSet.getObject("page_number", Integer.class), resultSet.getString("section_title"),
+                        resultSet.getString("content"), true, false),
+                parameters.toArray());
     }
 
     private void upsertSpace(KnowledgeDocument document) {

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -170,6 +171,11 @@ class KnowledgeIngestionServiceTest {
         @Override
         public void markIndexingFailed(String documentId, String failureCode) {
             failedDocumentIds.add(documentId);
+        }
+
+        @Override
+        public List<KnowledgeChunkMetadata> findPublishedChunks(String tenantId, Collection<String> chunkIds) {
+            return List.of();
         }
     }
 
