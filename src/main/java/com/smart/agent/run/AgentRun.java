@@ -19,17 +19,20 @@ import java.util.UUID;
 public class AgentRun {
 
     private static final Map<AgentRunStatus, Set<AgentRunStatus>> ALLOWED = Map.of(
-            AgentRunStatus.RECEIVED, Set.of(AgentRunStatus.ROUTING, AgentRunStatus.FAILED, AgentRunStatus.CANCELLED),
+            AgentRunStatus.RECEIVED, Set.of(AgentRunStatus.ROUTING, AgentRunStatus.FAILED,
+                    AgentRunStatus.CANCELLED, AgentRunStatus.PERMISSION_DENIED),
             AgentRunStatus.ROUTING, Set.of(AgentRunStatus.PLANNING, AgentRunStatus.FAILED, AgentRunStatus.CANCELLED),
             AgentRunStatus.PLANNING, Set.of(AgentRunStatus.TOOL_SELECTING, AgentRunStatus.RETRIEVING,
                     AgentRunStatus.GENERATING, AgentRunStatus.FAILED, AgentRunStatus.CANCELLED),
             AgentRunStatus.TOOL_SELECTING, Set.of(AgentRunStatus.TOOL_EXECUTING, AgentRunStatus.FAILED,
                     AgentRunStatus.CANCELLED),
             AgentRunStatus.TOOL_EXECUTING, Set.of(AgentRunStatus.RETRIEVING, AgentRunStatus.GENERATING,
-                    AgentRunStatus.FAILED, AgentRunStatus.TIMEOUT, AgentRunStatus.PERMISSION_DENIED),
+                    AgentRunStatus.FAILED, AgentRunStatus.CANCELLED, AgentRunStatus.TIMEOUT,
+                    AgentRunStatus.PERMISSION_DENIED),
             AgentRunStatus.RETRIEVING, Set.of(AgentRunStatus.GENERATING, AgentRunStatus.FAILED,
                     AgentRunStatus.TIMEOUT, AgentRunStatus.PERMISSION_DENIED),
-            AgentRunStatus.GENERATING, Set.of(AgentRunStatus.COMPLETED, AgentRunStatus.FAILED, AgentRunStatus.TIMEOUT),
+            AgentRunStatus.GENERATING, Set.of(AgentRunStatus.TOOL_SELECTING, AgentRunStatus.COMPLETED,
+                    AgentRunStatus.FAILED, AgentRunStatus.TIMEOUT, AgentRunStatus.CANCELLED),
             AgentRunStatus.WAITING_APPROVAL, Set.of(AgentRunStatus.RESUMING, AgentRunStatus.CANCELLED),
             AgentRunStatus.RESUMING, Set.of(AgentRunStatus.TOOL_EXECUTING, AgentRunStatus.FAILED,
                     AgentRunStatus.PERMISSION_DENIED));
@@ -46,6 +49,24 @@ public class AgentRun {
 
     @Column(name = "conversation_id", nullable = false, length = 36, updatable = false)
     private String conversationId;
+
+    @Column(name = "trace_id", length = 128, updatable = false)
+    private String traceId;
+
+    @Column(name = "safe_error_code", length = 128)
+    private String safeErrorCode;
+
+    @Column(name = "input_tokens", nullable = false)
+    private int inputTokens;
+
+    @Column(name = "output_tokens", nullable = false)
+    private int outputTokens;
+
+    @Column(name = "tool_execution_summaries", columnDefinition = "LONGTEXT")
+    private String toolExecutionSummaries;
+
+    @Column(name = "citation_summaries", columnDefinition = "LONGTEXT")
+    private String citationSummaries;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 32)
@@ -64,11 +85,14 @@ public class AgentRun {
     protected AgentRun() {
     }
 
-    private AgentRun(String tenantId, String userId, String conversationId) {
+    private AgentRun(String tenantId, String userId, String conversationId, String traceId) {
         this.id = UUID.randomUUID().toString();
         this.tenantId = tenantId;
         this.userId = userId;
         this.conversationId = conversationId;
+        this.traceId = traceId;
+        this.toolExecutionSummaries = "";
+        this.citationSummaries = "";
         this.status = AgentRunStatus.RECEIVED;
         Instant now = Instant.now();
         this.createdAt = now;
@@ -76,8 +100,12 @@ public class AgentRun {
     }
 
     public static AgentRun start(String tenantId, String userId, String conversationId) {
+        return start(tenantId, userId, conversationId, null);
+    }
+
+    public static AgentRun start(String tenantId, String userId, String conversationId, String traceId) {
         return new AgentRun(requireText(tenantId, "tenantId"), requireText(userId, "userId"),
-                requireText(conversationId, "conversationId"));
+                requireText(conversationId, "conversationId"), traceId);
     }
 
     public void transition(AgentRunStatus next) {
@@ -106,6 +134,32 @@ public class AgentRun {
 
     public AgentRunStatus status() {
         return status;
+    }
+
+    public void recordUsage(int input, int output) {
+        inputTokens += Math.max(0, input);
+        outputTokens += Math.max(0, output);
+    }
+
+    public void recordSafeError(String code) { safeErrorCode = code; }
+
+    public void recordToolSummary(String summary) {
+        toolExecutionSummaries = appendLine(toolExecutionSummaries, requireText(summary, "summary"));
+    }
+
+    public void recordCitationSummary(String summary) {
+        citationSummaries = appendLine(citationSummaries, requireText(summary, "summary"));
+    }
+
+    public String traceId() { return traceId; }
+    public String safeErrorCode() { return safeErrorCode; }
+    public int inputTokens() { return inputTokens; }
+    public int outputTokens() { return outputTokens; }
+    public String toolExecutionSummaries() { return toolExecutionSummaries == null ? "" : toolExecutionSummaries; }
+    public String citationSummaries() { return citationSummaries == null ? "" : citationSummaries; }
+
+    private static String appendLine(String existing, String value) {
+        return existing == null || existing.isBlank() ? value : existing + "\n" + value;
     }
 
     @PrePersist

@@ -35,6 +35,17 @@ public class ProjectOverviewTool implements AgentTool<ProjectOverviewInput, Proj
     }
 
     @Override
+    public String description() {
+        return "Get the overview of one permitted project";
+    }
+
+    @Override
+    public String argumentsSchemaJson() {
+        return "{\"type\":\"object\",\"properties\":{\"projectId\":{\"type\":\"string\"}},"
+                + "\"required\":[\"projectId\"],\"additionalProperties\":false}";
+    }
+
+    @Override
     public ProjectOverviewResult execute(ProjectOverviewInput input, ToolContext context) {
         return projectBusinessClient.getOverview(context, input.projectId());
     }

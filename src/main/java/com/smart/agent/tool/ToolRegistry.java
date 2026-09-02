@@ -1,7 +1,9 @@
 package com.smart.agent.tool;
 
 import com.smart.agent.common.error.AgentException;
+import com.smart.agent.security.AgentUserContext;
 import java.util.Collection;
+import java.util.List;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.springframework.stereotype.Component;
@@ -26,5 +28,12 @@ public class ToolRegistry {
             throw new AgentException("AGENT_TOOL_NOT_FOUND", org.springframework.http.HttpStatus.NOT_FOUND, "Unknown tool");
         }
         return tool;
+    }
+
+    public List<AgentTool<?, ?>> allowedReadOnlyTools(AgentUserContext context) {
+        return tools.values().stream()
+                .filter(tool -> tool.risk() == ToolRisk.L0 || tool.risk() == ToolRisk.L1)
+                .filter(tool -> context.permissions().contains(tool.requiredPermission()))
+                .toList();
     }
 }

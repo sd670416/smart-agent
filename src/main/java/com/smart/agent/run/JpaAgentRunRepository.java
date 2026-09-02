@@ -1,6 +1,7 @@
 package com.smart.agent.run;
 
 import jakarta.persistence.EntityManager;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Repository;
@@ -36,5 +37,13 @@ public class JpaAgentRunRepository implements AgentRunRepository {
                 .setParameter("userId", userId)
                 .getResultStream()
                 .findFirst();
+    }
+
+    @Override
+    public List<AgentRun> findByConversationId(String conversationId) {
+        return entityManager.createQuery(
+                        "select r from AgentRun r where r.conversationId = :conversationId", AgentRun.class)
+                .setParameter("conversationId", conversationId)
+                .getResultList();
     }
 }

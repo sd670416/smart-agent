@@ -23,12 +23,17 @@ public class AgentRunService {
 
     @Transactional
     public AgentRun start(String tenantId, String userId, String conversationId) {
+        return start(tenantId, userId, conversationId, null);
+    }
+
+    @Transactional
+    public AgentRun start(String tenantId, String userId, String conversationId, String traceId) {
         String scopedTenantId = requireText(tenantId, "tenantId");
         String scopedUserId = requireText(userId, "userId");
         String requiredConversationId = requireText(conversationId, "conversationId");
         conversationRepository.findByIdAndTenantIdAndUserId(scopedTenantId, scopedUserId, requiredConversationId)
                 .orElseThrow(() -> new IllegalArgumentException("Conversation not found: " + requiredConversationId));
-        return agentRunRepository.save(AgentRun.start(scopedTenantId, scopedUserId, requiredConversationId));
+        return agentRunRepository.save(AgentRun.start(scopedTenantId, scopedUserId, requiredConversationId, traceId));
     }
 
     @Transactional
@@ -47,6 +52,18 @@ public class AgentRunService {
         Objects.requireNonNull(summary, "summary");
         log.info("tool_execution_summary toolKey={} risk={} outcome={} durationMillis={} resultSizeBytes={}",
                 summary.toolKey(), summary.risk(), summary.outcome(), summary.durationMillis(), summary.resultSizeBytes());
+    }
+
+    @Transactional
+    public AgentRun recordAudit(String tenantId, String userId, String runId, int inputTokens, int outputTokens,
+            String toolSummary, String citationSummary, String safeErrorCode) {
+        AgentRun run = agentRunRepository.findByIdAndTenantIdAndUserId(tenantId, userId, runId)
+                .orElseThrow(() -> new IllegalArgumentException("Agent run not found: " + runId));
+        run.recordUsage(inputTokens, outputTokens);
+        if (toolSummary != null) run.recordToolSummary(toolSummary);
+        if (citationSummary != null) run.recordCitationSummary(citationSummary);
+        if (safeErrorCode != null) run.recordSafeError(safeErrorCode);
+        return agentRunRepository.save(run);
     }
 
     private static String requireText(String value, String fieldName) {

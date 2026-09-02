@@ -11,6 +11,14 @@ public interface AgentTool<I, O> {
 
     ToolRisk risk();
 
+    default String description() {
+        return key();
+    }
+
+    default String argumentsSchemaJson() {
+        return "{\"type\":\"object\",\"properties\":{},\"additionalProperties\":false}";
+    }
+
     O execute(I input, ToolContext context);
 
     default Optional<String> projectId(I input) {
