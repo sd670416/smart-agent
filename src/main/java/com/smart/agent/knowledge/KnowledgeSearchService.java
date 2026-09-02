@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.stereotype.Service;
 
@@ -35,13 +36,22 @@ public class KnowledgeSearchService {
         if (context == null) {
             throw new IllegalArgumentException("context must not be null");
         }
+        if (!context.permissions().contains("knowledge:read")) {
+            throw new IllegalArgumentException("knowledge:read permission is required");
+        }
         if (!context.canAccessProject(query.projectId())) {
             throw new IllegalArgumentException("project is not accessible to this user");
+        }
+        Set<String> trustedSpaceIds = query.allowedSpaceIds().stream()
+                .filter(context::canAccessKnowledgeSpace)
+                .collect(Collectors.toUnmodifiableSet());
+        if (trustedSpaceIds.isEmpty()) {
+            throw new IllegalArgumentException("no trusted knowledge space is accessible");
         }
 
         List<Float> vector = embeddingGateway.embed(query.query());
         VectorSearchQuery vectorQuery = new VectorSearchQuery(
-                context.tenantId(), query.allowedSpaceIds(), Set.of(query.projectId()), vector, query.topK());
+                context.tenantId(), trustedSpaceIds, Set.of(query.projectId()), vector, query.topK());
         List<VectorHit> hits = vectorIndex.search(vectorQuery).stream().limit(query.topK()).toList();
         if (hits.isEmpty()) {
             return List.of();
@@ -50,7 +60,7 @@ public class KnowledgeSearchService {
         Map<String, KnowledgeChunkMetadata> metadataByChunkId = metadataByChunkId(
                 context.tenantId(), hits.stream().map(VectorHit::chunkId).filter(Objects::nonNull).toList());
         return hits.stream()
-                .map(hit -> toCitation(hit, metadataByChunkId.get(hit.chunkId()), query, context))
+                .map(hit -> toCitation(hit, metadataByChunkId.get(hit.chunkId()), trustedSpaceIds, query, context))
                 .filter(Objects::nonNull)
                 .limit(query.topK())
                 .toList();
@@ -70,13 +80,14 @@ public class KnowledgeSearchService {
     }
 
     private static KnowledgeCitation toCitation(
-            VectorHit hit, KnowledgeChunkMetadata chunk, KnowledgeSearchQuery query, AgentUserContext context) {
+            VectorHit hit, KnowledgeChunkMetadata chunk, Set<String> trustedSpaceIds,
+            KnowledgeSearchQuery query, AgentUserContext context) {
         if (hit == null || chunk == null || !Double.isFinite(hit.score())) {
             return null;
         }
         if (!context.tenantId().equals(chunk.tenantId())
                 || !chunk.documentId().equals(hit.documentId())
-                || !query.allowedSpaceIds().contains(chunk.spaceId())
+                || !trustedSpaceIds.contains(chunk.spaceId())
                 || (chunk.projectId() != null && !query.projectId().equals(chunk.projectId()))
                 || !chunk.published()
                 || chunk.deleted()) {

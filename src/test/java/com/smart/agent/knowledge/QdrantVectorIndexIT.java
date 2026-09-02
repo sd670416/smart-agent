@@ -62,22 +62,23 @@ class QdrantVectorIndexIT {
     }
 
     @Test
-    void searchRequiresAnAllowedSpaceOrProject() {
+    void searchRequiresEveryProvidedAllowedScope() {
         index.upsert(List.of(
                 chunk("space-allowed", "doc-a", "tenant-1", "space-1", "project-x", "published", vector(1, 0)),
                 chunk("project-allowed", "doc-b", "tenant-1", "space-x", "project-1", "published", vector(1, 0)),
-                chunk("denied", "doc-c", "tenant-1", "space-x", "project-x", "published", vector(1, 0))));
+                chunk("both-allowed", "doc-c", "tenant-1", "space-1", "project-1", "published", vector(1, 0)),
+                chunk("denied", "doc-d", "tenant-1", "space-x", "project-x", "published", vector(1, 0))));
 
         assertThat(index.search(query("tenant-1", Set.of("space-1"), Set.of(), vector(1, 0), 10)))
                 .extracting(VectorHit::chunkId)
-                .containsExactly("space-allowed");
+                .containsExactlyInAnyOrder("space-allowed", "both-allowed");
         assertThat(index.search(query("tenant-1", Set.of(), Set.of("project-1"), vector(1, 0), 10)))
                 .extracting(VectorHit::chunkId)
-                .containsExactly("project-allowed");
+                .containsExactlyInAnyOrder("project-allowed", "both-allowed");
         assertThat(index.search(query(
                 "tenant-1", Set.of("space-1"), Set.of("project-1"), vector(1, 0), 10)))
                 .extracting(VectorHit::chunkId)
-                .containsExactlyInAnyOrder("space-allowed", "project-allowed");
+                .containsExactly("both-allowed");
     }
 
     @Test

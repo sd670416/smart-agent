@@ -62,7 +62,8 @@ public class LocalContextTokenVerifier implements ContextTokenVerifier {
                     payload.userId(),
                     payload.identityId(),
                     payload.permissions(),
-                    payload.projectIds());
+                    payload.projectIds(),
+                    payload.knowledgeSpaceIds() == null ? Set.of() : payload.knowledgeSpaceIds());
         } catch (AgentException exception) {
             throw exception;
         } catch (Exception exception) {
@@ -76,6 +77,7 @@ public class LocalContextTokenVerifier implements ContextTokenVerifier {
             String identityId,
             Set<String> permissions,
             Set<String> projectIds,
+            Set<String> knowledgeSpaceIds,
             long exp) {
     }
 }

@@ -82,14 +82,13 @@ public final class QdrantVectorIndex implements VectorIndex {
         Common.Filter.Builder filter = Common.Filter.newBuilder()
                 .addMust(matchKeyword("tenant_id", query.tenantId()))
                 .addMust(matchKeyword("status", "published"));
-        Common.MinShould.Builder scopes = Common.MinShould.newBuilder().setMinCount(1);
         if (!query.allowedSpaceIds().isEmpty()) {
-            scopes.addConditions(matchKeywords("space_id", sorted(query.allowedSpaceIds())));
+            filter.addMust(matchKeywords("space_id", sorted(query.allowedSpaceIds())));
         }
         if (!query.allowedProjectIds().isEmpty()) {
-            scopes.addConditions(matchKeywords("project_id", sorted(query.allowedProjectIds())));
+            filter.addMust(matchKeywords("project_id", sorted(query.allowedProjectIds())));
         }
-        return filter.setMinShould(scopes).build();
+        return filter.build();
     }
 
     private void initializeCollection() {

@@ -26,24 +26,21 @@ class VectorContractTest {
     }
 
     @Test
-    void filterAlwaysRequiresTenantPublishedStatusAndOneAllowedScope() {
+    void filterRequiresTenantPublishedStatusAndEveryProvidedTrustedScope() {
         VectorSearchQuery query = new VectorSearchQuery(
                 "tenant-1", Set.of("space-2", "space-1"), Set.of("project-1"), vector(), 5);
 
         Filter filter = QdrantVectorIndex.buildFilter(query);
 
         assertThat(filter.getMustList()).extracting(condition -> condition.getField().getKey())
-                .containsExactly("tenant_id", "status");
+                .containsExactly("tenant_id", "status", "space_id", "project_id");
         assertThat(filter.getMust(0).getField().getMatch().getKeyword()).isEqualTo("tenant-1");
         assertThat(filter.getMust(1).getField().getMatch().getKeyword()).isEqualTo("published");
-        assertThat(filter.getMinShould().getMinCount()).isEqualTo(1);
-        assertThat(filter.getMinShould().getConditionsList())
-                .extracting(condition -> condition.getField().getKey())
-                .containsExactly("space_id", "project_id");
-        assertThat(filter.getMinShould().getConditions(0).getField().getMatch().getKeywords().getStringsList())
+        assertThat(filter.getMust(2).getField().getMatch().getKeywords().getStringsList())
                 .containsExactly("space-1", "space-2");
-        assertThat(filter.getMinShould().getConditions(1).getField().getMatch().getKeywords().getStringsList())
+        assertThat(filter.getMust(3).getField().getMatch().getKeywords().getStringsList())
                 .containsExactly("project-1");
+        assertThat(filter.hasMinShould()).isFalse();
     }
 
     @Test

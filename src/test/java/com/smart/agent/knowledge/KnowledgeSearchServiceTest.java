@@ -16,8 +16,9 @@ class KnowledgeSearchServiceTest {
 
     private final RecordingRepository repository = new RecordingRepository();
     private final RecordingVectorIndex index = new RecordingVectorIndex();
+    private final RecordingEmbeddingGateway embeddingGateway = new RecordingEmbeddingGateway();
     private final KnowledgeSearchService service = new KnowledgeSearchService(
-            repository, new StaticEmbeddingGateway(), index);
+            repository, embeddingGateway, index);
 
     @Test
     void returnsOnlyAllowedPublishedEvidenceWithStableCitationLocation() {
@@ -79,6 +80,40 @@ class KnowledgeSearchServiceTest {
     }
 
     @Test
+    void rejectsSelfClaimedKnowledgeSpaceBeforeEmbeddingOrVectorSearch() {
+        assertThatThrownBy(() -> service.search(
+                        new KnowledgeSearchQuery("Safety inspection requirements", Set.of("restricted-space"), "project-1", 5),
+                        context("tenant-1", Set.of("project-1"), Set.of("allowed-space"))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("knowledge space");
+
+        assertThat(embeddingGateway.embedCalls).isZero();
+        assertThat(index.lastQuery).isNull();
+    }
+
+    @Test
+    void passesOnlyTrustedKnowledgeSpaceSubsetToVectorSearch() {
+        service.search(
+                new KnowledgeSearchQuery(
+                        "Safety inspection requirements", Set.of("space-1", "restricted-space"), "project-1", 5),
+                context("tenant-1", Set.of("project-1"), Set.of("space-1")));
+
+        assertThat(index.lastQuery.allowedSpaceIds()).containsExactly("space-1");
+    }
+
+    @Test
+    void rejectsMissingKnowledgeReadPermissionBeforeEmbeddingOrVectorSearch() {
+        assertThatThrownBy(() -> service.search(
+                        query(5),
+                        context("tenant-1", Set.of("project-1"), Set.of("space-1"), Set.of("project:read"))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("knowledge:read");
+
+        assertThat(embeddingGateway.embedCalls).isZero();
+        assertThat(index.lastQuery).isNull();
+    }
+
+    @Test
     void returnsNoMoreThanRequestedTopKWhenIndexOverReturns() {
         for (int number = 1; number <= 3; number++) {
             String suffix = Integer.toString(number);
@@ -113,7 +148,17 @@ class KnowledgeSearchServiceTest {
     }
 
     private static AgentUserContext context(String tenantId, Set<String> projectIds) {
-        return new AgentUserContext(tenantId, "user-1", "identity-1", Set.of("knowledge:read"), projectIds);
+        return context(tenantId, projectIds, Set.of("space-1"));
+    }
+
+    private static AgentUserContext context(String tenantId, Set<String> projectIds, Set<String> knowledgeSpaceIds) {
+        return context(tenantId, projectIds, knowledgeSpaceIds, Set.of("knowledge:read"));
+    }
+
+    private static AgentUserContext context(
+            String tenantId, Set<String> projectIds, Set<String> knowledgeSpaceIds, Set<String> permissions) {
+        return new AgentUserContext(
+                tenantId, "user-1", "identity-1", permissions, projectIds, knowledgeSpaceIds);
     }
 
     private static VectorHit hit(
@@ -191,9 +236,12 @@ class KnowledgeSearchServiceTest {
         }
     }
 
-    private static final class StaticEmbeddingGateway implements EmbeddingGateway {
+    private static final class RecordingEmbeddingGateway implements EmbeddingGateway {
+        private int embedCalls;
+
         @Override
         public List<Float> embed(String text) {
+            embedCalls++;
             return List.of(0.25f, 0.75f);
         }
 
