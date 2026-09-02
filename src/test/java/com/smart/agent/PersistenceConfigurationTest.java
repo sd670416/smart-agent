@@ -6,11 +6,15 @@ import com.smart.agent.conversation.ConversationService;
 import com.smart.agent.conversation.JpaConversationRepository;
 import com.smart.agent.run.AgentRunService;
 import com.smart.agent.run.JpaAgentRunRepository;
+import com.smart.agent.tool.ToolExecutor;
+import com.smart.agent.tool.ToolRegistry;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.FilterType;
 import org.springframework.context.annotation.Import;
 
 class PersistenceConfigurationTest {
@@ -37,8 +41,31 @@ class PersistenceConfigurationTest {
         });
     }
 
+    @Test
+    void enablesToolExecutorWithPersistenceEvenWhenItsDefinitionIsRegisteredFirst() {
+        contextRunner.withPropertyValues("agent.persistence.enabled=true").run(context ->
+                assertThat(context).hasSingleBean(ToolExecutor.class));
+    }
+
+    @Test
+    void disablesToolExecutorWhenPersistenceIsDisabled() {
+        contextRunner.withPropertyValues("agent.persistence.enabled=false").run(context ->
+                assertThat(context).doesNotHaveBean(ToolExecutor.class));
+    }
+
     @Configuration(proxyBeanMethods = false)
-    @Import({ConversationService.class, AgentRunService.class, JpaConversationRepository.class, JpaAgentRunRepository.class})
+    @ComponentScan(
+            basePackageClasses = ToolExecutor.class,
+            useDefaultFilters = false,
+            includeFilters = @ComponentScan.Filter(
+                    type = FilterType.ASSIGNABLE_TYPE,
+                    classes = {ToolRegistry.class, ToolExecutor.class}))
+    @Import({
+        ConversationService.class,
+        AgentRunService.class,
+        JpaConversationRepository.class,
+        JpaAgentRunRepository.class
+    })
     static class PersistenceBeans {
         @Bean
         EntityManager entityManager() {
