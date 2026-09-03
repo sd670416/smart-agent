@@ -1,11 +1,16 @@
 package com.smart.agent.run;
 
 import com.smart.agent.conversation.ConversationRepository;
+import com.smart.agent.conversation.Conversation;
+import com.smart.agent.conversation.Message;
 import com.smart.agent.tool.ToolExecutionSummary;
 import java.util.Objects;
+import java.util.List;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.ObjectProvider;
 
 @Service
 @ConditionalOnProperty(prefix = "agent.persistence", name = "enabled", havingValue = "true", matchIfMissing = true)
@@ -15,10 +20,23 @@ public class AgentRunService {
 
     private final AgentRunRepository agentRunRepository;
     private final ConversationRepository conversationRepository;
+    private final AgentRunStepRepository stepRepository;
 
     public AgentRunService(AgentRunRepository agentRunRepository, ConversationRepository conversationRepository) {
+        this(agentRunRepository, conversationRepository, (AgentRunStepRepository) null);
+    }
+
+    @Autowired
+    public AgentRunService(AgentRunRepository agentRunRepository, ConversationRepository conversationRepository,
+            ObjectProvider<AgentRunStepRepository> stepRepository) {
+        this(agentRunRepository, conversationRepository, stepRepository.getIfAvailable());
+    }
+
+    public AgentRunService(AgentRunRepository agentRunRepository, ConversationRepository conversationRepository,
+            AgentRunStepRepository stepRepository) {
         this.agentRunRepository = agentRunRepository;
         this.conversationRepository = conversationRepository;
+        this.stepRepository = stepRepository;
     }
 
     @Transactional
@@ -65,6 +83,61 @@ public class AgentRunService {
         if (safeErrorCode != null) run.recordSafeError(safeErrorCode);
         return agentRunRepository.save(run);
     }
+
+    @Transactional
+    public void recordStep(String tenantId, String userId, String runId, String type,
+            String safeInputSummary, String safeOutputSummary) {
+        if (stepRepository == null) return;
+        List<AgentRunStep> existing = stepRepository.findByTenantIdAndUserIdAndRunIdOrderBySequence(
+                tenantId, userId, runId);
+        stepRepository.save(AgentRunStep.completed(tenantId, userId, runId, existing.size() + 1L,
+                requireText(type, "type"), safeInputSummary, safeOutputSummary));
+    }
+
+    @Transactional
+    public Completion completeWithAssistant(String tenantId, String userId, String conversationId, String runId,
+            AgentRunStatus expected, String content, int inputTokens, int outputTokens,
+            String safeModelInput, String safeModelOutput) {
+        Conversation conversation = conversationRepository.findByIdAndTenantIdAndUserId(
+                tenantId, userId, conversationId)
+                .orElseThrow(() -> new IllegalArgumentException("Conversation not found: " + conversationId));
+        AgentRun run = agentRunRepository.findByIdAndTenantIdAndUserId(tenantId, userId, runId)
+                .orElseThrow(() -> new IllegalArgumentException("Agent run not found: " + runId));
+        if (run.status() != expected) throw new IllegalStateException("Unexpected run status");
+        Message message = conversation.append(Message.Role.ASSISTANT, content);
+        run.recordUsage(inputTokens, outputTokens);
+        run.transition(AgentRunStatus.COMPLETED);
+        conversationRepository.save(conversation);
+        agentRunRepository.save(run);
+        if (stepRepository != null) {
+            List<AgentRunStep> existing = stepRepository.findByTenantIdAndUserIdAndRunIdOrderBySequence(
+                    tenantId, userId, runId);
+            stepRepository.save(AgentRunStep.completed(tenantId, userId, runId, existing.size() + 1L,
+                    "MODEL", safeModelInput, safeModelOutput));
+        }
+        return new Completion(run, message);
+    }
+
+    @Transactional
+    public AgentRun finishTerminal(String tenantId, String userId, String runId, AgentRunStatus expected,
+            AgentRunStatus terminal, String safeErrorCode) {
+        AgentRun run = agentRunRepository.findByIdAndTenantIdAndUserId(tenantId, userId, runId)
+                .orElseThrow(() -> new IllegalArgumentException("Agent run not found: " + runId));
+        if (run.status() != expected) throw new IllegalStateException("Unexpected run status");
+        if (safeErrorCode != null) run.recordSafeError(safeErrorCode);
+        run.transition(terminal);
+        AgentRun saved = agentRunRepository.save(run);
+        if (stepRepository != null) {
+            List<AgentRunStep> existing = stepRepository.findByTenantIdAndUserIdAndRunIdOrderBySequence(
+                    tenantId, userId, runId);
+            stepRepository.save(AgentRunStep.completed(tenantId, userId, runId, existing.size() + 1L,
+                    "TERMINAL", null, "{\"status\":\"" + terminal.name() + "\",\"errorCode\":"
+                            + (safeErrorCode == null ? "null" : "\"" + safeErrorCode + "\"") + "}"));
+        }
+        return saved;
+    }
+
+    public record Completion(AgentRun run, Message message) {}
 
     private static String requireText(String value, String fieldName) {
         if (value == null || value.isBlank()) {

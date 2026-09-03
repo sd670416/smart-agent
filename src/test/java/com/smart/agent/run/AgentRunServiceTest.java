@@ -115,6 +115,15 @@ class AgentRunServiceTest {
                     .map(AgentRunSnapshot::restore);
         }
 
+        @Override
+        public java.util.List<AgentRun> findByTenantIdAndUserIdAndConversationId(
+                String tenantId, String userId, String conversationId) {
+            return runs.values().stream().filter(run -> run.tenantId().equals(tenantId))
+                    .filter(run -> run.userId().equals(userId))
+                    .filter(run -> run.conversationId().equals(conversationId))
+                    .map(AgentRunSnapshot::restore).toList();
+        }
+
         int saveCount() {
             return saveCount;
         }

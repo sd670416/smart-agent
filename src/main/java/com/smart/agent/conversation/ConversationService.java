@@ -29,6 +29,12 @@ public class ConversationService {
         return message;
     }
 
+    @Transactional(readOnly = true)
+    public Conversation find(String tenantId, String userId, String conversationId) {
+        return conversationRepository.findByIdAndTenantIdAndUserId(tenantId, userId, conversationId)
+                .orElseThrow(() -> new IllegalArgumentException("Conversation not found: " + conversationId));
+    }
+
     private static String requireText(String value, String fieldName) {
         if (value == null || value.isBlank()) {
             throw new IllegalArgumentException(fieldName + " must not be blank");

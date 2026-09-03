@@ -40,9 +40,13 @@ public class JpaAgentRunRepository implements AgentRunRepository {
     }
 
     @Override
-    public List<AgentRun> findByConversationId(String conversationId) {
+    public List<AgentRun> findByTenantIdAndUserIdAndConversationId(
+            String tenantId, String userId, String conversationId) {
         return entityManager.createQuery(
-                        "select r from AgentRun r where r.conversationId = :conversationId", AgentRun.class)
+                        "select r from AgentRun r where r.tenantId = :tenantId and r.userId = :userId "
+                                + "and r.conversationId = :conversationId", AgentRun.class)
+                .setParameter("tenantId", tenantId)
+                .setParameter("userId", userId)
                 .setParameter("conversationId", conversationId)
                 .getResultList();
     }

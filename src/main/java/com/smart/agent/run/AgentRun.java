@@ -26,7 +26,7 @@ public class AgentRun {
                     AgentRunStatus.GENERATING, AgentRunStatus.FAILED, AgentRunStatus.CANCELLED),
             AgentRunStatus.TOOL_SELECTING, Set.of(AgentRunStatus.TOOL_EXECUTING, AgentRunStatus.FAILED,
                     AgentRunStatus.CANCELLED),
-            AgentRunStatus.TOOL_EXECUTING, Set.of(AgentRunStatus.RETRIEVING, AgentRunStatus.GENERATING,
+            AgentRunStatus.TOOL_EXECUTING, Set.of(AgentRunStatus.TOOL_SELECTING, AgentRunStatus.RETRIEVING, AgentRunStatus.GENERATING,
                     AgentRunStatus.FAILED, AgentRunStatus.CANCELLED, AgentRunStatus.TIMEOUT,
                     AgentRunStatus.PERMISSION_DENIED),
             AgentRunStatus.RETRIEVING, Set.of(AgentRunStatus.GENERATING, AgentRunStatus.FAILED,
@@ -109,11 +109,19 @@ public class AgentRun {
     }
 
     public void transition(AgentRunStatus next) {
-        if (!ALLOWED.getOrDefault(status, Set.of()).contains(next)) {
+        boolean forcedTerminal = (next == AgentRunStatus.CANCELLED || next == AgentRunStatus.TIMEOUT)
+                && !isTerminal(status);
+        if (!forcedTerminal && !ALLOWED.getOrDefault(status, Set.of()).contains(next)) {
             throw new IllegalStateException("Invalid agent run transition from " + status + " to " + next);
         }
         status = next;
         updatedAt = Instant.now();
+    }
+
+    private static boolean isTerminal(AgentRunStatus value) {
+        return value == AgentRunStatus.COMPLETED || value == AgentRunStatus.FAILED
+                || value == AgentRunStatus.CANCELLED || value == AgentRunStatus.TIMEOUT
+                || value == AgentRunStatus.PERMISSION_DENIED;
     }
 
     public String id() {

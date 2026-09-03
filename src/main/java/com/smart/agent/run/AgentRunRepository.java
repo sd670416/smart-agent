@@ -8,7 +8,5 @@ public interface AgentRunRepository {
 
     Optional<AgentRun> findByIdAndTenantIdAndUserId(String tenantId, String userId, String id);
 
-    default List<AgentRun> findByConversationId(String conversationId) {
-        return List.of();
-    }
+    List<AgentRun> findByTenantIdAndUserIdAndConversationId(String tenantId, String userId, String conversationId);
 }

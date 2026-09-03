@@ -21,7 +21,7 @@ public class LocalDeterministicModelGateway implements ModelGateway {
                     "MODEL_INSTRUCTION_VERSION_UNSUPPORTED", "Model instruction version is not supported"));
         }
         String question = request.redactedConversationMessages().getLast().content();
-        if (PROJECT_OVERVIEW_QUESTION.equals(question) && allowsProjectOverview(request)) {
+        if (question.startsWith(PROJECT_OVERVIEW_QUESTION) && allowsProjectOverview(request)) {
             return Flux.just(
                     new ModelEvent.ToolRequested(
                             "local-" + request.runId(), "project.getOverview", "{\"projectId\":\"project-1\"}"),

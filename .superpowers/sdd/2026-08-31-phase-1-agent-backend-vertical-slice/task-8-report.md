@@ -36,3 +36,37 @@
 ## Deferred environment checks
 
 - Docker/Testcontainers and external Qdrant checks remain opt-in/environment-dependent and were not required by this task's default suite.
+
+## Fix round 1 — streaming lifecycle hardening
+
+### Recovery and RED evidence
+
+- Recovered the interrupted 467-line working diff and the three untracked `AgentRunStep` files without reverting or rewriting it.
+- `mvn -q '-Dtest=ChatControllerIT,AgentRunServiceTest' test` initially failed: the citation scenario incorrectly caused the test gateway to request a project tool without `project:read`, proving capability routing was not represented faithfully in the integration fixture.
+- Replacing the unbounded sink directly with `OverflowStrategy.ERROR` produced a real `OverflowException` before Spring MVC established demand. The resulting GREEN design retains producer buffering only behind a 256-event bounded backpressure queue.
+- Moving persistence behind the run deadline exposed Reactor's prohibition on `block()` from the parallel scheduler. Publishing model callbacks on `boundedElastic` made the absolute-deadline persistence boundary safe.
+- A compile RED caught the exact `ModelRequest.allowedToolSpecifications()` contract and another compile RED caught a non-effectively-final audit variable; both were corrected before rerunning tests.
+
+### Review findings resolved
+
+- **C1 cancellation linearization:** completion, failure, and cancellation now serialize on one terminal lock. Cancellation disposes the current model subscription, wins only from a non-terminal state, and prevents subsequent model events, tool result audit, assistant message, or terminal success emission.
+- **C2 absolute 90-second deadline:** run creation, user append, status transitions, knowledge retrieval/audit, tool execution/audit, model streaming, and atomic completion all consume the same absolute budget. Any budget expiry maps to `AGENT_RUN_TIMEOUT` / `TIMEOUT`; terminal persistence remains allowed so the timeout itself is durable.
+- **C3 structured audit:** `ai_run_step` now stores scoped MODEL, KNOWLEDGE_SEARCH, TOOL, and TERMINAL steps. Tool steps include safe key, risk, outcome, duration, and result size; model steps include every completed turn's token usage, including tool-request turns. Raw prompts, evidence, tool results, and provider error details are excluded.
+- **I1 incremental SSE:** every `TextDelta` is forwarded as it arrives; model events are no longer collected before emission. Active subscriptions are cancellable.
+- **I2 multiple tools:** all `ToolRequested` events in a turn execute in arrival order under the global five-call cap, after recording that turn's `Completed` usage.
+- **I3 atomic terminal persistence:** assistant append, final usage, MODEL audit step, and COMPLETED transition share one transaction; failure/cancellation use transactional terminal methods. `message_end` is emitted only after the transaction succeeds. A persistence-failure integration test proves no false success or assistant message is emitted.
+- **I4 untrusted tool provenance:** tool results enter the next request with an explicit `UNTRUSTED_TOOL_RESULT` provenance label and instruction boundary, reinforced by the trusted system instruction catalog.
+- **I5 capability routing:** project tools are supplied only for project/current-page questions and only after server-side permission filtering; signed page context is injected as trusted context. Knowledge routing remains keyword/capability gated and project/space scoped by the server context.
+- **I6 scoped reads:** the unscoped/default-empty `findByConversationId` contract was removed. Production and tests use tenant + user + conversation scope.
+- **I7 production-semantics tests:** coverage now proves first delta precedes completion, multi-tool ordering and accumulated non-zero tokens, cancellation before and during model generation, absence of post-cancel persistence, absolute knowledge deadline, structured safe audit, and completion-persistence failure behavior.
+- **Minor:** provider failures now map to stable `AGENT_MODEL_TIMEOUT` or `AGENT_MODEL_FAILED`; orchestration, tool, and persistence failures remain distinct. SSE backpressure is capped at 256 queued events and answer content remains capped at 64 KiB.
+
+### Database compatibility
+
+- Existing committed V3 was left unchanged to preserve Flyway checksums. New V4 adds nullable `ai_run_step.user_id`, backfills it from `ai_run`, then enforces `NOT NULL` and creates the scoped index.
+
+### GREEN verification
+
+- `mvn -q '-Dtest=ChatControllerIT,AgentRunServiceTest' test`: pass (19 tests after the final fix set).
+- `mvn -q test`: pass (96 default Docker-independent tests, 0 failures/errors/skips).
+- `git diff --check`: pass; only Git's existing LF-to-CRLF notices were printed.
