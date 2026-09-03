@@ -25,10 +25,12 @@
 ```powershell
 Copy-Item .env.example .env
 docker compose --env-file .env -f compose.dev.yml up -d
-mvn spring-boot:run "-Dspring-boot.run.profiles=local"
 mvn test
-mvn -DskipTests package
+mvn spring-boot:run "-Dspring-boot.run.profiles=local"
+Invoke-RestMethod http://localhost:8080/actuator/health
 ```
+
+完整的本地启动、健康检查和密钥处理说明见 [本地开发运行手册](docs/runbooks/local-development.md)；索引重建说明见 [Qdrant 重建运行手册](docs/runbooks/qdrant-rebuild.md)。
 
 `.env` 文件不会由 PowerShell 自动导出为进程环境变量。Spring Boot 本地 profile 已能直接读取它；如果 Maven 插件或其他 JVM 子进程也必须收到这些变量，请在当前 PowerShell 窗口中执行下面的导入，再启动应用：
 

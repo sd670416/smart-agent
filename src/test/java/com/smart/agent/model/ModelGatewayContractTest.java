@@ -46,6 +46,34 @@ class ModelGatewayContractTest {
     }
 
     @Test
+    void localGatewayTurnsProjectToolResultIntoDeterministicBusinessFactWithUsage() {
+        ModelRequest toolResultRequest = new ModelRequest(
+                "run-local-result",
+                "v1",
+                List.of(
+                        new ModelRequest.ConversationMessage("user", "查询项目 project-1 概况"),
+                        new ModelRequest.ConversationMessage("assistant", "Requested permitted tool project.getOverview"),
+                        new ModelRequest.ToolResultMessage("call-1", "project.getOverview",
+                                "{\"projectId\":\"project-1\",\"projectName\":\"项目 project-1\","
+                                        + "\"status\":\"IN_PROGRESS\",\"progress\":0.42}")),
+                List.of(),
+                List.of());
+
+        List<ModelEvent> events = eventsOf(new LocalDeterministicModelGateway(), toolResultRequest);
+
+        assertThat(events).hasSize(2);
+        assertThat(events.getFirst()).isEqualTo(new ModelEvent.TextDelta(
+                "本地模型: 项目 project-1 当前状态为 IN_PROGRESS，完成进度为 42%。"));
+        assertThat(events.getLast()).satisfies(event -> {
+            assertThat(event).isInstanceOf(ModelEvent.Completed.class);
+            ModelEvent.Completed completed = (ModelEvent.Completed) event;
+            assertThat(completed.text()).contains("项目 project-1", "IN_PROGRESS", "42%");
+            assertThat(completed.inputTokens()).isPositive();
+            assertThat(completed.outputTokens()).isPositive();
+        });
+    }
+
+    @Test
     void openAiGatewayStreamsTextDeltasAndTokenMetadata() {
         ModelGateway gateway = new OpenAiCompatibleModelGateway(streamingModel(handler -> {
             handler.onPartialResponse("项目");

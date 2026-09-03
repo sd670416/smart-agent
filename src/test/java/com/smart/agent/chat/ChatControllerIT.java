@@ -651,8 +651,13 @@ class ChatControllerIT {
         }
 
         @Bean
-        ChatController chatController(ChatOrchestrator orchestrator) {
-            return new ChatController(orchestrator);
+        ChatSseUseCase chatSseUseCase(ChatOrchestrator orchestrator) {
+            return new ChatSseUseCase(orchestrator);
+        }
+
+        @Bean
+        ChatController chatController(ChatSseUseCase chat) {
+            return new ChatController(chat);
         }
     }
 

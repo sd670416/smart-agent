@@ -28,4 +28,9 @@ class ChatConfiguration {
                 conversationService, runService, modelGateway, toolRegistry, toolExecutor, objectMapper,
                 knowledgeSearchService.getIfAvailable());
     }
+
+    @Bean
+    ChatSseUseCase chatSseUseCase(ChatOrchestrator orchestrator) {
+        return new ChatSseUseCase(orchestrator);
+    }
 }
