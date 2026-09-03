@@ -40,3 +40,10 @@ DONE_WITH_CONCERNS. Architecture and default Maven verification are green. The D
 ## Concerns
 
 - Phase 1 cannot be declared fully accepted until `mvn clean verify -Dagent.it.acceptance=true` runs against an available Docker/Testcontainers environment and the native Compose configuration command succeeds.
+
+## Review fix round 1
+
+- Independent review found that four SSE assertions in `AcceptanceIT` searched for backslash-escaped JSON quotes even though `WebTestClient` returns the response data with ordinary JSON quotes. The existing random-port `ChatControllerIT` response assertions provided the observed production format.
+- Corrected the four event-type literals for `tool_start`, `citation`, `message_delta`, and `message_end`.
+- Focused verification `mvn -q "-Dtest=ArchitectureTest,ChatControllerIT" test` exited 0.
+- The Docker-backed acceptance path remains deferred, so this fix is verified against the real HTTP SSE format and compilation/default lifecycle but is not claimed as an executed container acceptance run.

@@ -100,13 +100,13 @@ class AcceptanceIT {
         List<String> tenantOneEvents = stream(tenantOneConversation.id(), signedToken(
                 "tenant-1", "user-1", Set.of("project:read", "knowledge:read"), Set.of("project-1"), Set.of("space-1")));
 
-        assertThat(tenantOneEvents).anyMatch(event -> event.contains("\\\"type\\\":\\\"tool_start\\\"")
+        assertThat(tenantOneEvents).anyMatch(event -> event.contains("\"type\":\"tool_start\"")
                 && event.contains("project.getOverview"));
-        assertThat(tenantOneEvents).anyMatch(event -> event.contains("\\\"type\\\":\\\"citation\\\"")
+        assertThat(tenantOneEvents).anyMatch(event -> event.contains("\"type\":\"citation\"")
                 && event.contains("项目安全检查制度") && event.contains(tenantOneDocumentId));
-        assertThat(tenantOneEvents).anyMatch(event -> event.contains("\\\"type\\\":\\\"message_delta\\\"")
+        assertThat(tenantOneEvents).anyMatch(event -> event.contains("\"type\":\"message_delta\"")
                 && event.contains("项目 project-1 当前状态为 IN_PROGRESS，完成进度为 42%"));
-        assertThat(tenantOneEvents.getLast()).contains("\\\"type\\\":\\\"message_end\\\"");
+        assertThat(tenantOneEvents.getLast()).contains("\"type\":\"message_end\"");
 
         AgentRun tenantOneRun = onlyRun("tenant-1", "user-1", tenantOneConversation.id());
         assertThat(tenantOneRun.status()).isEqualTo(AgentRunStatus.COMPLETED);
