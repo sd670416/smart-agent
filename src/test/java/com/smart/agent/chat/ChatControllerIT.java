@@ -29,8 +29,11 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.IntStream;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -44,12 +47,14 @@ import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.Disposable;
 import org.springframework.http.MediaType;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.when;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
@@ -212,7 +217,8 @@ class ChatControllerIT {
         assertThat(run.status()).isEqualTo(AgentRunStatus.COMPLETED);
         assertThat(stepRepository.findByTenantIdAndUserIdAndRunIdOrderBySequence(
                 "tenant-1", "user-1", run.id())).extracting(AgentRunStep::type)
-                .containsExactly("MODEL", "TOOL", "TOOL", "MODEL");
+                .containsExactly("MODEL", "TOOL", "TOOL", "MODEL", "TERMINAL");
+        assertThat(scenarioModelGateway.sawTypedToolResult()).isTrue();
     }
 
     @Test
@@ -310,6 +316,103 @@ class ChatControllerIT {
         assertThat(events.getLast().type()).isEqualTo("error");
         assertThat(events.getLast().code()).isEqualTo("AGENT_PERSISTENCE_FAILED");
         assertThat(events.getLast().text()).doesNotContain("database detail");
+        assertThat(conversationService.find("tenant-1", "user-1", conversationId).messages())
+                .extracting(com.smart.agent.conversation.Message::role)
+                .containsExactly(com.smart.agent.conversation.Message.Role.USER);
+    }
+
+    @Test
+    void cancellationAtToolStartWinsBeforeToolInvocationAndLeavesNoToolAudit() {
+        AtomicInteger invocations = new AtomicInteger();
+        ToolExecutor observedExecutor = spy(toolExecutor);
+        doAnswer(invocation -> {
+            invocations.incrementAndGet();
+            return invocation.callRealMethod();
+        }).when(observedExecutor).execute(any(), any(), any());
+        ChatOrchestrator observed = new ChatOrchestrator(conversationService, agentRunService,
+                scenarioModelGateway, toolRegistry, observedExecutor, objectMapper, knowledgeSearchService);
+
+        observed.stream(new ChatCommand(conversationId, "multi-tools", null),
+                        new AgentUserContext("tenant-1", "user-1", "identity-1", Set.of("project:read"),
+                                Set.of("project-1"), Set.of()), "trace-tool-race")
+                .takeUntil(event -> event.type().equals("tool_start"))
+                .blockLast(Duration.ofSeconds(5));
+
+        awaitStatus(AgentRunStatus.CANCELLED);
+        assertThat(invocations).hasValue(0);
+        AgentRun run = runRepository.findByTenantIdAndUserIdAndConversationId(
+                "tenant-1", "user-1", conversationId).getFirst();
+        assertThat(run.toolExecutionSummaries()).isEmpty();
+        assertThat(conversationService.find("tenant-1", "user-1", conversationId).messages())
+                .extracting(com.smart.agent.conversation.Message::role)
+                .containsExactly(com.smart.agent.conversation.Message.Role.USER);
+    }
+
+    @Test
+    void callbackAuditBudgetExpiryPersistsTimeoutInsteadOfLeavingGenerating() {
+        stepRepository.delayNextSave(Duration.ofMillis(150));
+        ChatOrchestrator shortBudget = new ChatOrchestrator(conversationService, agentRunService,
+                scenarioModelGateway, toolRegistry, toolExecutor, objectMapper, knowledgeSearchService,
+                Duration.ofMillis(40));
+
+        List<ChatEvent> events = shortBudget.stream(new ChatCommand(conversationId, "multi-tools", null),
+                        new AgentUserContext("tenant-1", "user-1", "identity-1", Set.of("project:read"),
+                                Set.of("project-1"), Set.of()), "trace-callback-timeout")
+                .collectList().block(Duration.ofSeconds(5));
+
+        assertThat(events.getLast().code()).isEqualTo("AGENT_RUN_TIMEOUT");
+        assertThat(runRepository.findByTenantIdAndUserIdAndConversationId(
+                "tenant-1", "user-1", conversationId).getFirst().status()).isEqualTo(AgentRunStatus.TIMEOUT);
+    }
+
+    @Test
+    void cancellationInterruptsAnAlreadyStartedToolAndSuppressesItsResult() throws Exception {
+        CountDownLatch toolStarted = new CountDownLatch(1);
+        CountDownLatch toolInterrupted = new CountDownLatch(1);
+        AtomicInteger invocations = new AtomicInteger();
+        ToolExecutor blockingExecutor = spy(toolExecutor);
+        doAnswer(invocation -> {
+            invocations.incrementAndGet();
+            toolStarted.countDown();
+            try {
+                new CountDownLatch(1).await();
+                return null;
+            } catch (InterruptedException interrupted) {
+                toolInterrupted.countDown();
+                Thread.currentThread().interrupt();
+                return Map.of("ignored", true);
+            }
+        }).when(blockingExecutor).execute(any(), any(), any());
+        ChatOrchestrator observed = new ChatOrchestrator(conversationService, agentRunService,
+                scenarioModelGateway, toolRegistry, blockingExecutor, objectMapper, knowledgeSearchService);
+
+        Disposable subscription = observed.stream(new ChatCommand(conversationId, "multi-tools", null),
+                        new AgentUserContext("tenant-1", "user-1", "identity-1", Set.of("project:read"),
+                                Set.of("project-1"), Set.of()), "trace-active-tool-cancel")
+                .subscribe();
+        assertThat(toolStarted.await(2, TimeUnit.SECONDS)).isTrue();
+        subscription.dispose();
+
+        assertThat(toolInterrupted.await(2, TimeUnit.SECONDS)).isTrue();
+        awaitStatus(AgentRunStatus.CANCELLED);
+        assertThat(invocations).hasValue(1);
+        AgentRun run = runRepository.findByTenantIdAndUserIdAndConversationId(
+                "tenant-1", "user-1", conversationId).getFirst();
+        assertThat(run.toolExecutionSummaries()).isEmpty();
+        assertThat(conversationService.find("tenant-1", "user-1", conversationId).messages())
+                .extracting(com.smart.agent.conversation.Message::role)
+                .containsExactly(com.smart.agent.conversation.Message.Role.USER);
+    }
+
+    @Test
+    void rejectsCompletedOnlyAnswerOverUtf8LimitBeforeDeltaOrPersistence() {
+        List<String> events = stream("oversized-completed", Set.of(), Set.of());
+
+        assertThat(events).noneMatch(event -> event.contains("message_delta"));
+        assertThat(events.getLast()).contains("AGENT_ANSWER_TOO_LARGE");
+        AgentRun run = runRepository.findByTenantIdAndUserIdAndConversationId(
+                "tenant-1", "user-1", conversationId).getFirst();
+        assertThat(run.status()).isEqualTo(AgentRunStatus.FAILED);
         assertThat(conversationService.find("tenant-1", "user-1", conversationId).messages())
                 .extracting(com.smart.agent.conversation.Message::role)
                 .containsExactly(com.smart.agent.conversation.Message.Role.USER);
@@ -418,6 +521,7 @@ class ChatControllerIT {
             private final AtomicInteger subscriptions = new AtomicInteger();
             private final AtomicBoolean disposed = new AtomicBoolean();
             private final AtomicBoolean completedEmitted = new AtomicBoolean();
+            private final AtomicBoolean typedToolResult = new AtomicBoolean();
 
             @Override
             public Flux<ModelEvent> stream(ModelRequest request) {
@@ -452,7 +556,12 @@ class ChatControllerIT {
                             new ModelEvent.Completed("", 7, 8));
                 }
                 if (question.equals("multi-tools")) {
+                    typedToolResult.set(request.redactedConversationMessages().getLast()
+                            instanceof ModelRequest.ToolResultMessage);
                     return Flux.just(new ModelEvent.TextDelta("answer"), new ModelEvent.Completed("answer", 3, 4));
+                }
+                if (question.equals("oversized-completed")) {
+                    return Flux.just(new ModelEvent.Completed("x".repeat(64 * 1024 + 1), 1, 1));
                 }
                 if (question.contains("project-1") && request.redactedConversationMessages().size() == 1
                         && request.allowedToolSpecifications().stream()
@@ -466,7 +575,10 @@ class ChatControllerIT {
             int subscriptions() { return subscriptions.get(); }
             boolean disposed() { return disposed.get(); }
             boolean completedEmitted() { return completedEmitted.get(); }
-            void reset() { subscriptions.set(0); disposed.set(false); completedEmitted.set(false); }
+            boolean sawTypedToolResult() { return typedToolResult.get(); }
+            void reset() {
+                subscriptions.set(0); disposed.set(false); completedEmitted.set(false); typedToolResult.set(false);
+            }
         }
 
         @Bean
@@ -545,12 +657,20 @@ class ChatControllerIT {
 
     static final class InMemoryAgentRunStepRepository implements AgentRunStepRepository {
         private final List<AgentRunStep> steps = new java.util.concurrent.CopyOnWriteArrayList<>();
+        private final AtomicReference<Duration> nextDelay = new AtomicReference<>();
 
         @Override
         public AgentRunStep save(AgentRunStep step) {
+            Duration delay = nextDelay.getAndSet(null);
+            if (delay != null) {
+                try { Thread.sleep(delay); }
+                catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); }
+            }
             steps.add(step);
             return step;
         }
+
+        void delayNextSave(Duration delay) { nextDelay.set(delay); }
 
         @Override
         public List<AgentRunStep> findByTenantIdAndUserIdAndRunIdOrderBySequence(

@@ -70,3 +70,26 @@
 - `mvn -q '-Dtest=ChatControllerIT,AgentRunServiceTest' test`: pass (19 tests after the final fix set).
 - `mvn -q test`: pass (96 default Docker-independent tests, 0 failures/errors/skips).
 - `git diff --check`: pass; only Git's existing LF-to-CRLF notices were printed.
+
+## Fix round 2 — close chat lifecycle races
+
+### RED evidence
+
+- `mvn -q '-Dtest=ModelGatewayContractTest,ChatControllerIT' test` first failed to compile because the required typed `ModelRequest.ToolResultMessage` did not exist.
+- After introducing the wished-for typed test API, the same focused command produced four behavioral failures: cancellation at `tool_start` still wrote `project.getOverview:INVALID_INPUT`; successful runs lacked `TERMINAL`; callback audit deadline expiry timed out the test while leaving the stream open; and a 65,537-byte Completed-only answer was emitted as `message_delta`.
+- The failing callback test also logged an `onErrorDropped` timeout from `finishModelTurn`, directly reproducing the completion-callback escape path.
+
+### GREEN changes
+
+- **C1:** tool execution permission is now acquired under the same terminal lock as cancellation. A cancellable future is installed before releasing the lock. Cancellation before permission prevents invocation; cancellation after start cancels/interrupts the future and all result audit, follow-up model work, and assistant persistence remain suppressed.
+- **C2:** model item and completion callbacks now have guarded entry points that map every runtime exception. Any nested absolute-budget timeout reaches `fail(AGENT_RUN_TIMEOUT, TIMEOUT)` and persists the terminal state.
+- **C3:** atomic successful completion now appends a safe `TERMINAL/COMPLETED` step immediately after the final MODEL step in the same transaction.
+- **I4:** model history now uses the sealed `ConversationEntry` contract. Tool output is a typed `ToolResultMessage(callId, toolKey, content)`, never a user/system message. The OpenAI-compatible gateway maps it to LangChain4j `ToolExecutionResultMessage` with an explicit untrusted provenance boundary; the local gateway recognizes the type without echoing its content.
+- **I7:** deterministic tests cover cancellation immediately at tool start, interruption after actual tool invocation, absence of tool audit/assistant messages, callback-audit deadline expiry, successful terminal-step ordering, typed adapter role mapping, and oversized Completed-only output.
+- **Minor2:** final answer selection now performs a UTF-8 64 KiB check before fallback delta emission or atomic persistence, closing the Completed-only bypass.
+
+### Verification
+
+- `mvn -q '-Dtest=ModelGatewayContractTest,ChatControllerIT,AgentRunServiceTest' test`: pass (41 focused tests).
+- `mvn -q test`: pass (101 default Docker-independent tests, 0 failures/errors/skips).
+- `git diff --check`: pass; only existing LF-to-CRLF notices were printed.

@@ -9,6 +9,7 @@ import dev.langchain4j.data.message.ChatMessage;
 import dev.langchain4j.data.message.ChatMessageType;
 import dev.langchain4j.data.message.SystemMessage;
 import dev.langchain4j.data.message.UserMessage;
+import dev.langchain4j.data.message.ToolExecutionResultMessage;
 import dev.langchain4j.model.chat.StreamingChatModel;
 import dev.langchain4j.model.chat.request.ChatRequest;
 import dev.langchain4j.model.chat.response.ChatResponse;
@@ -132,6 +133,29 @@ class ModelGatewayContractTest {
 
         assertThat(captured.get().messages()).extracting(ChatMessage::type)
                 .containsExactly(ChatMessageType.SYSTEM, ChatMessageType.USER, ChatMessageType.AI);
+    }
+
+    @Test
+    void openAiGatewayMapsTypedToolResultOutsideUserAndSystemInstructionChannels() {
+        AtomicReference<ChatRequest> captured = new AtomicReference<>();
+        ModelGateway gateway = capturingModel(captured, handler -> handler.onCompleteResponse(response("done", 1, 1)));
+        ModelRequest history = new ModelRequest(
+                "run-tool-result", "v1",
+                List.of(
+                        new ModelRequest.ConversationMessage("user", "question"),
+                        new ModelRequest.ConversationMessage("assistant", "requested tool"),
+                        new ModelRequest.ToolResultMessage("call-1", "project.getOverview", "{\"name\":\"x\"}")),
+                List.of(), List.of());
+
+        eventsOf(gateway, history);
+
+        assertThat(captured.get().messages()).extracting(ChatMessage::type)
+                .containsExactly(ChatMessageType.SYSTEM, ChatMessageType.USER, ChatMessageType.AI,
+                        ChatMessageType.TOOL_EXECUTION_RESULT);
+        ToolExecutionResultMessage result = (ToolExecutionResultMessage) captured.get().messages().getLast();
+        assertThat(result.id()).isEqualTo("call-1");
+        assertThat(result.toolName()).isEqualTo("project.getOverview");
+        assertThat(result.text()).contains("UNTRUSTED_TOOL_RESULT", "provenance=tool");
     }
 
     @Test

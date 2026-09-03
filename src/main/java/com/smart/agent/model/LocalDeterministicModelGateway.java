@@ -20,7 +20,12 @@ public class LocalDeterministicModelGateway implements ModelGateway {
             return Flux.just(new ModelEvent.Failed(
                     "MODEL_INSTRUCTION_VERSION_UNSUPPORTED", "Model instruction version is not supported"));
         }
-        String question = request.redactedConversationMessages().getLast().content();
+        ModelRequest.ConversationEntry last = request.redactedConversationMessages().getLast();
+        if (last instanceof ModelRequest.ToolResultMessage) {
+            String answer = "本地模型: 工具调用已完成。";
+            return Flux.just(new ModelEvent.TextDelta(answer), new ModelEvent.Completed(answer, 0, 0));
+        }
+        String question = last.content();
         if (question.startsWith(PROJECT_OVERVIEW_QUESTION) && allowsProjectOverview(request)) {
             return Flux.just(
                     new ModelEvent.ToolRequested(

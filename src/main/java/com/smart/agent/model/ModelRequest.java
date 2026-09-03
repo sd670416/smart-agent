@@ -7,7 +7,7 @@ import java.util.Set;
 public record ModelRequest(
         String runId,
         String systemInstructionVersion,
-        List<ConversationMessage> redactedConversationMessages,
+        List<ConversationEntry> redactedConversationMessages,
         List<AllowedToolSpecification> allowedToolSpecifications,
         List<RetrievedEvidence> retrievedEvidence) {
 
@@ -29,7 +29,11 @@ public record ModelRequest(
                 List.of());
     }
 
-    public record ConversationMessage(String role, String content) {
+    public sealed interface ConversationEntry permits ConversationMessage, ToolResultMessage {
+        String content();
+    }
+
+    public record ConversationMessage(String role, String content) implements ConversationEntry {
         private static final Set<String> ALLOWED_ROLES = Set.of("user", "assistant");
 
         public ConversationMessage {
@@ -38,6 +42,14 @@ public record ModelRequest(
             if (!ALLOWED_ROLES.contains(role)) {
                 throw new IllegalArgumentException("role must be user or assistant");
             }
+        }
+    }
+
+    public record ToolResultMessage(String callId, String toolKey, String content) implements ConversationEntry {
+        public ToolResultMessage {
+            requireText(callId, "callId");
+            requireText(toolKey, "toolKey");
+            requireText(content, "content");
         }
     }
 

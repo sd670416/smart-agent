@@ -112,8 +112,11 @@ public class AgentRunService {
         if (stepRepository != null) {
             List<AgentRunStep> existing = stepRepository.findByTenantIdAndUserIdAndRunIdOrderBySequence(
                     tenantId, userId, runId);
-            stepRepository.save(AgentRunStep.completed(tenantId, userId, runId, existing.size() + 1L,
+            long modelSequence = existing.size() + 1L;
+            stepRepository.save(AgentRunStep.completed(tenantId, userId, runId, modelSequence,
                     "MODEL", safeModelInput, safeModelOutput));
+            stepRepository.save(AgentRunStep.completed(tenantId, userId, runId, modelSequence + 1L,
+                    "TERMINAL", null, "{\"status\":\"COMPLETED\"}"));
         }
         return new Completion(run, message);
     }
