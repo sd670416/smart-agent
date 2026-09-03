@@ -12,6 +12,9 @@ public record IndexedChunk(
         String content,
         List<Float> vector) {
 
+    /** Payload value used for documents that apply to every project in their knowledge space. */
+    public static final String GLOBAL_PROJECT_ID = "__global__";
+
     public IndexedChunk {
         chunkId = requireText(chunkId, "chunkId");
         documentId = requireText(documentId, "documentId");

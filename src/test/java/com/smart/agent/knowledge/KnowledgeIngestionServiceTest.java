@@ -38,6 +38,15 @@ class KnowledgeIngestionServiceTest {
     }
 
     @Test
+    void rejectsReservedGlobalProjectSentinelFromExternalIngestion() {
+        assertThatThrownBy(() -> new IngestTextCommand(
+                        "tenant-1", "space-1", "org-1", IndexedChunk.GLOBAL_PROJECT_ID,
+                        "Safety guide", "text", "published", "user-1"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("reserved");
+    }
+
+    @Test
     void refusesToPersistWhenNoTransactionIsActive() {
         assertThatThrownBy(() -> service.ingestText(command("valid text")))
                 .isInstanceOf(IllegalStateException.class)

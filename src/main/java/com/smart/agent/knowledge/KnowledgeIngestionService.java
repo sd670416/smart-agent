@@ -57,7 +57,8 @@ public class KnowledgeIngestionService {
                     chunkId, null, draft.sectionTitle());
             chunks.add(chunk);
             indexedChunks.add(new IndexedChunk(
-                    chunk.vectorPointId(), documentId, command.tenantId(), command.spaceId(), command.projectId(),
+                    chunk.vectorPointId(), documentId, command.tenantId(), command.spaceId(),
+                    command.projectId() == null ? IndexedChunk.GLOBAL_PROJECT_ID : command.projectId(),
                     command.status(), chunk.content(), embeddingGateway.embed(chunk.content())));
         }
         KnowledgeDocument document = new KnowledgeDocument(

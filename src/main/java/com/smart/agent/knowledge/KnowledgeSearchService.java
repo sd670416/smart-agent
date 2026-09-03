@@ -51,7 +51,8 @@ public class KnowledgeSearchService {
 
         List<Float> vector = embeddingGateway.embed(query.query());
         VectorSearchQuery vectorQuery = new VectorSearchQuery(
-                context.tenantId(), trustedSpaceIds, Set.of(query.projectId()), vector, query.topK());
+                context.tenantId(), trustedSpaceIds,
+                Set.of(query.projectId(), IndexedChunk.GLOBAL_PROJECT_ID), vector, query.topK());
         List<VectorHit> hits = vectorIndex.search(vectorQuery).stream().limit(query.topK()).toList();
         if (hits.isEmpty()) {
             return List.of();

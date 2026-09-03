@@ -40,7 +40,8 @@ class KnowledgeSearchServiceTest {
             assertThat(citation.citationToken()).matches("[0-9a-f]{64}");
         });
         assertThat(index.lastQuery).isEqualTo(new VectorSearchQuery(
-                "tenant-1", Set.of("space-1"), Set.of("project-1"), List.of(0.25f, 0.75f), 5));
+                "tenant-1", Set.of("space-1"), Set.of("project-1", IndexedChunk.GLOBAL_PROJECT_ID),
+                List.of(0.25f, 0.75f), 5));
     }
 
     @Test
@@ -99,6 +100,21 @@ class KnowledgeSearchServiceTest {
                 context("tenant-1", Set.of("project-1"), Set.of("space-1")));
 
         assertThat(index.lastQuery.allowedSpaceIds()).containsExactly("space-1");
+        assertThat(index.lastQuery.allowedProjectIds()).containsExactlyInAnyOrder("project-1", IndexedChunk.GLOBAL_PROJECT_ID);
+    }
+
+    @Test
+    void returnsTrustedGlobalDocumentForCurrentProjectWithoutWideningTenantOrSpaceScope() {
+        repository.add(publishedChunk("global-chunk", "global-doc", "global-version", "tenant-1", "space-1", null,
+                "Global safety guide", 1, "General", "Global safety evidence"));
+        index.hits = List.of(hit("global-chunk", "global-doc", 0.9, "vector payload", "tenant-1", "space-1",
+                IndexedChunk.GLOBAL_PROJECT_ID));
+
+        assertThat(service.search(query(5), context("tenant-1", Set.of("project-1"))))
+                .extracting(KnowledgeCitation::documentId)
+                .containsExactly("global-doc");
+        assertThat(index.lastQuery.allowedProjectIds())
+                .containsExactlyInAnyOrder("project-1", IndexedChunk.GLOBAL_PROJECT_ID);
     }
 
     @Test

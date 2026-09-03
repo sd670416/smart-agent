@@ -141,9 +141,7 @@ public final class QdrantVectorIndex implements VectorIndex {
         payload.put("document_id", value(chunk.documentId()));
         payload.put("tenant_id", value(chunk.tenantId()));
         payload.put("space_id", value(chunk.spaceId()));
-        if (chunk.projectId() != null) {
-            payload.put("project_id", value(chunk.projectId()));
-        }
+        payload.put("project_id", value(projectPayloadValue(chunk.projectId())));
         payload.put("status", value(chunk.status()));
         payload.put("content", value(chunk.content()));
         return Points.PointStruct.newBuilder()
@@ -151,6 +149,10 @@ public final class QdrantVectorIndex implements VectorIndex {
                 .putAllPayload(payload)
                 .setVectors(io.qdrant.client.VectorsFactory.vectors(chunk.vector()))
                 .build();
+    }
+
+    static String projectPayloadValue(String projectId) {
+        return projectId == null ? IndexedChunk.GLOBAL_PROJECT_ID : projectId;
     }
 
     private void requireDimension(List<Float> vector) {

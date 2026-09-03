@@ -6,6 +6,9 @@ public record KnowledgeSearchQuery(String query, Set<String> allowedSpaceIds, St
     public KnowledgeSearchQuery {
         query = requireText(query, "query");
         projectId = requireText(projectId, "projectId");
+        if (IndexedChunk.GLOBAL_PROJECT_ID.equals(projectId)) {
+            throw new IllegalArgumentException("projectId uses a reserved global sentinel");
+        }
         if (allowedSpaceIds == null || allowedSpaceIds.isEmpty()
                 || allowedSpaceIds.stream().anyMatch(value -> value == null || value.isBlank())) {
             throw new IllegalArgumentException("allowedSpaceIds must contain at least one non-blank value");

@@ -2,7 +2,7 @@
 
 ## 启动
 
-在项目根目录执行。`.env` 仅用于本地开发，不要提交到版本库，也不要把真实密钥写入 `.env.example`、日志或测试代码。
+在项目根目录执行。`.env` 仅用于本地开发，不要提交到版本库，也不要把真实密钥写入 `.env.example`、日志或测试代码。复制后立即生成并替换 `AGENT_LOCAL_CONTEXT_SECRET` 的随机本地值；示例值只是非敏感占位符，生产环境必须由 secret manager 注入。
 
 ```powershell
 Copy-Item .env.example .env
@@ -17,6 +17,14 @@ Invoke-RestMethod http://localhost:8080/actuator/health
 ## 配置和密钥
 
 `AGENT_DB_PASSWORD`、`AGENT_QDRANT_API_KEY` 和模型 API key 只放在本地 `.env` 或部署平台的密钥管理中。启动日志、异常响应和提交内容不得包含这些值。若需要让 Maven 子进程读取 `.env`，请在当前 PowerShell 窗口导入变量后再启动；关闭窗口后变量应失效。
+
+本地上下文签名还必须配置 `AGENT_LOCAL_CONTEXT_SECRET`。可使用密码管理器或下列命令生成随机值，并只保存到被 `.gitignore` 忽略的 `.env`；生产环境禁止使用模板占位符。
+
+```powershell
+$bytes = [Security.Cryptography.RandomNumberGenerator]::GetBytes(32)
+$secret = [Convert]::ToBase64String($bytes)
+"AGENT_LOCAL_CONTEXT_SECRET=$secret"
+```
 
 ```powershell
 Get-Content .env |

@@ -9,6 +9,8 @@ import com.smart.agent.run.JpaAgentRunRepository;
 import com.smart.agent.tool.ToolExecutor;
 import com.smart.agent.tool.ToolRegistry;
 import jakarta.persistence.EntityManager;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Bean;
@@ -51,6 +53,14 @@ class PersistenceConfigurationTest {
     void disablesToolExecutorWhenPersistenceIsDisabled() {
         contextRunner.withPropertyValues("agent.persistence.enabled=false").run(context ->
                 assertThat(context).doesNotHaveBean(ToolExecutor.class));
+    }
+
+    @Test
+    void localEnvironmentTemplateDeclaresAReplaceableContextSecret() throws Exception {
+        String template = Files.readString(Path.of(".env.example"));
+
+        assertThat(template).contains("AGENT_LOCAL_CONTEXT_SECRET=");
+        assertThat(template).contains("change-this-local-context-secret-before-sharing");
     }
 
     @Configuration(proxyBeanMethods = false)

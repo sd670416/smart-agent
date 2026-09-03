@@ -23,12 +23,17 @@ class VectorContractTest {
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new VectorSearchQuery("tenant-1", Set.of("space-1"), Set.of(), vector(), 101))
                 .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new KnowledgeSearchQuery(
+                "safety", Set.of("space-1"), IndexedChunk.GLOBAL_PROJECT_ID, 5))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("reserved");
     }
 
     @Test
     void filterRequiresTenantPublishedStatusAndEveryProvidedTrustedScope() {
         VectorSearchQuery query = new VectorSearchQuery(
-                "tenant-1", Set.of("space-2", "space-1"), Set.of("project-1"), vector(), 5);
+                "tenant-1", Set.of("space-2", "space-1"),
+                Set.of("project-1", IndexedChunk.GLOBAL_PROJECT_ID), vector(), 5);
 
         Filter filter = QdrantVectorIndex.buildFilter(query);
 
@@ -39,8 +44,14 @@ class VectorContractTest {
         assertThat(filter.getMust(2).getField().getMatch().getKeywords().getStringsList())
                 .containsExactly("space-1", "space-2");
         assertThat(filter.getMust(3).getField().getMatch().getKeywords().getStringsList())
-                .containsExactly("project-1");
+                .containsExactly(IndexedChunk.GLOBAL_PROJECT_ID, "project-1");
         assertThat(filter.hasMinShould()).isFalse();
+    }
+
+    @Test
+    void mapsUnscopedIndexedDocumentsToTheGlobalProjectSentinel() {
+        assertThat(QdrantVectorIndex.projectPayloadValue(null)).isEqualTo(IndexedChunk.GLOBAL_PROJECT_ID);
+        assertThat(QdrantVectorIndex.projectPayloadValue("project-1")).isEqualTo("project-1");
     }
 
     @Test

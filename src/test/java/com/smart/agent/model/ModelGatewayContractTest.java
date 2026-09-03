@@ -46,6 +46,13 @@ class ModelGatewayContractTest {
     }
 
     @Test
+    void modelRequestRejectsEmptyConversation() {
+        assertThatIllegalArgumentException().isThrownBy(() -> new ModelRequest(
+                "run-empty", "v1", List.of(), List.of(), List.of()))
+                .withMessageContaining("conversation");
+    }
+
+    @Test
     void localGatewayTurnsProjectToolResultIntoDeterministicBusinessFactWithUsage() {
         ModelRequest toolResultRequest = new ModelRequest(
                 "run-local-result",

@@ -14,6 +14,9 @@ public record ModelRequest(
     public ModelRequest {
         requireText(runId, "runId");
         requireText(systemInstructionVersion, "systemInstructionVersion");
+        if (redactedConversationMessages == null || redactedConversationMessages.isEmpty()) {
+            throw new IllegalArgumentException("conversation must contain at least one message");
+        }
         redactedConversationMessages = List.copyOf(redactedConversationMessages);
         allowedToolSpecifications = List.copyOf(allowedToolSpecifications);
         retrievedEvidence = List.copyOf(retrievedEvidence);

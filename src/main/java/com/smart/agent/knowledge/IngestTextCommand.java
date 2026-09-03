@@ -19,6 +19,9 @@ public record IngestTextCommand(
         spaceId = requireText(spaceId, "spaceId");
         organizationId = optionalText(organizationId, "organizationId");
         projectId = optionalText(projectId, "projectId");
+        if (IndexedChunk.GLOBAL_PROJECT_ID.equals(projectId)) {
+            throw new IllegalArgumentException("projectId uses a reserved global sentinel");
+        }
         title = requireText(title, "title");
         if (text == null) {
             throw new IllegalArgumentException("text must not be null");
