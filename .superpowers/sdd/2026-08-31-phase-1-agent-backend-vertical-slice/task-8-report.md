@@ -93,3 +93,24 @@
 - `mvn -q '-Dtest=ModelGatewayContractTest,ChatControllerIT,AgentRunServiceTest' test`: pass (41 focused tests).
 - `mvn -q test`: pass (101 default Docker-independent tests, 0 failures/errors/skips).
 - `git diff --check`: pass; only existing LF-to-CRLF notices were printed.
+
+## Fix round 3 — linearize tool audit cancellation
+
+### RED
+
+- Added a deterministic serialization gate that pauses after the tool has returned but before tool audit begins. A spy on the scoped run audit service observes whether the TOOL summary is attempted.
+- `mvn -q '-Dtest=ChatControllerIT#cancellationAfterToolReturnsButBeforeAuditSuppressesEveryLaterSideEffect' test` failed because `toolAuditAttempted` became true after cancellation, reproducing the post-return race without relying on timing sleeps.
+
+### GREEN
+
+- Result serialization remains outside the terminal lock, so no long-running external tool call is performed while holding it.
+- After serialization, the final cancellation check, safe tool summary persistence, structured TOOL step, typed assistant/tool-result history append, and `tool_result` event now form one terminal-lock commit section.
+- If cancellation wins before that section, every later side effect is skipped. If the tool commit section wins, cancellation waits and observes the already-linearized commit.
+- Tool audit persistence failures have a dedicated wrapper and map to `AGENT_PERSISTENCE_FAILED` or `AGENT_RUN_TIMEOUT`; they no longer fall through as invalid tool input, and synchronized cleanup remains reentrant/deadlock-free.
+- The deterministic GREEN test asserts: no tool summary, only MODEL then cancellation TERMINAL steps, exactly one model call, no assistant message, and terminal `CANCELLED`.
+
+### Verification
+
+- `mvn -q '-Dtest=ChatControllerIT,AgentRunServiceTest' test`: pass (24 focused tests).
+- `mvn -q test`: pass (102 default Docker-independent tests, 0 failures/errors/skips).
+- `git diff --check`: pass; only existing LF-to-CRLF notices were printed.

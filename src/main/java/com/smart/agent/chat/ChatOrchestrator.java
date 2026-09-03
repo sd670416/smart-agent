@@ -359,25 +359,42 @@ public class ChatOrchestrator {
                 String serializedResult = objectMapper.writeValueAsString(result);
                 long durationMillis = Duration.ofNanos(System.nanoTime() - toolStarted).toMillis();
                 String risk = toolRegistry.require(request.toolKey()).risk().name();
-                run = withinBudget(() -> runService.recordAudit(context.tenantId(), context.userId(), run.id(), 0, 0,
-                        request.toolKey() + ":" + risk + ":SUCCEEDED:" + durationMillis + ":"
-                                + serializedResult.getBytes(java.nio.charset.StandardCharsets.UTF_8).length, null, null));
-                withinBudget(() -> { runService.recordStep(context.tenantId(), context.userId(), run.id(), "TOOL",
-                        "{\"toolKey\":\"" + request.toolKey() + "\",\"risk\":\"" + risk + "\"}",
-                        "{\"outcome\":\"SUCCEEDED\",\"durationMillis\":" + durationMillis
-                                + ",\"resultSizeBytes\":"
-                                + serializedResult.getBytes(java.nio.charset.StandardCharsets.UTF_8).length + "}"); return null; });
-                messages.add(new ModelRequest.ConversationMessage(
-                        "assistant", "Requested permitted tool " + request.toolKey() + " with call " + request.callId()));
-                messages.add(new ModelRequest.ToolResultMessage(
-                        request.callId(), request.toolKey(), serializedResult));
-                emit(ChatEvent.toolResult(run.id(), traceId, request.toolKey()));
+                int resultSize = serializedResult.getBytes(java.nio.charset.StandardCharsets.UTF_8).length;
+                synchronized (terminalLock) {
+                    if (terminated.get() || sink.isCancelled()) return false;
+                    try {
+                        run = withinBudget(() -> runService.recordAudit(
+                                context.tenantId(), context.userId(), run.id(), 0, 0,
+                                request.toolKey() + ":" + risk + ":SUCCEEDED:" + durationMillis + ":" + resultSize,
+                                null, null));
+                        withinBudget(() -> {
+                            runService.recordStep(context.tenantId(), context.userId(), run.id(), "TOOL",
+                                    "{\"toolKey\":\"" + request.toolKey() + "\",\"risk\":\"" + risk + "\"}",
+                                    "{\"outcome\":\"SUCCEEDED\",\"durationMillis\":" + durationMillis
+                                            + ",\"resultSizeBytes\":" + resultSize + "}");
+                            return null;
+                        });
+                    } catch (RuntimeException persistenceFailure) {
+                        throw new ToolAuditPersistenceException(persistenceFailure);
+                    }
+                    messages.add(new ModelRequest.ConversationMessage(
+                            "assistant", "Requested permitted tool " + request.toolKey()
+                                    + " with call " + request.callId()));
+                    messages.add(new ModelRequest.ToolResultMessage(
+                            request.callId(), request.toolKey(), serializedResult));
+                    emit(ChatEvent.toolResult(run.id(), traceId, request.toolKey()));
+                }
                 return true;
             } catch (AgentException exception) {
                 if (terminated.get()) return false;
                 if (!recordFailedTool(request.toolKey(), safeToolOutcome(exception), toolStarted)) return false;
                 fail(exception.code(), exception.status().value() == 403
                         ? AgentRunStatus.PERMISSION_DENIED : AgentRunStatus.FAILED);
+                return false;
+            } catch (ToolAuditPersistenceException exception) {
+                if (terminated.get()) return false;
+                fail(isTimeout(exception) ? "AGENT_RUN_TIMEOUT" : "AGENT_PERSISTENCE_FAILED",
+                        isTimeout(exception) ? AgentRunStatus.TIMEOUT : AgentRunStatus.FAILED);
                 return false;
             } catch (RuntimeException exception) {
                 if (terminated.get()) return false;
@@ -582,5 +599,9 @@ public class ChatOrchestrator {
             }
             return false;
         }
+    }
+
+    private static final class ToolAuditPersistenceException extends RuntimeException {
+        private ToolAuditPersistenceException(Throwable cause) { super(cause); }
     }
 }

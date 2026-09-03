@@ -405,6 +405,51 @@ class ChatControllerIT {
     }
 
     @Test
+    void cancellationAfterToolReturnsButBeforeAuditSuppressesEveryLaterSideEffect() throws Exception {
+        CountDownLatch resultReturned = new CountDownLatch(1);
+        CountDownLatch releaseSerialization = new CountDownLatch(1);
+        CountDownLatch serializationFinished = new CountDownLatch(1);
+        CountDownLatch toolAuditAttempted = new CountDownLatch(1);
+        ObjectMapper gatedMapper = spy(objectMapper);
+        doAnswer(invocation -> {
+            resultReturned.countDown();
+            assertThat(releaseSerialization.await(2, TimeUnit.SECONDS)).isTrue();
+            Object serialized = invocation.callRealMethod();
+            serializationFinished.countDown();
+            return serialized;
+        }).when(gatedMapper).writeValueAsString(any());
+        AgentRunService observedRuns = spy(agentRunService);
+        doAnswer(invocation -> {
+            if (invocation.getArgument(5) != null) toolAuditAttempted.countDown();
+            return invocation.callRealMethod();
+        }).when(observedRuns).recordAudit(any(), any(), any(), anyInt(), anyInt(), any(), any(), any());
+        ChatOrchestrator observed = new ChatOrchestrator(conversationService, observedRuns,
+                scenarioModelGateway, toolRegistry, toolExecutor, gatedMapper, knowledgeSearchService);
+
+        Disposable subscription = observed.stream(new ChatCommand(conversationId, "multi-tools", null),
+                        new AgentUserContext("tenant-1", "user-1", "identity-1", Set.of("project:read"),
+                                Set.of("project-1"), Set.of()), "trace-post-tool-cancel")
+                .subscribe();
+        assertThat(resultReturned.await(2, TimeUnit.SECONDS)).isTrue();
+        subscription.dispose();
+        releaseSerialization.countDown();
+        assertThat(serializationFinished.await(2, TimeUnit.SECONDS)).isTrue();
+        assertThat(toolAuditAttempted.await(500, TimeUnit.MILLISECONDS)).isFalse();
+
+        awaitStatus(AgentRunStatus.CANCELLED);
+        AgentRun run = runRepository.findByTenantIdAndUserIdAndConversationId(
+                "tenant-1", "user-1", conversationId).getFirst();
+        assertThat(run.toolExecutionSummaries()).isEmpty();
+        assertThat(stepRepository.findByTenantIdAndUserIdAndRunIdOrderBySequence(
+                "tenant-1", "user-1", run.id())).extracting(AgentRunStep::type)
+                .containsExactly("MODEL", "TERMINAL");
+        assertThat(scenarioModelGateway.modelCalls()).isOne();
+        assertThat(conversationService.find("tenant-1", "user-1", conversationId).messages())
+                .extracting(com.smart.agent.conversation.Message::role)
+                .containsExactly(com.smart.agent.conversation.Message.Role.USER);
+    }
+
+    @Test
     void rejectsCompletedOnlyAnswerOverUtf8LimitBeforeDeltaOrPersistence() {
         List<String> events = stream("oversized-completed", Set.of(), Set.of());
 
@@ -522,9 +567,11 @@ class ChatControllerIT {
             private final AtomicBoolean disposed = new AtomicBoolean();
             private final AtomicBoolean completedEmitted = new AtomicBoolean();
             private final AtomicBoolean typedToolResult = new AtomicBoolean();
+            private final AtomicInteger modelCalls = new AtomicInteger();
 
             @Override
             public Flux<ModelEvent> stream(ModelRequest request) {
+                modelCalls.incrementAndGet();
                 String question = request.redactedConversationMessages().getFirst().content();
                 if (question.equals("malformed-tool")) {
                     return Flux.just(new ModelEvent.ToolRequested("bad", "project.getOverview", "not-json"));
@@ -576,8 +623,10 @@ class ChatControllerIT {
             boolean disposed() { return disposed.get(); }
             boolean completedEmitted() { return completedEmitted.get(); }
             boolean sawTypedToolResult() { return typedToolResult.get(); }
+            int modelCalls() { return modelCalls.get(); }
             void reset() {
                 subscriptions.set(0); disposed.set(false); completedEmitted.set(false); typedToolResult.set(false);
+                modelCalls.set(0);
             }
         }
 
