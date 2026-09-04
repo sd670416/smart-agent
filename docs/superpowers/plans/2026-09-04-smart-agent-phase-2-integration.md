@@ -341,17 +341,17 @@ git commit -m "feat: issue verified oss direct uploads"
 - `KnowledgeScope`：`TENANT`、`PROJECT`；`PROJECT` 必须恰好要求一个项目 ID。
 - 文档版本只能从 `DRAFT` 发布；不受支持或已隔离的内容不能发布。
 
-- [ ] **步骤 1：编写生命周期与授权测试**
+- [x] **步骤 1：编写生命周期与授权测试**
 
 覆盖租户/项目创建校验、上传关联、版本递增、仅草稿可发布、原已发布版本的原子替换、先禁用后删除行为、租户隔离以及禁止非管理员调用。
 
-- [ ] **步骤 2：运行测试并确认缺少管理类型时失败**
+- [x] **步骤 2：运行测试并确认缺少管理类型时失败**
 
 运行： `mvn -Dtest=KnowledgeManagementServiceTest,KnowledgeManagementControllerTest test`
 
 预期：编译失败。
 
-- [ ] **步骤 3：实现仓储与生命周期服务**
+- [x] **步骤 3：实现仓储与生命周期服务**
 
 ```java
 public interface KnowledgeManagementService {
@@ -365,11 +365,11 @@ public interface KnowledgeManagementService {
 
 在 MySQL 中以事务方式变更状态。仅在权威状态不再允许检索后发出清理工作。
 
-- [ ] **步骤 4：实现 Agent 内部控制器和 BFF 控制器**
+- [x] **步骤 4：实现 Agent 内部控制器和 BFF 控制器**
 
 对空间和文档列表使用分页。返回稳定状态、解析器错误码、活动版本、创建者和时间戳；绝不返回 OSS 凭据。
 
-- [ ] **步骤 5：运行回归测试套件**
+- [x] **步骤 5：运行回归测试套件**
 
 在 `agent` 中运行： `mvn test`
 
@@ -377,7 +377,7 @@ public interface KnowledgeManagementService {
 
 预期：所有非 Docker 测试通过。
 
-- [ ] **步骤 6：在两个仓库中提交**
+- [x] **步骤 6：在两个仓库中提交**
 
 Agent 提交： `feat: manage versioned knowledge documents`
 

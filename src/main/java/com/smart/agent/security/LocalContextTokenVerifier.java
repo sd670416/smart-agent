@@ -67,6 +67,9 @@ public class LocalContextTokenVerifier implements ContextTokenVerifier {
                     payload.tenantId(),
                     payload.userId(),
                     payload.identityId(),
+                    copyOrEmpty(payload.permissions()),
+                    copyOrEmpty(payload.projectIds()),
+                    Set.of(),
                     Set.copyOf(payload.roleIds()));
         } catch (AgentException exception) {
             throw exception;
@@ -97,11 +100,19 @@ public class LocalContextTokenVerifier implements ContextTokenVerifier {
         return value == null || value.isBlank();
     }
 
+    private static Set<String> copyOrEmpty(List<String> values) {
+        if (values == null) return Set.of();
+        if (values.stream().anyMatch(LocalContextTokenVerifier::isBlank)) throw AgentException.unauthorized();
+        return Set.copyOf(values);
+    }
+
     private record TokenPayload(
             String tenantId,
             String userId,
             String identityId,
             List<String> roleIds,
+            List<String> permissions,
+            List<String> projectIds,
             long issuedAt,
             long expiresAt,
             String nonce) {

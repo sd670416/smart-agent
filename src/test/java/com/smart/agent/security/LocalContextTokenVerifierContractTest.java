@@ -40,17 +40,33 @@ class LocalContextTokenVerifierContractTest {
                 .isInstanceOf(AgentException.class);
     }
 
+    @Test
+    void acceptsSignedPermissionsAndProjectIds() throws Exception {
+        AgentUserContext context = verifier().verify(token(
+                List.of("role-a"), List.of("ai:knowledge:upload"), List.of("project-1"), 1700000300L));
+
+        assertThat(context.permissions()).containsExactly("ai:knowledge:upload");
+        assertThat(context.projectIds()).containsExactly("project-1");
+    }
+
     private LocalContextTokenVerifier verifier() {
         return new LocalContextTokenVerifier(new ObjectMapper(), SECRET, CLOCK);
     }
 
     private String token(List<String> roleIds, long expiresAt) throws Exception {
+        return token(roleIds, null, null, expiresAt);
+    }
+
+    private String token(List<String> roleIds, List<String> permissions, List<String> projectIds,
+            long expiresAt) throws Exception {
         ObjectMapper mapper = new ObjectMapper();
         Map<String, Object> claims = new LinkedHashMap<>();
         claims.put("tenantId", "tenant-1");
         claims.put("userId", "user-1");
         claims.put("identityId", "identity-1");
         claims.put("roleIds", roleIds);
+        if (permissions != null) claims.put("permissions", permissions);
+        if (projectIds != null) claims.put("projectIds", projectIds);
         claims.put("issuedAt", 1700000000L);
         claims.put("expiresAt", expiresAt);
         claims.put("nonce", "nonce-1");
