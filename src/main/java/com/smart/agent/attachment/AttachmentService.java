@@ -98,12 +98,17 @@ public class AttachmentService {
         return repository.save(attachment);
     }
 
+    @Transactional(readOnly = true)
+    public Attachment get(UUID id, String tenantId, String userId) {
+        return owned(id, tenantId, userId);
+    }
+
     private Attachment owned(UUID id, String tenantId, String userId) {
         if (id == null) throw new IllegalArgumentException("attachmentId must not be null");
         String tenant = Attachment.requireText(tenantId, "tenantId");
         String user = Attachment.requireText(userId, "userId");
         return repository.findByIdAndTenantIdAndUserId(id, tenant, user)
-                .orElseThrow(() -> new IllegalArgumentException("Attachment not found"));
+                .orElseThrow(AttachmentNotFoundException::new);
     }
 
     private static String safePathPart(String value, String name) {
