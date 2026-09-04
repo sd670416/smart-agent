@@ -1,6 +1,5 @@
 package com.smart.agent.ingestion;
 
-import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -16,6 +15,8 @@ import java.util.function.Supplier;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import javax.imageio.ImageIO;
+import javax.imageio.ImageReader;
+import javax.imageio.stream.ImageInputStream;
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.text.PDFTextStripper;
@@ -298,12 +299,25 @@ public final class DocumentParserRegistry {
         @Override
         public ParsedDocument parse(InputStream input, ParseLimits limits) {
             return guarded(() -> {
-                try {
-                    BufferedImage image = ImageIO.read(input);
-                    if (image == null) return new ParsedDocument(List.of(), Map.of());
-                    return new ParsedDocument(List.of(), Map.of(
-                            "image:width", Integer.toString(image.getWidth()),
-                            "image:height", Integer.toString(image.getHeight())));
+                try (ImageInputStream imageInput = ImageIO.createImageInputStream(input)) {
+                    if (imageInput == null) return new ParsedDocument(List.of(), Map.of());
+                    java.util.Iterator<ImageReader> readers = ImageIO.getImageReaders(imageInput);
+                    if (!readers.hasNext()) return new ParsedDocument(List.of(), Map.of());
+                    ImageReader reader = readers.next();
+                    try {
+                        reader.setInput(imageInput, true, true);
+                        int width = reader.getWidth(0);
+                        int height = reader.getHeight(0);
+                        if (width > limits.maxImageWidth() || height > limits.maxImageHeight()
+                                || ((long) width * height) > limits.maxImagePixels()) {
+                            throw new DocumentParseException("IMAGE_PIXEL_LIMIT", "Image pixel limit exceeded");
+                        }
+                        return new ParsedDocument(List.of(), Map.of(
+                                "image:width", Integer.toString(width),
+                                "image:height", Integer.toString(height)));
+                    } finally {
+                        reader.dispose();
+                    }
                 } catch (IOException exception) {
                     throw new DocumentParseException("PARSER_FAILED", "Image metadata parsing failed", exception);
                 }

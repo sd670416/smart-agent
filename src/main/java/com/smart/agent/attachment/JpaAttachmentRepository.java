@@ -45,7 +45,8 @@ public class JpaAttachmentRepository implements AttachmentRepository {
         }
         return entityManager.createQuery("select a from Attachment a where a.purpose = :purpose "
                         + "and a.cleanupCompletedAt is null "
-                        + "and (a.status = :expired or a.updatedAt <= :lastUsedBefore) "
+                        + "and (a.status = :expired or (a.lastUsedAt is not null and a.lastUsedAt <= :lastUsedBefore) "
+                        + "or (a.lastUsedAt is null and a.updatedAt <= :lastUsedBefore)) "
                         + "and (:afterId is null or a.id > :afterId) order by a.id", Attachment.class)
                 .setParameter("purpose", AttachmentPurpose.CHAT_ATTACHMENT)
                 .setParameter("expired", AttachmentStatus.EXPIRED)

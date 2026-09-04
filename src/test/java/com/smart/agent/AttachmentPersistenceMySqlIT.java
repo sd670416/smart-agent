@@ -88,6 +88,18 @@ class AttachmentPersistenceMySqlIT {
         insertAttachment(UUID.randomUUID(), "tenant-2", key);
     }
 
+    @Test
+    void cleanupSelectionUsesLastUsedAtInsteadOfUpdateTime() {
+        UUID recent = UUID.randomUUID();
+        String recentKey = "ai/tenant-1/chat-attachment/recent/" + recent + ".txt";
+        insertAttachment(recent, "tenant-1", recentKey);
+        jdbcTemplate.update("UPDATE ai_attachment SET last_used_at = CURRENT_TIMESTAMP(3), "
+                        + "update_time = CURRENT_TIMESTAMP(3) - INTERVAL 30 DAY WHERE id = ?", recent.toString());
+
+        assertThat(repository.findExpiredChatAttachments(Instant.now().minusSeconds(7 * 24 * 3600), null, 10))
+                .noneMatch(value -> value.id().equals(recent));
+    }
+
     private void insertAttachment(UUID id, String tenantId, String objectKey) {
         jdbcTemplate.update("INSERT INTO ai_attachment "
                         + "(id, tenant_id, user_id, purpose, original_filename, object_key, status, "

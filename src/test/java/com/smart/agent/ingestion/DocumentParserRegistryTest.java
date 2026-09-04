@@ -101,6 +101,17 @@ class DocumentParserRegistryTest {
                 .hasMessageContaining("archive entr");
     }
 
+    @Test
+    void rejectsImagesThatExceedConfiguredPixelLimits() throws Exception {
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        ImageIO.write(new BufferedImage(3, 2, BufferedImage.TYPE_INT_RGB), "png", output);
+
+        assertThatThrownBy(() -> parse("large.png", output.toByteArray(),
+                new ParseLimits(2_000_000, 20_000, 10, 1_000, 5_000_000, 2, 2, 4)))
+                .isInstanceOf(DocumentParseException.class)
+                .hasMessageContaining("pixel");
+    }
+
     private void assertParsed(String filename, byte[] bytes, DetectedContentType type) throws Exception {
         DocumentParseResult result = parse(filename, bytes, limits);
         assertThat(result.status()).isEqualTo(DocumentParseStatus.PARSED);
