@@ -1,5 +1,6 @@
 package com.smart.agent.knowledge;
 
+import com.smart.agent.ingestion.ParsedTextBlock;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -7,6 +8,7 @@ import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.UUID;
+import java.util.Objects;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -66,25 +68,82 @@ public class KnowledgeIngestionService {
                 command.projectId(), command.title(), command.status(), normalizedText, sourceChecksum,
                 PARSER_VERSION, embeddingGateway.modelKey(), command.actorId(), chunks);
         repository.save(document);
-        registerAfterCommit(documentId, indexedChunks);
+        registerAfterCommit(documentId, VectorNamespace.KNOWLEDGE, indexedChunks, true);
         return documentId;
     }
 
-    private void registerAfterCommit(String documentId, List<IndexedChunk> indexedChunks) {
+    @Transactional
+    public String ingestDocument(IngestDocumentCommand command, List<ParsedTextBlock> parsedBlocks,
+            VectorNamespace namespace) {
+        if (command == null || parsedBlocks == null || namespace == null) {
+            throw new IllegalArgumentException("command, parsedBlocks and namespace are required");
+        }
+        List<ParsedTextBlock> nonBlankBlocks = parsedBlocks.stream()
+                .filter(Objects::nonNull)
+                .filter(block -> !block.text().isBlank())
+                .toList();
+        if (nonBlankBlocks.isEmpty()) {
+            throw new IllegalArgumentException("parsedBlocks must contain text");
+        }
+        String sourceText = normalizeAndValidate(nonBlankBlocks.stream()
+                .map(ParsedTextBlock::text)
+                .collect(java.util.stream.Collectors.joining("\n\n")));
+        requireTransaction();
+
+        List<KnowledgeChunk> chunks = new ArrayList<>();
+        List<IndexedChunk> indexedChunks = new ArrayList<>();
+        int ordinal = 0;
+        for (ParsedTextBlock block : nonBlankBlocks) {
+            String normalizedBlock = block.text().replace("\r\n", "\n").replace('\r', '\n');
+            for (ChunkDraft draft : chunk(normalizedBlock)) {
+                String checksum = sha256(draft.content());
+                String chunkId = deterministicId(command.documentVersionId() + "|" + ordinal + "|" + checksum);
+                String sectionTitle = firstNonBlank(block.sectionTitle(), block.sheetName(), draft.sectionTitle());
+                KnowledgeChunk chunk = new KnowledgeChunk(
+                        chunkId, command.documentId(), command.documentVersionId(), command.tenantId(), ordinal,
+                        draft.content(), checksum, chunkId, block.pageNumber(), sectionTitle);
+                chunks.add(chunk);
+                indexedChunks.add(new IndexedChunk(
+                        chunkId, command.documentId(), command.documentVersionId(), command.tenantId(),
+                        command.spaceId(), command.projectId() == null ? IndexedChunk.GLOBAL_PROJECT_ID : command.projectId(),
+                        command.status(), command.attachmentId(), command.expiresAt(), block.pageNumber(),
+                        block.sheetName(), sectionTitle, chunk.content(), embeddingGateway.embed(chunk.content())));
+                ordinal++;
+            }
+        }
+        KnowledgeDocument document = new KnowledgeDocument(
+                command.documentId(), command.documentVersionId(), command.attachmentId(), command.tenantId(),
+                command.spaceId(), command.organizationId(), command.projectId(), command.title(), command.status(),
+                sourceText, sha256(sourceText), command.parserVersion(), embeddingGateway.modelKey(),
+                command.actorId(), chunks);
+        boolean authoritativeKnowledge = namespace == VectorNamespace.KNOWLEDGE;
+        if (authoritativeKnowledge) {
+            repository.saveManagedDocument(document);
+        }
+        registerAfterCommit(command.documentId(), namespace, indexedChunks, authoritativeKnowledge);
+        return command.documentId();
+    }
+
+    private void registerAfterCommit(String documentId, VectorNamespace namespace,
+            List<IndexedChunk> indexedChunks, boolean updateRepositoryStatus) {
         List<IndexedChunk> immutableChunks = List.copyOf(indexedChunks);
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {
                 try {
-                    vectorIndex.upsert(immutableChunks);
-                    repository.markIndexingSucceeded(documentId);
+                    vectorIndex.upsert(namespace, immutableChunks);
+                    if (updateRepositoryStatus) {
+                        repository.markIndexingSucceeded(documentId);
+                    }
                 } catch (RuntimeException exception) {
                     String code = exception instanceof VectorIndexException vectorException
                             ? vectorException.code() : "VECTOR_INDEX_UPSERT_FAILED";
-                    try {
-                        repository.markIndexingFailed(documentId, code);
-                    } catch (RuntimeException statusException) {
-                        exception.addSuppressed(statusException);
+                    if (updateRepositoryStatus) {
+                        try {
+                            repository.markIndexingFailed(documentId, code);
+                        } catch (RuntimeException statusException) {
+                            exception.addSuppressed(statusException);
+                        }
                     }
                     throw exception;
                 }
@@ -194,6 +253,13 @@ public class KnowledgeIngestionService {
 
     private static String nullToEmpty(String value) {
         return value == null ? "" : value;
+    }
+
+    private static String firstNonBlank(String... values) {
+        for (String value : values) {
+            if (value != null && !value.isBlank()) return value;
+        }
+        return null;
     }
 
     record ChunkDraft(String content, String sectionTitle) {

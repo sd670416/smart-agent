@@ -68,6 +68,14 @@ class AttachmentPersistenceMySqlIT {
                 "SELECT table_name FROM information_schema.tables WHERE table_schema = DATABASE()",
                 String.class)).contains("ai_attachment", "ai_knowledge_space", "ai_document",
                 "ai_document_version", "ai_role_knowledge_grant", "ai_citation", "ai_audit_log");
+        assertThat(jdbcTemplate.queryForList(
+                "SELECT column_name FROM information_schema.columns "
+                        + "WHERE table_schema = DATABASE() AND table_name = 'ai_attachment'",
+                String.class)).contains("cleanup_completed_at");
+        assertThat(jdbcTemplate.queryForList(
+                "SELECT index_name FROM information_schema.statistics "
+                        + "WHERE table_schema = DATABASE() AND table_name = 'ai_attachment'",
+                String.class)).contains("idx_ai_attachment_cleanup");
     }
 
     @Test

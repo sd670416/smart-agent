@@ -402,29 +402,29 @@ Boot 提交： `feat: proxy knowledge management APIs`
 - `DocumentParser.parse(InputStream, ParseLimits)` 返回带页/工作表/章节定位信息的文本块。
 - 不支持的类型转换为 `UNSUPPORTED`；可疑不匹配转换为 `QUARANTINED`。
 
-- [ ] **步骤 1：添加会失败的解析器路由测试**
+- [x] **步骤 1：添加会失败的解析器路由测试**
 
 测试 PDF、DOCX、XLSX、Markdown、TXT、常见图像检测、未知二进制文件处理、可执行文件签名隔离、扩展名与内容不匹配、解压限制以及页数/字符数限制。
 
-- [ ] **步骤 2：运行聚焦测试并确认其失败**
+- [x] **步骤 2：运行聚焦测试并确认其失败**
 
 运行： `mvn -Dtest=DocumentParserRegistryTest,DocumentIngestionJobTest test`
 
 预期：因缺少摄取类而编译失败。
 
-- [ ] **步骤 3：添加 Apache Tika 检测和专用解析器**
+- [x] **步骤 3：添加 Apache Tika 检测和专用解析器**
 
 使用流式读取和明确的最大提取字符数，将归档深度设为零，禁用嵌入资源提取和公式执行；在配置视觉模型可用前，图像仅处理元数据。
 
-- [ ] **步骤 4：将摄取流程接入现有分块、嵌入和 `VectorIndex` 合约**
+- [x] **步骤 4：将摄取流程接入现有分块、嵌入和 `VectorIndex` 合约**
 
 为已发布知识和会过期的对话附件使用独立的 Qdrant 命名空间/集合。包含租户、空间、项目、文档、版本、发布状态、附件和过期载荷字段。
 
-- [ ] **步骤 5：实现保留期清理**
+- [x] **步骤 5：实现保留期清理**
 
 以有界分页选择过期聊天附件，将其标记为 `EXPIRED`，删除临时向量，再通过供应商端口删除 OSS 对象。重试必须幂等。
 
-- [ ] **步骤 6：运行单元测试和 Qdrant 测试**
+- [x] **步骤 6：运行单元测试和 Qdrant 测试**
 
 运行： `mvn test`
 
@@ -432,7 +432,7 @@ Boot 提交： `feat: proxy knowledge management APIs`
 
 预期：单元测试通过；外部集成测试证明租户和索引相互隔离。
 
-- [ ] **步骤 7：在 `smart-agent` 中提交**
+- [x] **步骤 7：在 `smart-agent` 中提交**
 
 ```bash
 git add pom.xml src/main/java/com/smart/agent/ingestion src/main/java/com/smart/agent/attachment src/main/java/com/smart/agent/knowledge src/test/java/com/smart/agent/ingestion src/test/java/com/smart/agent/attachment

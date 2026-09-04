@@ -23,42 +23,64 @@ import java.util.concurrent.ExecutionException;
 
 public final class QdrantVectorIndex implements VectorIndex {
     private static final List<String> INDEXED_PAYLOAD_FIELDS =
-            List.of("tenant_id", "space_id", "project_id", "status");
+            List.of("tenant_id", "space_id", "project_id", "document_id", "document_version_id",
+                    "status", "attachment_id", "expires_at");
 
     private final QdrantClient client;
-    private final String collectionName;
+    private final String knowledgeCollectionName;
+    private final String attachmentCollectionName;
     private final int vectorDimension;
 
     public QdrantVectorIndex(QdrantClient client, String collectionName, int vectorDimension) {
+        this(client, collectionName, collectionName, vectorDimension);
+    }
+
+    public QdrantVectorIndex(QdrantClient client, String knowledgeCollectionName,
+            String attachmentCollectionName, int vectorDimension) {
         if (client == null) {
             throw new IllegalArgumentException("client must not be null");
         }
-        if (collectionName == null || collectionName.isBlank()) {
-            throw new IllegalArgumentException("collectionName must not be blank");
+        if (knowledgeCollectionName == null || knowledgeCollectionName.isBlank()
+                || attachmentCollectionName == null || attachmentCollectionName.isBlank()) {
+            throw new IllegalArgumentException("collection names must not be blank");
         }
         if (vectorDimension < 1) {
             throw new IllegalArgumentException("vectorDimension must be positive");
         }
         this.client = client;
-        this.collectionName = collectionName;
+        this.knowledgeCollectionName = knowledgeCollectionName;
+        this.attachmentCollectionName = attachmentCollectionName;
         this.vectorDimension = vectorDimension;
-        initializeCollection();
+        initializeCollection(knowledgeCollectionName);
+        if (!knowledgeCollectionName.equals(attachmentCollectionName)) {
+            initializeCollection(attachmentCollectionName);
+        }
     }
 
     @Override
     public void upsert(List<IndexedChunk> chunks) {
+        upsert(VectorNamespace.KNOWLEDGE, chunks);
+    }
+
+    @Override
+    public void upsert(VectorNamespace namespace, List<IndexedChunk> chunks) {
         if (chunks == null || chunks.isEmpty()) {
             return;
         }
         List<Points.PointStruct> points = chunks.stream().map(this::toPoint).toList();
-        await(client.upsertAsync(collectionName, points), "VECTOR_INDEX_UPSERT_FAILED", "Vector upsert failed");
+        await(client.upsertAsync(collection(namespace), points), "VECTOR_INDEX_UPSERT_FAILED", "Vector upsert failed");
     }
 
     @Override
     public List<VectorHit> search(VectorSearchQuery query) {
+        return search(VectorNamespace.KNOWLEDGE, query);
+    }
+
+    @Override
+    public List<VectorHit> search(VectorNamespace namespace, VectorSearchQuery query) {
         requireDimension(query.vector());
         Points.SearchPoints request = Points.SearchPoints.newBuilder()
-                .setCollectionName(collectionName)
+                .setCollectionName(collection(namespace))
                 .addAllVector(query.vector())
                 .setFilter(buildFilter(query))
                 .setLimit(query.topK())
@@ -71,11 +93,25 @@ public final class QdrantVectorIndex implements VectorIndex {
 
     @Override
     public void deleteDocument(String tenantId, String documentId) {
+        deleteDocument(VectorNamespace.KNOWLEDGE, tenantId, documentId);
+    }
+
+    @Override
+    public void deleteDocument(VectorNamespace namespace, String tenantId, String documentId) {
         Common.Filter filter = Common.Filter.newBuilder()
                 .addMust(matchKeyword("tenant_id", requireText(tenantId, "tenantId")))
                 .addMust(matchKeyword("document_id", requireText(documentId, "documentId")))
                 .build();
-        await(client.deleteAsync(collectionName, filter), "VECTOR_INDEX_DELETE_FAILED", "Vector delete failed");
+        delete(namespace, filter);
+    }
+
+    @Override
+    public void deleteAttachment(VectorNamespace namespace, String tenantId, String attachmentId) {
+        Common.Filter filter = Common.Filter.newBuilder()
+                .addMust(matchKeyword("tenant_id", requireText(tenantId, "tenantId")))
+                .addMust(matchKeyword("attachment_id", requireText(attachmentId, "attachmentId")))
+                .build();
+        delete(namespace, filter);
     }
 
     static Common.Filter buildFilter(VectorSearchQuery query) {
@@ -91,7 +127,12 @@ public final class QdrantVectorIndex implements VectorIndex {
         return filter.build();
     }
 
-    private void initializeCollection() {
+    private void delete(VectorNamespace namespace, Common.Filter filter) {
+        await(client.deleteAsync(collection(namespace), filter),
+                "VECTOR_INDEX_DELETE_FAILED", "Vector delete failed");
+    }
+
+    private void initializeCollection(String collectionName) {
         boolean exists = await(client.collectionExistsAsync(collectionName),
                 "VECTOR_INDEX_INIT_FAILED", "Vector collection lookup failed");
         if (!exists) {
@@ -117,12 +158,12 @@ public final class QdrantVectorIndex implements VectorIndex {
         }
         for (String field : INDEXED_PAYLOAD_FIELDS) {
             if (!info.getPayloadSchemaMap().containsKey(field)) {
-                createPayloadIndex(field);
+                createPayloadIndex(collectionName, field);
             }
         }
     }
 
-    private void createPayloadIndex(String field) {
+    private void createPayloadIndex(String collectionName, String field) {
         try {
             await(client.createPayloadIndexAsync(collectionName, field, Collections.PayloadSchemaType.Keyword,
                             null, true, null, null),
@@ -139,10 +180,16 @@ public final class QdrantVectorIndex implements VectorIndex {
         Map<String, JsonWithInt.Value> payload = new LinkedHashMap<>();
         payload.put("chunk_id", value(chunk.chunkId()));
         payload.put("document_id", value(chunk.documentId()));
+        payload.put("document_version_id", value(chunk.documentVersionId()));
         payload.put("tenant_id", value(chunk.tenantId()));
         payload.put("space_id", value(chunk.spaceId()));
         payload.put("project_id", value(projectPayloadValue(chunk.projectId())));
         payload.put("status", value(chunk.status()));
+        put(payload, "attachment_id", chunk.attachmentId());
+        put(payload, "expires_at", chunk.expiresAt() == null ? null : chunk.expiresAt().toString());
+        if (chunk.pageNumber() != null) payload.put("page_number", value((long) chunk.pageNumber()));
+        put(payload, "sheet_name", chunk.sheetName());
+        put(payload, "section_title", chunk.sectionTitle());
         payload.put("content", value(chunk.content()));
         return Points.PointStruct.newBuilder()
                 .setId(io.qdrant.client.PointIdFactory.id(pointUuid(chunk.chunkId())))
@@ -153,6 +200,15 @@ public final class QdrantVectorIndex implements VectorIndex {
 
     static String projectPayloadValue(String projectId) {
         return projectId == null ? IndexedChunk.GLOBAL_PROJECT_ID : projectId;
+    }
+
+    private String collection(VectorNamespace namespace) {
+        if (namespace == null) throw new IllegalArgumentException("namespace must not be null");
+        return namespace == VectorNamespace.KNOWLEDGE ? knowledgeCollectionName : attachmentCollectionName;
+    }
+
+    private static void put(Map<String, JsonWithInt.Value> payload, String key, String value) {
+        if (value != null) payload.put(key, value(value));
     }
 
     private void requireDimension(List<Float> vector) {

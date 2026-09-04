@@ -31,7 +31,8 @@ class ExternalQdrantVectorIndexIT {
 
     private QdrantClient client;
     private QdrantVectorIndex index;
-    private String collectionName;
+    private String knowledgeCollectionName;
+    private String attachmentCollectionName;
 
     @BeforeEach
     void setUp() {
@@ -44,8 +45,10 @@ class ExternalQdrantVectorIndexIT {
             builder.withApiKey(apiKey);
         }
         client = new QdrantClient(builder.build());
-        collectionName = "agent_knowledge_external_it_" + UUID.randomUUID().toString().replace("-", "");
-        index = new QdrantVectorIndex(client, collectionName, 2);
+        String suffix = UUID.randomUUID().toString().replace("-", "");
+        knowledgeCollectionName = "agent_knowledge_external_it_" + suffix;
+        attachmentCollectionName = "agent_attachment_external_it_" + suffix;
+        index = new QdrantVectorIndex(client, knowledgeCollectionName, attachmentCollectionName, 2);
     }
 
     @AfterEach
@@ -54,18 +57,23 @@ class ExternalQdrantVectorIndexIT {
             return;
         }
         try {
-            if (collectionName != null && client.collectionExistsAsync(collectionName).get()) {
-                client.deleteCollectionAsync(collectionName).get();
-            }
+            deleteCollectionIfPresent(knowledgeCollectionName);
+            deleteCollectionIfPresent(attachmentCollectionName);
         } finally {
             client.close();
+        }
+    }
+
+    private void deleteCollectionIfPresent(String collectionName) throws Exception {
+        if (collectionName != null && client.collectionExistsAsync(collectionName).get()) {
+            client.deleteCollectionAsync(collectionName).get();
         }
     }
 
     @Test
     void enforcesIsolationScopesTopKDeletionAndIdempotentReindex() {
         index.upsert(List.of(
-                chunk("allowed", "doc-a", "tenant-1", "space-1", "project-x", "published", "first", 1, 0),
+                chunk("allowed", "doc-a", "tenant-1", "space-1", "project-1", "published", "first", 1, 0),
                 chunk("project", "doc-b", "tenant-1", "space-x", "project-1", "published", "project", 0.9f, 0.1f),
                 chunk("denied", "doc-c", "tenant-1", "space-x", "project-x", "published", "denied", 0.8f, 0.2f),
                 chunk("other-tenant", "doc-d", "tenant-2", "space-1", "project-1", "published", "other", 1, 0),
@@ -75,7 +83,7 @@ class ExternalQdrantVectorIndexIT {
         assertThat(scoped).extracting(VectorHit::chunkId).containsExactly("allowed");
 
         index.upsert(List.of(chunk(
-                "allowed", "doc-a", "tenant-1", "space-1", "project-x", "published", "updated", 1, 0)));
+                "allowed", "doc-a", "tenant-1", "space-1", "project-1", "published", "updated", 1, 0)));
         assertThat(index.search(query(Set.of("space-1"), Set.of(), 10)))
                 .singleElement().satisfies(hit -> assertThat(hit.content()).isEqualTo("updated"));
 
@@ -85,6 +93,33 @@ class ExternalQdrantVectorIndexIT {
         assertThat(index.search(new VectorSearchQuery(
                 "tenant-2", Set.of("space-1"), Set.of(), List.of(1.0f, 0.0f), 10)))
                 .extracting(VectorHit::chunkId).containsExactly("other-tenant");
+    }
+
+    @Test
+    void isolatesKnowledgeAndTemporaryAttachmentCollections() {
+        IndexedChunk knowledge = chunk(
+                "knowledge", "doc-shared", "tenant-1", "space-1", "project-1",
+                "published", "knowledge content", 1, 0);
+        IndexedChunk attachment = new IndexedChunk(
+                "attachment", "doc-shared", "version-1", "tenant-1", "space-1", "project-1",
+                "published", "attachment-1", java.time.Instant.parse("2026-09-06T00:00:00Z"),
+                null, null, null, "attachment content", List.of(1.0f, 0.0f));
+
+        index.upsert(VectorNamespace.KNOWLEDGE, List.of(knowledge));
+        index.upsert(VectorNamespace.CHAT_ATTACHMENT, List.of(attachment));
+
+        assertThat(index.search(VectorNamespace.KNOWLEDGE, query(Set.of("space-1"), Set.of("project-1"), 10)))
+                .extracting(VectorHit::chunkId).containsExactly("knowledge");
+        assertThat(index.search(VectorNamespace.CHAT_ATTACHMENT,
+                query(Set.of("space-1"), Set.of("project-1"), 10)))
+                .extracting(VectorHit::chunkId).containsExactly("attachment");
+
+        index.deleteAttachment(VectorNamespace.CHAT_ATTACHMENT, "tenant-1", "attachment-1");
+
+        assertThat(index.search(VectorNamespace.CHAT_ATTACHMENT,
+                query(Set.of("space-1"), Set.of("project-1"), 10))).isEmpty();
+        assertThat(index.search(VectorNamespace.KNOWLEDGE, query(Set.of("space-1"), Set.of("project-1"), 10)))
+                .extracting(VectorHit::chunkId).containsExactly("knowledge");
     }
 
     private static IndexedChunk chunk(String chunkId, String documentId, String tenantId, String spaceId,

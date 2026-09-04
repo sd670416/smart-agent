@@ -63,6 +63,9 @@ public class Attachment {
     @Column(name = "last_used_at")
     private Instant lastUsedAt;
 
+    @Column(name = "cleanup_completed_at")
+    private Instant cleanupCompletedAt;
+
     @Column(name = "create_time", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -145,13 +148,26 @@ public class Attachment {
     }
 
     void expire(Instant now) {
+        if (status == AttachmentStatus.EXPIRED) {
+            return;
+        }
         Set<AttachmentStatus> expirable = EnumSet.of(AttachmentStatus.PENDING_UPLOAD, AttachmentStatus.UPLOADED,
                 AttachmentStatus.PROCESSING, AttachmentStatus.READY, AttachmentStatus.FAILED,
-                AttachmentStatus.UNSUPPORTED);
+                AttachmentStatus.UNSUPPORTED, AttachmentStatus.QUARANTINED);
         if (!expirable.contains(status)) {
             throw new IllegalStateException("Attachment cannot expire from " + status);
         }
         transition(AttachmentStatus.EXPIRED, failureCode, now);
+    }
+
+    void markCleanupCompleted(Instant now) {
+        if (status != AttachmentStatus.EXPIRED) {
+            throw new IllegalStateException("Attachment must be expired before cleanup completion");
+        }
+        if (cleanupCompletedAt == null) {
+            cleanupCompletedAt = now;
+            updatedAt = now;
+        }
     }
 
     private void transition(AttachmentStatus next, String failureCode, Instant now) {
@@ -191,6 +207,8 @@ public class Attachment {
     public String failureCode() { return failureCode; }
     public Instant uploadExpiresAt() { return uploadExpiresAt; }
     public Instant lastUsedAt() { return lastUsedAt; }
+    public Instant cleanupCompletedAt() { return cleanupCompletedAt; }
+    public Instant updatedAt() { return updatedAt; }
 
     static String requireText(String value, String fieldName) {
         if (value == null || value.isBlank()) {

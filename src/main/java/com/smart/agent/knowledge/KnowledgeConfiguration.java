@@ -35,6 +35,7 @@ public class KnowledgeConfiguration {
     @Bean
     @ConditionalOnProperty(prefix = "agent.qdrant", name = "enabled", havingValue = "true")
     VectorIndex qdrantVectorIndex(QdrantClient client, QdrantProperties properties) {
-        return new QdrantVectorIndex(client, properties.getCollectionName(), properties.getVectorDimension());
+        return new QdrantVectorIndex(client, properties.getCollectionName(),
+                properties.getAttachmentCollectionName(), properties.getVectorDimension());
     }
 }

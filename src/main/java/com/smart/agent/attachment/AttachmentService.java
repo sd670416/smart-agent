@@ -98,6 +98,13 @@ public class AttachmentService {
         return repository.save(attachment);
     }
 
+    @Transactional
+    public Attachment completeCleanup(UUID id, String tenantId, String userId) {
+        Attachment attachment = owned(id, tenantId, userId);
+        attachment.markCleanupCompleted(clock.instant());
+        return repository.save(attachment);
+    }
+
     @Transactional(readOnly = true)
     public Attachment get(UUID id, String tenantId, String userId) {
         return owned(id, tenantId, userId);

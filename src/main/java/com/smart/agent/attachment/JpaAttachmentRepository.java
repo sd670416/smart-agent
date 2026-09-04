@@ -1,6 +1,8 @@
 package com.smart.agent.attachment;
 
 import jakarta.persistence.EntityManager;
+import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -34,5 +36,22 @@ public class JpaAttachmentRepository implements AttachmentRepository {
                 .setParameter("tenantId", tenantId)
                 .setParameter("userId", userId)
                 .getResultStream().findFirst();
+    }
+
+    @Override
+    public List<Attachment> findExpiredChatAttachments(Instant lastUsedBefore, UUID afterId, int limit) {
+        if (lastUsedBefore == null || limit < 1 || limit > 1_000) {
+            throw new IllegalArgumentException("Invalid cleanup page request");
+        }
+        return entityManager.createQuery("select a from Attachment a where a.purpose = :purpose "
+                        + "and a.cleanupCompletedAt is null "
+                        + "and (a.status = :expired or a.updatedAt <= :lastUsedBefore) "
+                        + "and (:afterId is null or a.id > :afterId) order by a.id", Attachment.class)
+                .setParameter("purpose", AttachmentPurpose.CHAT_ATTACHMENT)
+                .setParameter("expired", AttachmentStatus.EXPIRED)
+                .setParameter("lastUsedBefore", lastUsedBefore)
+                .setParameter("afterId", afterId)
+                .setMaxResults(limit)
+                .getResultList();
     }
 }
