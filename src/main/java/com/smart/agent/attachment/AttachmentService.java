@@ -6,6 +6,7 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.Locale;
 import java.util.UUID;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,6 +21,7 @@ public class AttachmentService {
     private final AttachmentRepository repository;
     private final Clock clock;
 
+    @Autowired
     public AttachmentService(AttachmentRepository repository) {
         this(repository, Clock.systemUTC());
     }

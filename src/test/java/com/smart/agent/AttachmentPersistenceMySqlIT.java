@@ -26,7 +26,11 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @Tag("mysql")
 @EnabledIfSystemProperty(named = "agent.it.mysql", matches = "true")
 @Testcontainers(disabledWithoutDocker = true)
-@SpringBootTest(properties = {"agent.persistence.enabled=true", "agent.qdrant.enabled=false"})
+@SpringBootTest(properties = {
+        "agent.persistence.enabled=true",
+        "agent.qdrant.enabled=false",
+        "AGENT_LOCAL_CONTEXT_SECRET=attachment-mysql-test-context-secret"
+})
 class AttachmentPersistenceMySqlIT {
 
     @Container
