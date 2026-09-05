@@ -43,6 +43,10 @@ public class RoleKnowledgeGrantService {
     }
 
     public Set<UUID> grantsForRole(String tenantId, String roleId) {
+        if (jdbc != null) {
+            return jdbc.query("SELECT knowledge_space_id FROM ai_role_knowledge_grant WHERE tenant_id=? AND role_id=?",
+                    (rs, n) -> UUID.fromString(rs.getString(1)), tenantId, roleId).stream().collect(Collectors.toUnmodifiableSet());
+        }
         return Set.copyOf(grants.getOrDefault(key(tenantId, roleId), Set.of()));
     }
 
