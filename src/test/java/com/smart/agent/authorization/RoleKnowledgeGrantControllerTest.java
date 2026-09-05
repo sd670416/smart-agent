@@ -28,7 +28,7 @@ class RoleKnowledgeGrantControllerTest {
 
     @Test void rejectsWithoutManagePermission() throws Exception {
         mvc.perform(get("/ai/roles/r1/knowledge-grants").requestAttr(AgentUserContext.class.getName(), actor(false)))
-                .andExpect(status().is5xxServerError());
+                .andExpect(status().isForbidden());
         verifyNoInteractions(service);
     }
 }
