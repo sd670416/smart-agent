@@ -108,6 +108,7 @@ public class ChatOrchestrator {
         private final reactor.core.Disposable.Swap modelSubscription = Disposables.swap();
         private final AtomicReference<CompletableFuture<?>> activeToolOperation = new AtomicReference<>();
         private final List<ModelRequest.ConversationEntry> messages = new ArrayList<>();
+        private long sequence;
         private AgentRun run;
         private AgentRunStatus status;
         private int modelTurns;
@@ -494,7 +495,8 @@ public class ChatOrchestrator {
 
         private void emit(ChatEvent event) {
             if (!terminated.get() && !sink.isCancelled()) {
-                sink.next(event);
+                sink.next(new ChatEvent(event.type(), event.runId(), ++sequence, event.traceId(), event.messageId(),
+                        event.code(), event.text(), event.toolKey(), event.data()));
             }
         }
 
