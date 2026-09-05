@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.smart.agent.common.error.AgentException;
 import com.smart.agent.conversation.ConversationService;
+import com.smart.agent.attachment.AttachmentService;
+import com.smart.agent.attachment.AttachmentStatus;
 import com.smart.agent.conversation.Message;
 import com.smart.agent.knowledge.KnowledgeCitation;
 import com.smart.agent.knowledge.KnowledgeSearchQuery;
@@ -49,6 +51,7 @@ public class ChatOrchestrator {
     private final ObjectMapper objectMapper;
     private final KnowledgeSearchService knowledgeSearchService;
     private final Duration runBudget;
+    private final AttachmentService attachmentService;
 
     public ChatOrchestrator(
             ConversationService conversationService,
@@ -57,7 +60,7 @@ public class ChatOrchestrator {
             ToolRegistry toolRegistry,
             ToolExecutor toolExecutor,
             ObjectMapper objectMapper) {
-        this(conversationService, runService, modelGateway, toolRegistry, toolExecutor, objectMapper, null);
+        this(conversationService, runService, modelGateway, toolRegistry, toolExecutor, objectMapper, null, null);
     }
 
     public ChatOrchestrator(
@@ -69,7 +72,7 @@ public class ChatOrchestrator {
             ObjectMapper objectMapper,
             KnowledgeSearchService knowledgeSearchService) {
         this(conversationService, runService, modelGateway, toolRegistry, toolExecutor, objectMapper,
-                knowledgeSearchService, MAX_RUN_DURATION);
+                knowledgeSearchService, MAX_RUN_DURATION, null);
     }
 
     ChatOrchestrator(
@@ -81,6 +84,11 @@ public class ChatOrchestrator {
             ObjectMapper objectMapper,
             KnowledgeSearchService knowledgeSearchService,
             Duration runBudget) {
+        this(conversationService, runService, modelGateway, toolRegistry, toolExecutor, objectMapper, knowledgeSearchService, runBudget, null);
+    }
+    ChatOrchestrator(ConversationService conversationService, AgentRunService runService, ModelGateway modelGateway,
+            ToolRegistry toolRegistry, ToolExecutor toolExecutor, ObjectMapper objectMapper,
+            KnowledgeSearchService knowledgeSearchService, Duration runBudget, AttachmentService attachmentService) {
         this.conversationService = conversationService;
         this.runService = runService;
         this.modelGateway = modelGateway;
@@ -89,6 +97,7 @@ public class ChatOrchestrator {
         this.objectMapper = objectMapper;
         this.knowledgeSearchService = knowledgeSearchService;
         this.runBudget = runBudget;
+        this.attachmentService = attachmentService;
     }
 
     public Flux<ChatEvent> stream(ChatCommand command, AgentUserContext context, String traceId) {
@@ -137,6 +146,7 @@ public class ChatOrchestrator {
                         command.question()));
                 messages.add(new ModelRequest.ConversationMessage("user", modelQuestion()));
                 emit(ChatEvent.messageStart(run.id(), traceId, userMessage.id()));
+                validateAttachments();
                 validatePageProject();
                 moveTo(AgentRunStatus.ROUTING);
                 emit(ChatEvent.status(run.id(), traceId, status));
@@ -497,6 +507,15 @@ public class ChatOrchestrator {
             if (!terminated.get() && !sink.isCancelled()) {
                 sink.next(new ChatEvent(event.type(), event.runId(), ++sequence, event.traceId(), event.messageId(),
                         event.code(), event.text(), event.toolKey(), event.data()));
+            }
+        }
+
+        private void validateAttachments() {
+            if (command.attachmentIds().size() > 10) throw new AgentException("AGENT_ATTACHMENTS_TOO_MANY", org.springframework.http.HttpStatus.BAD_REQUEST, "Too many attachments");
+            if (attachmentService == null) return;
+            for (java.util.UUID id : command.attachmentIds()) {
+                com.smart.agent.attachment.Attachment a = withinBudget(() -> attachmentService.get(id, context.tenantId(), context.userId()));
+                if (a.status() != AttachmentStatus.READY) throw new AgentException("AGENT_ATTACHMENT_NOT_READY", org.springframework.http.HttpStatus.CONFLICT, "Attachment is not ready");
             }
         }
 
