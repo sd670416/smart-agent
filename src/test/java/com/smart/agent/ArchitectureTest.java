@@ -23,5 +23,6 @@ class ArchitectureTest {
             .that().resideInAPackage("..chat..")
             .and().haveSimpleNameEndingWith("Controller")
             .should().onlyDependOnClassesThat()
-            .resideInAnyPackage("java..", "jakarta.validation..", "org.springframework..", "..chat..", "..security..");
+            .resideInAnyPackage("java..", "jakarta.validation..", "org.springframework..", "..chat..", "..security..",
+                    "..conversation..", "..run..");
 }

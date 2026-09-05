@@ -8,9 +8,11 @@ import com.smart.agent.run.AgentRunService;
 import com.smart.agent.security.AgentUserContext;
 import java.util.List;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 
 @RestController
 @RequestMapping("/agent/conversations")
+@ConditionalOnProperty(name = "agent.persistence.enabled", havingValue = "true", matchIfMissing = true)
 public class ConversationQueryController {
     private final ConversationService conversations;
     private final AgentRunRepository runs;
