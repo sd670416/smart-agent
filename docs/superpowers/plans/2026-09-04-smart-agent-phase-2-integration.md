@@ -457,11 +457,11 @@ git commit -m "feat: ingest and clean managed documents"
 - 内部权限检查：`POST /internal/ai/permissions/projects/check` 仅返回当前对可信用户可见的请求项目 ID。
 - `KnowledgeAccessResolver.resolve(AgentUserContext)` 返回已发布的租户空间，以及通过权限交集的项目空间。
 
-- [ ] **步骤 1：编写会失败的授权测试**
+- [x] **步骤 1：编写会失败的授权测试**
 
 测试角色并集、无角色拒绝、租户隔离、排除未发布空间、项目权限交集、陈旧的已删除角色授权、未经授权的授权管理，以及对新请求的即时生效。
 
-- [ ] **步骤 2：运行聚焦测试并验证失败**
+- [x] **步骤 2：运行聚焦测试并验证失败**
 
 在 `agent` 中运行： `mvn -Dtest=KnowledgeAccessResolverTest test`
 
@@ -469,7 +469,7 @@ git commit -m "feat: ingest and clean managed documents"
 
 预期：因缺少类型或端点而失败。
 
-- [ ] **步骤 3：实现授权替换和访问解析**
+- [x] **步骤 3：实现授权替换和访问解析**
 
 ```java
 public Set<UUID> replaceGrants(
@@ -480,11 +480,11 @@ public Set<AuthorizedKnowledgeSpace> resolve(AgentUserContext context);
 
 验证每个目标空间均属于该租户。以事务方式替换授权，并审计替换前后集合。
 
-- [ ] **步骤 4：实现项目权限适配器，且不复制业务规则**
+- [x] **步骤 4：实现项目权限适配器，且不复制业务规则**
 
 定位并调用 `smart-boot` 内现有的项目数据范围服务。适配器只能返回交集；不得实现第二套项目权限算法。
 
-- [ ] **步骤 5：运行模块和 Agent 回归测试**
+- [x] **步骤 5：运行模块和 Agent 回归测试**
 
 运行： `mvn -pl smart-ai test`
 
@@ -492,7 +492,7 @@ public Set<AuthorizedKnowledgeSpace> resolve(AgentUserContext context);
 
 预期：所有非 Docker 测试通过。
 
-- [ ] **步骤 6：独立提交**
+- [x] **步骤 6：独立提交**
 
 Agent 提交： `feat: authorize knowledge by role and project`
 
