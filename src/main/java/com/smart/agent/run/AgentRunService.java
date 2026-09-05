@@ -140,6 +140,17 @@ public class AgentRunService {
         return saved;
     }
 
+    @Transactional
+    public AgentRun cancel(String tenantId, String userId, String runId) {
+        AgentRun run = agentRunRepository.findByIdAndTenantIdAndUserId(tenantId, userId, runId)
+                .orElseThrow(() -> new IllegalArgumentException("Agent run not found: " + runId));
+        if (run.status().name().equals("COMPLETED") || run.status().name().equals("FAILED")
+                || run.status().name().equals("CANCELLED") || run.status().name().equals("TIMEOUT")
+                || run.status().name().equals("PERMISSION_DENIED")) return run;
+        run.transition(AgentRunStatus.CANCELLED);
+        return agentRunRepository.save(run);
+    }
+
     public record Completion(AgentRun run, Message message) {}
 
     private static String requireText(String value, String fieldName) {
