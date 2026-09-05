@@ -517,25 +517,25 @@ Boot 提交： `feat: expose trusted project permission checks`
 - 发出 `run.started`、`message.accepted`、`attachment.processing`、`retrieval.started`、`citation`、`tool.started`、`tool.completed`、`answer.delta`、`answer.completed` 和 `run.failed`。
 - 每个事件均包含 `runId` 和单调递增的 `sequence`。
 
-- [ ] **步骤 1：编写会失败的端到端对话合约测试**
+- [x] **步骤 1：编写会失败的端到端对话合约测试**
 
 覆盖已授权知识检索、项目访问拒绝、就绪附件上下文、附件所有权拒绝、不支持附件拒绝、引用先于完成事件、序列单调递增、取消后转为 `CANCELLED`、不自动重放，以及重新生成时创建新的运行。
 
-- [ ] **步骤 2：运行 Agent 对话测试并确认新用例失败**
+- [x] **步骤 2：运行 Agent 对话测试并确认新用例失败**
 
 运行： `mvn -Dtest=AuthorizedChatControllerIT,ChatControllerIT test`
 
 预期：因尚未集成附件和已授权空间而测试失败。
 
-- [ ] **步骤 3：使用明确限额和权限检查扩展编排流程**
+- [x] **步骤 3：使用明确限额和权限检查扩展编排流程**
 
 在调用模型前解析附件和知识空间。仅搜索已授权的空间 ID，以及属于当前对话的临时向量。在生成引用前重新检查 MySQL 中的发布状态。
 
-- [ ] **步骤 4：实现查询 API 和 BFF POST SSE 代理**
+- [x] **步骤 4：实现查询 API 和 BFF POST SSE 代理**
 
 公开对话创建/列表/删除、消息历史、运行状态、重新生成和对话流端点。保留 `text/event-stream`、UTF-8、Trace ID、取消和背压语义。
 
-- [ ] **步骤 5：运行聚焦测试和完整测试**
+- [x] **步骤 5：运行聚焦测试和完整测试**
 
 在 `agent` 中运行： `mvn test`
 
@@ -543,7 +543,7 @@ Boot 提交： `feat: expose trusted project permission checks`
 
 预期：所有测试通过，且取消操作会留下经过审计的终态。
 
-- [ ] **步骤 6：独立提交**
+- [x] **步骤 6：独立提交**
 
 Agent 提交： `feat: stream authorized conversations with attachments`
 
