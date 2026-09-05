@@ -710,7 +710,7 @@ git commit -m "feat: retrieve permission filtered knowledge"
 - Consumes: conversation/run services, context, model gateway, tool executor, and knowledge search from Tasks 2-7.
 - Produces: `POST /agent/chat/stream` with `text/event-stream` and events `message_start`, `status`, `tool_start`, `tool_result`, `citation`, `message_delta`, `message_end`, and `error`.
 
-- [ ] **Step 1: Write the failing end-to-end SSE test**
+- [x] **Step 1: Write the failing end-to-end SSE test**
 
 ```java
 @Test
@@ -736,13 +736,13 @@ void streamsProjectToolAnswerAndPersistsAuditTrail() {
 }
 ```
 
-- [ ] **Step 2: Run test and verify chat API is absent**
+- [x] **Step 2: Run test and verify chat API is absent**
 
 Run: `mvn -q -Dtest=ChatControllerIT test`
 
 Expected: FAIL with 404 or missing chat types.
 
-- [ ] **Step 3: Implement validated chat command**
+- [x] **Step 3: Implement validated chat command**
 
 ```java
 public record ChatCommand(
@@ -755,7 +755,7 @@ public record PageContext(String pageCode, String projectId, String businessType
 
 Ignore tenant/user fields if supplied as unknown JSON properties by rejecting the request. Verify that page project belongs to `AgentUserContext.projectIds`.
 
-- [ ] **Step 4: Implement orchestration order**
+- [x] **Step 4: Implement orchestration order**
 
 Exact flow:
 
@@ -773,13 +773,13 @@ Exact flow:
 
 Limit each run to 6 model turns, 5 tool calls, 20 citations, 90 seconds total, and 64KB per tool result.
 
-- [ ] **Step 5: Run chat integration tests**
+- [x] **Step 5: Run chat integration tests**
 
 Run: `mvn -q -Dtest=ChatControllerIT test`
 
 Expected: PASS for normal text, project tool call, knowledge citation, missing permission, malformed tool input, model timeout, client cancellation, and trace ID propagation.
 
-- [ ] **Step 6: Commit the vertical slice API**
+- [x] **Step 6: Commit the vertical slice API**
 
 ```bash
 git add src/main/java/com/smart/agent/chat src/test/java/com/smart/agent/chat
