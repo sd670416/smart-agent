@@ -8,7 +8,8 @@ public record AgentUserContext(
         String identityId,
         Set<String> permissions,
         Set<String> projectIds,
-        Set<String> knowledgeSpaceIds) {
+        Set<String> knowledgeSpaceIds,
+        Set<String> roleIds) {
     public AgentUserContext {
         tenantId = requireText(tenantId, "tenantId");
         userId = requireText(userId, "userId");
@@ -16,11 +17,22 @@ public record AgentUserContext(
         permissions = Set.copyOf(permissions);
         projectIds = Set.copyOf(projectIds);
         knowledgeSpaceIds = Set.copyOf(knowledgeSpaceIds);
+        roleIds = Set.copyOf(roleIds);
     }
 
     public AgentUserContext(
             String tenantId, String userId, String identityId, Set<String> permissions, Set<String> projectIds) {
-        this(tenantId, userId, identityId, permissions, projectIds, Set.of());
+        this(tenantId, userId, identityId, permissions, projectIds, Set.of(), Set.of());
+    }
+
+    public AgentUserContext(
+            String tenantId, String userId, String identityId, Set<String> permissions, Set<String> projectIds,
+            Set<String> knowledgeSpaceIds) {
+        this(tenantId, userId, identityId, permissions, projectIds, knowledgeSpaceIds, Set.of());
+    }
+
+    public AgentUserContext(String tenantId, String userId, String identityId, Set<String> roleIds) {
+        this(tenantId, userId, identityId, Set.of(), Set.of(), Set.of(), roleIds);
     }
 
     public boolean canAccessProject(String projectId) {

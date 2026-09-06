@@ -5,6 +5,7 @@ import java.util.List;
 public record KnowledgeDocument(
         String id,
         String versionId,
+        String attachmentId,
         String tenantId,
         String spaceId,
         String organizationId,
@@ -34,6 +35,14 @@ public record KnowledgeDocument(
         if (chunks.isEmpty()) {
             throw new IllegalArgumentException("chunks must not be empty");
         }
+    }
+
+    public KnowledgeDocument(String id, String versionId, String tenantId, String spaceId,
+            String organizationId, String projectId, String title, String status, String sourceText,
+            String sourceChecksum, String parserVersion, String embeddingModelKey, String actorId,
+            List<KnowledgeChunk> chunks) {
+        this(id, versionId, null, tenantId, spaceId, organizationId, projectId, title, status,
+                sourceText, sourceChecksum, parserVersion, embeddingModelKey, actorId, chunks);
     }
 
     private static String requireText(String value, String fieldName) {

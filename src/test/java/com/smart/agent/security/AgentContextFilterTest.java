@@ -145,8 +145,9 @@ class AgentContextFilterTest {
                 .andExpect(jsonPath("$.tenantId").value("tenant-1"))
                 .andExpect(jsonPath("$.userId").value("user-1"))
                 .andExpect(jsonPath("$.identityId").value("identity-1"))
-                .andExpect(jsonPath("$.permissions", containsInAnyOrder("project:read")))
-                .andExpect(jsonPath("$.projectIds", containsInAnyOrder("project-1")));
+                .andExpect(jsonPath("$.roleIds", containsInAnyOrder("role-1")))
+                .andExpect(jsonPath("$.permissions").isEmpty())
+                .andExpect(jsonPath("$.projectIds").isEmpty());
     }
 
     @Test
@@ -328,6 +329,7 @@ class AgentContextFilterTest {
                     "identityId", requestContext.identityId(),
                     "permissions", requestContext.permissions(),
                     "projectIds", requestContext.projectIds(),
+                    "roleIds", requestContext.roleIds(),
                     "holderTenantId", holderContext.tenantId());
         }
 
@@ -353,14 +355,17 @@ class AgentContextFilterTest {
                 "tenantId", tenantId,
                 "userId", "user-1",
                 "identityId", "identity-1",
-                "permissions", Set.of("project:read"),
-                "projectIds", Set.of("project-1"),
-                "exp", expiresAtEpochSecond));
+                "roleIds", Set.of("role-1"),
+                "issuedAt", Instant.parse("2026-09-01T00:55:00Z").getEpochSecond(),
+                "expiresAt", expiresAtEpochSecond,
+                "nonce", "nonce-1"));
+        String encodedHeader = Base64.getUrlEncoder().withoutPadding()
+                .encodeToString("{\"alg\":\"HS256\",\"typ\":\"JWT\"}".getBytes(StandardCharsets.UTF_8));
         String encodedPayload = Base64.getUrlEncoder().withoutPadding().encodeToString(payload);
         Mac mac = Mac.getInstance("HmacSHA256");
         mac.init(new SecretKeySpec(LOCAL_SECRET.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
         String encodedSignature = Base64.getUrlEncoder().withoutPadding()
-                .encodeToString(mac.doFinal(encodedPayload.getBytes(StandardCharsets.UTF_8)));
-        return encodedPayload + "." + encodedSignature;
+                .encodeToString(mac.doFinal((encodedHeader + "." + encodedPayload).getBytes(StandardCharsets.UTF_8)));
+        return encodedHeader + "." + encodedPayload + "." + encodedSignature;
     }
 }

@@ -2,6 +2,8 @@ package com.smart.agent;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.smart.agent.attachment.AttachmentService;
+import com.smart.agent.attachment.JpaAttachmentRepository;
 import com.smart.agent.conversation.ConversationService;
 import com.smart.agent.conversation.JpaConversationRepository;
 import com.smart.agent.run.AgentRunService;
@@ -28,8 +30,10 @@ class PersistenceConfigurationTest {
         contextRunner.withPropertyValues("agent.persistence.enabled=false").run(context -> {
             assertThat(context).doesNotHaveBean(ConversationService.class);
             assertThat(context).doesNotHaveBean(AgentRunService.class);
+            assertThat(context).doesNotHaveBean(AttachmentService.class);
             assertThat(context).doesNotHaveBean(JpaConversationRepository.class);
             assertThat(context).doesNotHaveBean(JpaAgentRunRepository.class);
+            assertThat(context).doesNotHaveBean(JpaAttachmentRepository.class);
         });
     }
 
@@ -38,8 +42,10 @@ class PersistenceConfigurationTest {
         contextRunner.withPropertyValues("agent.persistence.enabled=true").run(context -> {
             assertThat(context).hasSingleBean(ConversationService.class);
             assertThat(context).hasSingleBean(AgentRunService.class);
+            assertThat(context).hasSingleBean(AttachmentService.class);
             assertThat(context).hasSingleBean(JpaConversationRepository.class);
             assertThat(context).hasSingleBean(JpaAgentRunRepository.class);
+            assertThat(context).hasSingleBean(JpaAttachmentRepository.class);
         });
     }
 
@@ -73,8 +79,10 @@ class PersistenceConfigurationTest {
     @Import({
         ConversationService.class,
         AgentRunService.class,
+        AttachmentService.class,
         JpaConversationRepository.class,
-        JpaAgentRunRepository.class
+        JpaAgentRunRepository.class,
+        JpaAttachmentRepository.class
     })
     static class PersistenceBeans {
         @Bean

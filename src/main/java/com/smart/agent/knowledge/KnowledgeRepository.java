@@ -6,6 +6,10 @@ import java.util.List;
 public interface KnowledgeRepository {
     void save(KnowledgeDocument document);
 
+    default void saveManagedDocument(KnowledgeDocument document) {
+        save(document);
+    }
+
     void markIndexingSucceeded(String documentId);
 
     void markIndexingFailed(String documentId, String failureCode);

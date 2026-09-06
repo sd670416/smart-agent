@@ -10,6 +10,7 @@ public class QdrantProperties {
     private String apiKey = "";
     private boolean tls;
     private String collectionName = "agent_knowledge_dev";
+    private String attachmentCollectionName = "agent_conversation_attachment_dev";
     private int vectorDimension = LocalHashEmbeddingGateway.DIMENSIONS;
 
     public boolean isEnabled() {
@@ -58,6 +59,14 @@ public class QdrantProperties {
 
     public void setCollectionName(String collectionName) {
         this.collectionName = collectionName;
+    }
+
+    public String getAttachmentCollectionName() {
+        return attachmentCollectionName;
+    }
+
+    public void setAttachmentCollectionName(String attachmentCollectionName) {
+        this.attachmentCollectionName = attachmentCollectionName;
     }
 
     public int getVectorDimension() {

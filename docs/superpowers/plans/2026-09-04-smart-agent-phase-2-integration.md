@@ -341,17 +341,17 @@ git commit -m "feat: issue verified oss direct uploads"
 - `KnowledgeScope`：`TENANT`、`PROJECT`；`PROJECT` 必须恰好要求一个项目 ID。
 - 文档版本只能从 `DRAFT` 发布；不受支持或已隔离的内容不能发布。
 
-- [ ] **步骤 1：编写生命周期与授权测试**
+- [x] **步骤 1：编写生命周期与授权测试**
 
 覆盖租户/项目创建校验、上传关联、版本递增、仅草稿可发布、原已发布版本的原子替换、先禁用后删除行为、租户隔离以及禁止非管理员调用。
 
-- [ ] **步骤 2：运行测试并确认缺少管理类型时失败**
+- [x] **步骤 2：运行测试并确认缺少管理类型时失败**
 
 运行： `mvn -Dtest=KnowledgeManagementServiceTest,KnowledgeManagementControllerTest test`
 
 预期：编译失败。
 
-- [ ] **步骤 3：实现仓储与生命周期服务**
+- [x] **步骤 3：实现仓储与生命周期服务**
 
 ```java
 public interface KnowledgeManagementService {
@@ -365,11 +365,11 @@ public interface KnowledgeManagementService {
 
 在 MySQL 中以事务方式变更状态。仅在权威状态不再允许检索后发出清理工作。
 
-- [ ] **步骤 4：实现 Agent 内部控制器和 BFF 控制器**
+- [x] **步骤 4：实现 Agent 内部控制器和 BFF 控制器**
 
 对空间和文档列表使用分页。返回稳定状态、解析器错误码、活动版本、创建者和时间戳；绝不返回 OSS 凭据。
 
-- [ ] **步骤 5：运行回归测试套件**
+- [x] **步骤 5：运行回归测试套件**
 
 在 `agent` 中运行： `mvn test`
 
@@ -377,7 +377,7 @@ public interface KnowledgeManagementService {
 
 预期：所有非 Docker 测试通过。
 
-- [ ] **步骤 6：在两个仓库中提交**
+- [x] **步骤 6：在两个仓库中提交**
 
 Agent 提交： `feat: manage versioned knowledge documents`
 
@@ -402,29 +402,29 @@ Boot 提交： `feat: proxy knowledge management APIs`
 - `DocumentParser.parse(InputStream, ParseLimits)` 返回带页/工作表/章节定位信息的文本块。
 - 不支持的类型转换为 `UNSUPPORTED`；可疑不匹配转换为 `QUARANTINED`。
 
-- [ ] **步骤 1：添加会失败的解析器路由测试**
+- [x] **步骤 1：添加会失败的解析器路由测试**
 
 测试 PDF、DOCX、XLSX、Markdown、TXT、常见图像检测、未知二进制文件处理、可执行文件签名隔离、扩展名与内容不匹配、解压限制以及页数/字符数限制。
 
-- [ ] **步骤 2：运行聚焦测试并确认其失败**
+- [x] **步骤 2：运行聚焦测试并确认其失败**
 
 运行： `mvn -Dtest=DocumentParserRegistryTest,DocumentIngestionJobTest test`
 
 预期：因缺少摄取类而编译失败。
 
-- [ ] **步骤 3：添加 Apache Tika 检测和专用解析器**
+- [x] **步骤 3：添加 Apache Tika 检测和专用解析器**
 
 使用流式读取和明确的最大提取字符数，将归档深度设为零，禁用嵌入资源提取和公式执行；在配置视觉模型可用前，图像仅处理元数据。
 
-- [ ] **步骤 4：将摄取流程接入现有分块、嵌入和 `VectorIndex` 合约**
+- [x] **步骤 4：将摄取流程接入现有分块、嵌入和 `VectorIndex` 合约**
 
 为已发布知识和会过期的对话附件使用独立的 Qdrant 命名空间/集合。包含租户、空间、项目、文档、版本、发布状态、附件和过期载荷字段。
 
-- [ ] **步骤 5：实现保留期清理**
+- [x] **步骤 5：实现保留期清理**
 
 以有界分页选择过期聊天附件，将其标记为 `EXPIRED`，删除临时向量，再通过供应商端口删除 OSS 对象。重试必须幂等。
 
-- [ ] **步骤 6：运行单元测试和 Qdrant 测试**
+- [x] **步骤 6：运行单元测试和 Qdrant 测试**
 
 运行： `mvn test`
 
@@ -432,7 +432,7 @@ Boot 提交： `feat: proxy knowledge management APIs`
 
 预期：单元测试通过；外部集成测试证明租户和索引相互隔离。
 
-- [ ] **步骤 7：在 `smart-agent` 中提交**
+- [x] **步骤 7：在 `smart-agent` 中提交**
 
 ```bash
 git add pom.xml src/main/java/com/smart/agent/ingestion src/main/java/com/smart/agent/attachment src/main/java/com/smart/agent/knowledge src/test/java/com/smart/agent/ingestion src/test/java/com/smart/agent/attachment
@@ -457,11 +457,11 @@ git commit -m "feat: ingest and clean managed documents"
 - 内部权限检查：`POST /internal/ai/permissions/projects/check` 仅返回当前对可信用户可见的请求项目 ID。
 - `KnowledgeAccessResolver.resolve(AgentUserContext)` 返回已发布的租户空间，以及通过权限交集的项目空间。
 
-- [ ] **步骤 1：编写会失败的授权测试**
+- [x] **步骤 1：编写会失败的授权测试**
 
 测试角色并集、无角色拒绝、租户隔离、排除未发布空间、项目权限交集、陈旧的已删除角色授权、未经授权的授权管理，以及对新请求的即时生效。
 
-- [ ] **步骤 2：运行聚焦测试并验证失败**
+- [x] **步骤 2：运行聚焦测试并验证失败**
 
 在 `agent` 中运行： `mvn -Dtest=KnowledgeAccessResolverTest test`
 
@@ -469,7 +469,7 @@ git commit -m "feat: ingest and clean managed documents"
 
 预期：因缺少类型或端点而失败。
 
-- [ ] **步骤 3：实现授权替换和访问解析**
+- [x] **步骤 3：实现授权替换和访问解析**
 
 ```java
 public Set<UUID> replaceGrants(
@@ -480,11 +480,11 @@ public Set<AuthorizedKnowledgeSpace> resolve(AgentUserContext context);
 
 验证每个目标空间均属于该租户。以事务方式替换授权，并审计替换前后集合。
 
-- [ ] **步骤 4：实现项目权限适配器，且不复制业务规则**
+- [x] **步骤 4：实现项目权限适配器，且不复制业务规则**
 
 定位并调用 `smart-boot` 内现有的项目数据范围服务。适配器只能返回交集；不得实现第二套项目权限算法。
 
-- [ ] **步骤 5：运行模块和 Agent 回归测试**
+- [x] **步骤 5：运行模块和 Agent 回归测试**
 
 运行： `mvn -pl smart-ai test`
 
@@ -492,7 +492,7 @@ public Set<AuthorizedKnowledgeSpace> resolve(AgentUserContext context);
 
 预期：所有非 Docker 测试通过。
 
-- [ ] **步骤 6：独立提交**
+- [x] **步骤 6：独立提交**
 
 Agent 提交： `feat: authorize knowledge by role and project`
 
@@ -517,25 +517,25 @@ Boot 提交： `feat: expose trusted project permission checks`
 - 发出 `run.started`、`message.accepted`、`attachment.processing`、`retrieval.started`、`citation`、`tool.started`、`tool.completed`、`answer.delta`、`answer.completed` 和 `run.failed`。
 - 每个事件均包含 `runId` 和单调递增的 `sequence`。
 
-- [ ] **步骤 1：编写会失败的端到端对话合约测试**
+- [x] **步骤 1：编写会失败的端到端对话合约测试**
 
 覆盖已授权知识检索、项目访问拒绝、就绪附件上下文、附件所有权拒绝、不支持附件拒绝、引用先于完成事件、序列单调递增、取消后转为 `CANCELLED`、不自动重放，以及重新生成时创建新的运行。
 
-- [ ] **步骤 2：运行 Agent 对话测试并确认新用例失败**
+- [x] **步骤 2：运行 Agent 对话测试并确认新用例失败**
 
 运行： `mvn -Dtest=AuthorizedChatControllerIT,ChatControllerIT test`
 
 预期：因尚未集成附件和已授权空间而测试失败。
 
-- [ ] **步骤 3：使用明确限额和权限检查扩展编排流程**
+- [x] **步骤 3：使用明确限额和权限检查扩展编排流程**
 
 在调用模型前解析附件和知识空间。仅搜索已授权的空间 ID，以及属于当前对话的临时向量。在生成引用前重新检查 MySQL 中的发布状态。
 
-- [ ] **步骤 4：实现查询 API 和 BFF POST SSE 代理**
+- [x] **步骤 4：实现查询 API 和 BFF POST SSE 代理**
 
 公开对话创建/列表/删除、消息历史、运行状态、重新生成和对话流端点。保留 `text/event-stream`、UTF-8、Trace ID、取消和背压语义。
 
-- [ ] **步骤 5：运行聚焦测试和完整测试**
+- [x] **步骤 5：运行聚焦测试和完整测试**
 
 在 `agent` 中运行： `mvn test`
 
@@ -543,7 +543,7 @@ Boot 提交： `feat: expose trusted project permission checks`
 
 预期：所有测试通过，且取消操作会留下经过审计的终态。
 
-- [ ] **步骤 6：独立提交**
+- [x] **步骤 6：独立提交**
 
 Agent 提交： `feat: stream authorized conversations with attachments`
 

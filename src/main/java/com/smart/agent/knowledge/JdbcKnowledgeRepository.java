@@ -29,6 +29,22 @@ public class JdbcKnowledgeRepository implements KnowledgeRepository {
     }
 
     @Override
+    @Transactional
+    public void saveManagedDocument(KnowledgeDocument document) {
+        int changed = jdbcTemplate.update("UPDATE ai_document_version SET attachment_id = ?, source_text = ?, "
+                        + "source_checksum = ?, parser_version = ?, embedding_model_key = ?, status = 'DRAFT', "
+                        + "failure_code = NULL, updated_by = ?, update_time = CURRENT_TIMESTAMP(3), "
+                        + "deleted = b'0', version = version + 1 WHERE id = ? AND document_id = ? AND tenant_id = ?",
+                document.attachmentId(), document.sourceText(), document.sourceChecksum(), document.parserVersion(),
+                document.embeddingModelKey(), document.actorId(), document.versionId(), document.id(), document.tenantId());
+        if (changed == 0) {
+            throw new IllegalStateException("Managed document version does not exist");
+        }
+        replaceChunks(document);
+        upsertIngestionJob(document);
+    }
+
+    @Override
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void markIndexingSucceeded(String documentId) {
         jdbcTemplate.update("UPDATE ai_ingestion_job SET status = 'indexed', failure_code = NULL, "

@@ -6,12 +6,18 @@ import java.util.Map;
 public record ChatEvent(
         String type,
         String runId,
+        long sequence,
         String traceId,
         String messageId,
         String code,
         String text,
         String toolKey,
         Map<String, Object> data) {
+
+    public ChatEvent(String type, String runId, String traceId, String messageId, String code,
+            String text, String toolKey, Map<String, Object> data) {
+        this(type, runId, 0L, traceId, messageId, code, text, toolKey, data);
+    }
 
     static ChatEvent messageStart(String runId, String traceId, String messageId) {
         return new ChatEvent("message_start", runId, traceId, messageId, null, null, null, Map.of());

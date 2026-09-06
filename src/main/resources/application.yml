@@ -33,6 +33,7 @@ agent:
     api-key: ${AGENT_QDRANT_API_KEY:}
     tls: ${AGENT_QDRANT_TLS:false}
     collection-name: ${AGENT_QDRANT_COLLECTION:agent_knowledge_dev}
+    attachment-collection-name: ${AGENT_QDRANT_ATTACHMENT_COLLECTION:agent_conversation_attachment_dev}
     vector-dimension: ${AGENT_QDRANT_VECTOR_DIMENSION:64}
   embedding:
     mode: ${AGENT_EMBEDDING_MODE:local-hash}
