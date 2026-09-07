@@ -1,3 +1,39 @@
 spring:
-  config:
-    import: optional:file:./.env[.properties]
+  # smart-agent 独立数据库，请按本机实际地址修改。
+  datasource:
+    url: jdbc:mysql://localhost:3306/smart_agent?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+    username: root
+    password: root
+
+  data:
+    redis:
+      host: localhost
+      port: 6379
+
+# 必须与 smart-boot 的 smart.ai.agent-context-secret 完全一致。
+AGENT_LOCAL_CONTEXT_SECRET: smart-agent-local-demo-secret-2026
+
+agent:
+  persistence:
+    enabled: true
+
+  qdrant:
+    enabled: true
+    host: 192.168.0.179
+    grpc-port: 6334
+    api-key: "b3947db2ce4ca4a59cbe1e262d2cf91240ca955bf3ef08ae35aec23e2991e9d7"
+    tls: false
+    collection-name: agent_knowledge_dev
+    attachment-collection-name: agent_conversation_attachment_dev
+    vector-dimension: 64
+
+  # 向量暂时使用本地哈希；聊天默认调用 OpenAI 兼容的外部模型。
+  embedding:
+    mode: local-hash
+  model:
+    mode: openai-compatible
+    base-url: https://api.iruidong.com/v1
+    api-key: "rk-4ffe99a27082d8147800e278e834679891f17c3fb487d659da0407a04cc1d021"
+    chat-model: glm-4.6
+    connect-timeout: 10s
+    read-timeout: 120s
