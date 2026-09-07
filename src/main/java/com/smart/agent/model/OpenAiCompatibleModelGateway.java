@@ -30,8 +30,11 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxSink;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class OpenAiCompatibleModelGateway implements ModelGateway {
+    private static final Logger log = LoggerFactory.getLogger(OpenAiCompatibleModelGateway.class);
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     private final StreamingChatModel model;
@@ -228,9 +231,20 @@ public class OpenAiCompatibleModelGateway implements ModelGateway {
     }
 
     private static ModelEvent.Failed failureFor(Throwable error) {
+        log.error("模型调用失败: {}", rootMessage(error), error);
         return containsTimeout(error)
                 ? new ModelEvent.Failed("MODEL_PROVIDER_TIMEOUT", "Model provider timed out")
                 : new ModelEvent.Failed("MODEL_PROVIDER_ERROR", "Model provider request failed");
+    }
+
+    private static String rootMessage(Throwable error) {
+        Throwable current = error;
+        Throwable last = error;
+        while (current != null) {
+            last = current;
+            current = current.getCause();
+        }
+        return last == null ? "unknown" : String.valueOf(last.getMessage());
     }
 
     private static boolean containsTimeout(Throwable error) {

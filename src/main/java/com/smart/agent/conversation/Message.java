@@ -1,5 +1,6 @@
 package com.smart.agent.conversation;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -80,18 +81,22 @@ public class Message {
         return new Message(conversation, sequence, role, content);
     }
 
+    @JsonProperty("id")
     public String id() {
         return id;
     }
 
+    @JsonProperty("sequence")
     public long sequence() {
         return sequence;
     }
 
+    @JsonProperty("role")
     public Role role() {
         return role;
     }
 
+    @JsonProperty("content")
     public String content() {
         return content;
     }

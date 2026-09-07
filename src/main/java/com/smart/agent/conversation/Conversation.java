@@ -1,5 +1,7 @@
 package com.smart.agent.conversation;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -14,6 +16,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 @Entity
 @Table(name = "ai_conversation")
@@ -34,6 +37,7 @@ public class Conversation {
 
     @OneToMany(mappedBy = "conversation", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("sequence ASC")
+    @JsonProperty("messages")
     private List<Message> messages = new ArrayList<>();
 
     @Column(name = "create_time", nullable = false, updatable = false)
@@ -74,6 +78,7 @@ public class Conversation {
         return message;
     }
 
+    @JsonProperty("id")
     public String id() {
         return id;
     }
@@ -86,10 +91,20 @@ public class Conversation {
         return userId;
     }
 
+    @JsonProperty("title")
     public String title() {
         return title;
     }
 
+    public void rename(String title) {
+        this.title = requireText(title, "title").trim();
+        if (this.title.length() > 255) {
+            this.title = this.title.substring(0, 255);
+        }
+        this.updatedAt = Instant.now();
+    }
+
+    @JsonIgnore
     public List<Message> messages() {
         return List.copyOf(messages);
     }

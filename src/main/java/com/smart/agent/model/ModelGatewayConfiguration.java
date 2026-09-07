@@ -7,10 +7,13 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Configuration(proxyBeanMethods = false)
 @EnableConfigurationProperties(ModelGatewayProperties.class)
 public class ModelGatewayConfiguration {
+    private static final Logger log = LoggerFactory.getLogger(ModelGatewayConfiguration.class);
 
     @Bean
     @ConditionalOnProperty(prefix = "agent.model", name = "mode", havingValue = "local", matchIfMissing = true)
@@ -21,6 +24,9 @@ public class ModelGatewayConfiguration {
     @Bean
     @ConditionalOnProperty(prefix = "agent.model", name = "mode", havingValue = "openai-compatible")
     ModelGateway openAiCompatibleModelGateway(ModelGatewayProperties properties) {
+        log.info("AI模型配置: mode={}, baseUrl={}, chatModel={}, connectTimeout={}, readTimeout={}, apiKeyPresent={}",
+                properties.mode(), properties.baseUrl(), properties.chatModel(), properties.connectTimeout(),
+                properties.readTimeout(), properties.apiKey() != null && !properties.apiKey().isBlank());
         StreamingChatModel model = OpenAiStreamingChatModel.builder()
                 .baseUrl(properties.baseUrl())
                 .apiKey(properties.apiKey())

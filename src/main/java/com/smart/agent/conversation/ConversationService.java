@@ -36,6 +36,15 @@ public class ConversationService {
                 .orElseThrow(() -> new IllegalArgumentException("Conversation not found: " + conversationId));
     }
 
+    @Transactional
+    public Conversation rename(String tenantId, String userId, String conversationId, String title) {
+        Conversation conversation = conversationRepository.findByIdAndTenantIdAndUserId(
+                requireText(tenantId, "tenantId"), requireText(userId, "userId"), requireText(conversationId, "conversationId"))
+                .orElseThrow(() -> new IllegalArgumentException("Conversation not found: " + conversationId));
+        conversation.rename(requireText(title, "title"));
+        return conversationRepository.save(conversation);
+    }
+
     @Transactional(readOnly = true)
     public List<Conversation> list(String tenantId, String userId) {
         return conversationRepository.findByTenantIdAndUserId(tenantId, userId);
