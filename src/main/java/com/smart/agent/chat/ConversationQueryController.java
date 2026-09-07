@@ -24,6 +24,20 @@ public class ConversationQueryController {
     public Conversation get(@PathVariable String id, @RequestAttribute("com.smart.agent.security.AgentUserContext") AgentUserContext c) {
         return conversations.find(c.tenantId(), c.userId(), id);
     }
+
+    @GetMapping
+    public List<Conversation> list(@RequestAttribute("com.smart.agent.security.AgentUserContext") AgentUserContext c) {
+        return conversations.list(c.tenantId(), c.userId());
+    }
+
+    @PostMapping
+    public Conversation create(@RequestBody CreateConversationRequest request,
+                               @RequestAttribute("com.smart.agent.security.AgentUserContext") AgentUserContext c) {
+        String title = request == null || request.title == null || request.title.trim().isEmpty() ? "新建对话" : request.title.trim();
+        return conversations.create(c.tenantId(), c.userId(), title);
+    }
+
+    public static class CreateConversationRequest { public String title; }
     @GetMapping("/{id}/runs")
     public List<AgentRun> runs(@PathVariable String id, @RequestAttribute("com.smart.agent.security.AgentUserContext") AgentUserContext c) {
         return runs.findByTenantIdAndUserIdAndConversationId(c.tenantId(), c.userId(), id);

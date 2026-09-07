@@ -3,6 +3,7 @@ package com.smart.agent.conversation;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import java.util.List;
 
 @Service
 @ConditionalOnProperty(prefix = "agent.persistence", name = "enabled", havingValue = "true", matchIfMissing = true)
@@ -33,6 +34,11 @@ public class ConversationService {
     public Conversation find(String tenantId, String userId, String conversationId) {
         return conversationRepository.findByIdAndTenantIdAndUserId(tenantId, userId, conversationId)
                 .orElseThrow(() -> new IllegalArgumentException("Conversation not found: " + conversationId));
+    }
+
+    @Transactional(readOnly = true)
+    public List<Conversation> list(String tenantId, String userId) {
+        return conversationRepository.findByTenantIdAndUserId(tenantId, userId);
     }
 
     private static String requireText(String value, String fieldName) {

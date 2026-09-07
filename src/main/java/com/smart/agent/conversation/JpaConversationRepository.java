@@ -2,6 +2,7 @@ package com.smart.agent.conversation;
 
 import jakarta.persistence.EntityManager;
 import java.util.Optional;
+import java.util.List;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Repository;
 
@@ -36,5 +37,11 @@ public class JpaConversationRepository implements ConversationRepository {
                 .setParameter("userId", userId)
                 .getResultStream()
                 .findFirst();
+    }
+
+    @Override
+    public List<Conversation> findByTenantIdAndUserId(String tenantId, String userId) {
+        return entityManager.createQuery("select c from Conversation c where c.tenantId = :tenantId and c.userId = :userId order by c.updatedAt desc", Conversation.class)
+                .setParameter("tenantId", tenantId).setParameter("userId", userId).getResultList();
     }
 }
