@@ -60,6 +60,11 @@ public class ConversationQueryController {
         return new ConversationSummary(conversation.id(), conversation.title());
     }
 
+    @DeleteMapping("/{id}")
+    public void delete(@PathVariable String id, @RequestAttribute("com.smart.agent.security.AgentUserContext") AgentUserContext c) {
+        conversations.delete(c.tenantId(), c.userId(), id);
+    }
+
     public static class CreateConversationRequest { public String title; }
     @GetMapping("/{id}/runs")
     public List<AgentRun> runs(@PathVariable String id, @RequestAttribute("com.smart.agent.security.AgentUserContext") AgentUserContext c) {

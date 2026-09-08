@@ -5,6 +5,7 @@ import java.util.List;
 
 public interface ConversationRepository {
     Conversation save(Conversation conversation);
+    default void delete(Conversation conversation) { throw new UnsupportedOperationException("delete is not supported"); }
 
     Optional<Conversation> findByIdAndTenantIdAndUserId(String tenantId, String userId, String id);
 

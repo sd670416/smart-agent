@@ -69,10 +69,14 @@ public class Conversation {
     }
 
     public Message append(Message.Role role, String content) {
+        return append(role, content, null);
+    }
+
+    public Message append(Message.Role role, String content, String attachmentsJson) {
         if (role == null) {
             throw new IllegalArgumentException("role must not be null");
         }
-        Message message = Message.create(this, messages.size() + 1L, role, requireText(content, "content"));
+        Message message = Message.create(this, messages.size() + 1L, role, requireText(content, "content"), attachmentsJson);
         messages.add(message);
         updatedAt = Instant.now();
         return message;

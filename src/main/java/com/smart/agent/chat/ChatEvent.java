@@ -48,6 +48,10 @@ public record ChatEvent(
     }
 
     static ChatEvent error(String runId, String traceId, String code) {
-        return new ChatEvent("error", runId, traceId, null, code, "Agent request failed", null, Map.of());
+        return error(runId, traceId, code, "Agent request failed");
+    }
+
+    static ChatEvent error(String runId, String traceId, String code, String text) {
+        return new ChatEvent("error", runId, traceId, null, code, text, null, Map.of());
     }
 }

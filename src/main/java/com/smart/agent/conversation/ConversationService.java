@@ -22,10 +22,16 @@ public class ConversationService {
 
     @Transactional
     public Message appendMessage(String tenantId, String userId, String conversationId, Message.Role role, String content) {
+        return appendMessage(tenantId, userId, conversationId, role, content, null);
+    }
+
+    @Transactional
+    public Message appendMessage(String tenantId, String userId, String conversationId, Message.Role role, String content,
+            String attachmentsJson) {
         Conversation conversation = conversationRepository.findByIdAndTenantIdAndUserId(
                         requireText(tenantId, "tenantId"), requireText(userId, "userId"), requireText(conversationId, "conversationId"))
                 .orElseThrow(() -> new IllegalArgumentException("Conversation not found: " + conversationId));
-        Message message = conversation.append(role, content);
+        Message message = conversation.append(role, content, attachmentsJson);
         conversationRepository.save(conversation);
         return message;
     }
@@ -43,6 +49,14 @@ public class ConversationService {
                 .orElseThrow(() -> new IllegalArgumentException("Conversation not found: " + conversationId));
         conversation.rename(requireText(title, "title"));
         return conversationRepository.save(conversation);
+    }
+
+    @Transactional
+    public void delete(String tenantId, String userId, String conversationId) {
+        Conversation conversation = conversationRepository.findByIdAndTenantIdAndUserId(
+                requireText(tenantId, "tenantId"), requireText(userId, "userId"), requireText(conversationId, "conversationId"))
+                .orElseThrow(() -> new IllegalArgumentException("Conversation not found: " + conversationId));
+        conversationRepository.delete(conversation);
     }
 
     @Transactional(readOnly = true)

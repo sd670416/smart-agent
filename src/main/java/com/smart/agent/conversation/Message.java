@@ -15,6 +15,8 @@ import jakarta.persistence.Table;
 import jakarta.persistence.Version;
 import java.time.Instant;
 import java.util.UUID;
+import java.util.List;
+import java.util.Arrays;
 
 @Entity
 @Table(name = "ai_message")
@@ -48,6 +50,9 @@ public class Message {
     @Column(nullable = false, columnDefinition = "LONGTEXT")
     private String content;
 
+    @Column(name = "attachments_json", columnDefinition = "LONGTEXT")
+    private String attachmentsJson;
+
     @Column(name = "sequence_no", nullable = false, updatable = false)
     private long sequence;
 
@@ -64,7 +69,7 @@ public class Message {
     protected Message() {
     }
 
-    private Message(Conversation conversation, long sequence, Role role, String content) {
+    private Message(Conversation conversation, long sequence, Role role, String content, String attachmentsJson) {
         this.id = UUID.randomUUID().toString();
         this.conversation = conversation;
         this.tenantId = conversation.tenantId();
@@ -72,13 +77,18 @@ public class Message {
         this.sequence = sequence;
         this.role = role;
         this.content = content;
+        this.attachmentsJson = attachmentsJson;
         Instant now = Instant.now();
         this.createdAt = now;
         this.updatedAt = now;
     }
 
     static Message create(Conversation conversation, long sequence, Role role, String content) {
-        return new Message(conversation, sequence, role, content);
+        return create(conversation, sequence, role, content, null);
+    }
+
+    static Message create(Conversation conversation, long sequence, Role role, String content, String attachmentsJson) {
+        return new Message(conversation, sequence, role, content, attachmentsJson);
     }
 
     @JsonProperty("id")
@@ -99,6 +109,12 @@ public class Message {
     @JsonProperty("content")
     public String content() {
         return content;
+    }
+
+    @JsonProperty("attachments")
+    public List<String> attachments() {
+        if (attachmentsJson == null || attachmentsJson.isBlank()) return List.of();
+        return Arrays.stream(attachmentsJson.split("\\n", -1)).filter(value -> !value.isBlank()).toList();
     }
 
     @PrePersist

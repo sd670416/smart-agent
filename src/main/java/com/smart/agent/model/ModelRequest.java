@@ -36,16 +36,23 @@ public record ModelRequest(
         String content();
     }
 
-    public record ConversationMessage(String role, String content) implements ConversationEntry {
+    public record ConversationMessage(String role, String content, List<AttachmentPart> attachments) implements ConversationEntry {
         private static final Set<String> ALLOWED_ROLES = Set.of("user", "assistant");
 
         public ConversationMessage {
             requireText(role, "role");
             requireText(content, "content");
+            attachments = attachments == null ? List.of() : List.copyOf(attachments);
             if (!ALLOWED_ROLES.contains(role)) {
                 throw new IllegalArgumentException("role must be user or assistant");
             }
         }
+
+        public ConversationMessage(String role, String content) { this(role, content, List.of()); }
+    }
+
+    public record AttachmentPart(String url, String mediaType, String filename) {
+        public AttachmentPart { requireText(url, "url"); }
     }
 
     public record ToolResultMessage(String callId, String toolKey, String content) implements ConversationEntry {

@@ -37,3 +37,8 @@ agent:
     chat-model: glm-4.6
     connect-timeout: 10s
     read-timeout: 120s
+
+  # OSS 公共访问域名，例如 https://bucket.oss-cn-hangzhou.aliyuncs.com
+  # 图片多模态消息会基于该地址拼接附件 objectKey。
+  attachment:
+    public-base-url: "http://gongchengxitong-bucket.oss-cn-beijing.aliyuncs.com"

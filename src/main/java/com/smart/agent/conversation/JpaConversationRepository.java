@@ -40,6 +40,33 @@ public class JpaConversationRepository implements ConversationRepository {
     }
 
     @Override
+    public void delete(Conversation conversation) {
+        // 会话下的运行记录、运行步骤和引用记录没有配置级联，必须先按租户和用户清理，
+        // 否则删除 ai_conversation 时会被外键 fk_ai_run_conversation 拒绝。
+        entityManager.createNativeQuery("DELETE FROM ai_citation WHERE tenant_id = :tenantId AND user_id = :userId "
+                        + "AND run_id IN (SELECT id FROM ai_run WHERE conversation_id = :conversationId "
+                        + "AND tenant_id = :tenantId AND user_id = :userId)")
+                .setParameter("tenantId", conversation.tenantId())
+                .setParameter("userId", conversation.userId())
+                .setParameter("conversationId", conversation.id())
+                .executeUpdate();
+        entityManager.createNativeQuery("DELETE FROM ai_run_step WHERE tenant_id = :tenantId AND user_id = :userId "
+                        + "AND run_id IN (SELECT id FROM ai_run WHERE conversation_id = :conversationId "
+                        + "AND tenant_id = :tenantId AND user_id = :userId)")
+                .setParameter("tenantId", conversation.tenantId())
+                .setParameter("userId", conversation.userId())
+                .setParameter("conversationId", conversation.id())
+                .executeUpdate();
+        entityManager.createNativeQuery("DELETE FROM ai_run WHERE conversation_id = :conversationId "
+                        + "AND tenant_id = :tenantId AND user_id = :userId")
+                .setParameter("conversationId", conversation.id())
+                .setParameter("tenantId", conversation.tenantId())
+                .setParameter("userId", conversation.userId())
+                .executeUpdate();
+        entityManager.remove(entityManager.contains(conversation) ? conversation : entityManager.merge(conversation));
+    }
+
+    @Override
     public List<Conversation> findByTenantIdAndUserId(String tenantId, String userId) {
         return entityManager.createQuery("select c from Conversation c where c.tenantId = :tenantId and c.userId = :userId order by c.updatedAt desc", Conversation.class)
                 .setParameter("tenantId", tenantId).setParameter("userId", userId).getResultList();

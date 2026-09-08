@@ -8,6 +8,8 @@ import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.ChatMessage;
 import dev.langchain4j.data.message.SystemMessage;
 import dev.langchain4j.data.message.UserMessage;
+import dev.langchain4j.data.message.TextContent;
+import dev.langchain4j.data.message.ImageContent;
 import dev.langchain4j.data.message.ToolExecutionResultMessage;
 import dev.langchain4j.model.chat.StreamingChatModel;
 import dev.langchain4j.model.chat.request.ChatRequest;
@@ -180,9 +182,16 @@ public class OpenAiCompatibleModelGateway implements ModelGateway {
                         formatUntrustedToolResult(toolResult)));
             } else {
                 ModelRequest.ConversationMessage conversation = (ModelRequest.ConversationMessage) message;
-                messages.add("assistant".equals(conversation.role())
-                        ? AiMessage.from(conversation.content())
-                        : UserMessage.from(conversation.content()));
+                if ("assistant".equals(conversation.role())) {
+                    messages.add(AiMessage.from(conversation.content()));
+                } else if (conversation.attachments().isEmpty()) {
+                    messages.add(UserMessage.from(conversation.content()));
+                } else {
+                    List<dev.langchain4j.data.message.Content> contents = new ArrayList<>();
+                    contents.add(TextContent.from(conversation.content()));
+                    conversation.attachments().forEach(part -> contents.add(ImageContent.from(part.url())));
+                    messages.add(UserMessage.from(contents));
+                }
             }
         }
         for (ModelRequest.RetrievedEvidence evidence : request.retrievedEvidence()) {

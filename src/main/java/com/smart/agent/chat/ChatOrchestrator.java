@@ -25,6 +25,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicReference;
@@ -52,6 +53,7 @@ public class ChatOrchestrator {
     private final KnowledgeSearchService knowledgeSearchService;
     private final Duration runBudget;
     private final AttachmentService attachmentService;
+    private final String attachmentPublicBaseUrl;
 
     public ChatOrchestrator(
             ConversationService conversationService,
@@ -60,7 +62,7 @@ public class ChatOrchestrator {
             ToolRegistry toolRegistry,
             ToolExecutor toolExecutor,
             ObjectMapper objectMapper) {
-        this(conversationService, runService, modelGateway, toolRegistry, toolExecutor, objectMapper, null, null);
+        this(conversationService, runService, modelGateway, toolRegistry, toolExecutor, objectMapper, null, null, null);
     }
 
     public ChatOrchestrator(
@@ -72,7 +74,7 @@ public class ChatOrchestrator {
             ObjectMapper objectMapper,
             KnowledgeSearchService knowledgeSearchService) {
         this(conversationService, runService, modelGateway, toolRegistry, toolExecutor, objectMapper,
-                knowledgeSearchService, MAX_RUN_DURATION, null);
+                knowledgeSearchService, MAX_RUN_DURATION, null, null);
     }
 
     ChatOrchestrator(
@@ -84,11 +86,18 @@ public class ChatOrchestrator {
             ObjectMapper objectMapper,
             KnowledgeSearchService knowledgeSearchService,
             Duration runBudget) {
-        this(conversationService, runService, modelGateway, toolRegistry, toolExecutor, objectMapper, knowledgeSearchService, runBudget, null);
+        this(conversationService, runService, modelGateway, toolRegistry, toolExecutor, objectMapper, knowledgeSearchService, runBudget, null, null);
     }
     ChatOrchestrator(ConversationService conversationService, AgentRunService runService, ModelGateway modelGateway,
             ToolRegistry toolRegistry, ToolExecutor toolExecutor, ObjectMapper objectMapper,
             KnowledgeSearchService knowledgeSearchService, Duration runBudget, AttachmentService attachmentService) {
+        this(conversationService, runService, modelGateway, toolRegistry, toolExecutor, objectMapper,
+                knowledgeSearchService, runBudget, attachmentService, null);
+    }
+    ChatOrchestrator(ConversationService conversationService, AgentRunService runService, ModelGateway modelGateway,
+            ToolRegistry toolRegistry, ToolExecutor toolExecutor, ObjectMapper objectMapper,
+            KnowledgeSearchService knowledgeSearchService, Duration runBudget, AttachmentService attachmentService,
+            String attachmentPublicBaseUrl) {
         this.conversationService = conversationService;
         this.runService = runService;
         this.modelGateway = modelGateway;
@@ -98,6 +107,7 @@ public class ChatOrchestrator {
         this.knowledgeSearchService = knowledgeSearchService;
         this.runBudget = runBudget;
         this.attachmentService = attachmentService;
+        this.attachmentPublicBaseUrl = attachmentPublicBaseUrl == null ? "" : attachmentPublicBaseUrl.trim();
     }
 
     public Flux<ChatEvent> stream(ChatCommand command, AgentUserContext context, String traceId) {
@@ -141,12 +151,14 @@ public class ChatOrchestrator {
                 run = withinBudget(() -> runService.start(
                         context.tenantId(), context.userId(), command.conversationId(), traceId));
                 status = AgentRunStatus.RECEIVED;
+                validateAttachments();
+                String attachmentUrls = attachmentReferences().stream()
+                        .collect(java.util.stream.Collectors.joining("\n"));
                 Message userMessage = withinBudget(() -> conversationService.appendMessage(
                         context.tenantId(), context.userId(), command.conversationId(), Message.Role.USER,
-                        command.question()));
-                messages.add(new ModelRequest.ConversationMessage("user", modelQuestion()));
+                        command.question(), attachmentUrls));
                 emit(ChatEvent.messageStart(run.id(), traceId, userMessage.id()));
-                validateAttachments();
+                messages.add(new ModelRequest.ConversationMessage("user", modelQuestion(), attachmentParts()));
                 validatePageProject();
                 moveTo(AgentRunStatus.ROUTING);
                 emit(ChatEvent.status(run.id(), traceId, status));
@@ -183,6 +195,22 @@ public class ChatOrchestrator {
             appendContext(safe, "businessType", page.businessType());
             appendContext(safe, "businessId", page.businessId());
             return safe.append(']').toString();
+        }
+
+        private List<ModelRequest.AttachmentPart> attachmentParts() {
+            if (attachmentService == null || attachmentPublicBaseUrl.isBlank()) return List.of();
+            return command.attachmentIds().stream().map(id -> withinBudget(() -> attachmentService.get(id,
+                    context.tenantId(), context.userId()))).filter(a -> a.detectedMediaType() != null
+                    && a.detectedMediaType().startsWith("image/"))
+                    .map(a -> new ModelRequest.AttachmentPart(attachmentPublicBaseUrl + "/" + a.objectKey(),
+                            a.detectedMediaType(), a.originalFilename())).toList();
+        }
+
+        private List<String> attachmentReferences() {
+            if (attachmentService == null || attachmentPublicBaseUrl.isBlank()) return List.of();
+            return command.attachmentIds().stream()
+                    .map(id -> withinBudget(() -> attachmentService.get(id, context.tenantId(), context.userId())))
+                    .map(a -> attachmentPublicBaseUrl + "/" + a.objectKey()).toList();
         }
 
         private void appendContext(StringBuilder target, String key, String value) {
@@ -515,7 +543,10 @@ public class ChatOrchestrator {
             if (attachmentService == null) return;
             for (java.util.UUID id : command.attachmentIds()) {
                 com.smart.agent.attachment.Attachment a = withinBudget(() -> attachmentService.get(id, context.tenantId(), context.userId()));
-                if (a.status() != AttachmentStatus.READY) throw new AgentException("AGENT_ATTACHMENT_NOT_READY", org.springframework.http.HttpStatus.CONFLICT, "Attachment is not ready");
+                boolean image = a.detectedMediaType() != null && a.detectedMediaType().startsWith("image/");
+                if (a.status() != AttachmentStatus.READY && !(a.status() == AttachmentStatus.UPLOADED && !image)) {
+                    throw new AgentException("AGENT_ATTACHMENT_NOT_READY", org.springframework.http.HttpStatus.CONFLICT, "Attachment is not ready");
+                }
             }
         }
 
@@ -541,20 +572,37 @@ public class ChatOrchestrator {
                 if (!terminated.compareAndSet(false, true)) return;
                 modelSubscription.dispose();
                 cancelActiveTool();
+                String message = errorMessage(code);
                 if (run != null && status != null && !isTerminal(status)) {
                     try {
                         run = runService.finishTerminal(context.tenantId(), context.userId(), run.id(), status,
                                 terminalStatus, code);
                         status = terminalStatus;
+                        conversationService.appendMessage(context.tenantId(), context.userId(),
+                                command.conversationId(), Message.Role.ASSISTANT, message);
                     } catch (RuntimeException persistenceFailure) {
                         code = "AGENT_PERSISTENCE_FAILED";
+                        message = errorMessage(code);
                     }
                 }
                 if (!sink.isCancelled()) {
-                    sink.next(ChatEvent.error(run == null ? null : run.id(), traceId, code));
+                    sink.next(ChatEvent.error(run == null ? null : run.id(), traceId, code, message));
                     sink.complete();
                 }
             }
+        }
+
+        private String errorMessage(String code) {
+            if ("AGENT_MODEL_FAILED".equals(code) && !command.attachmentIds().isEmpty()) {
+                return "当前模型暂不支持图片分析，请改用文字提问或切换支持视觉能力的模型。";
+            }
+            if ("AGENT_MODEL_TIMEOUT".equals(code) || "AGENT_RUN_TIMEOUT".equals(code)) {
+                return "本次请求处理超时，请稍后重试。";
+            }
+            if ("AGENT_PERSISTENCE_FAILED".equals(code)) {
+                return "消息保存失败，请稍后重试。";
+            }
+            return "Agent request failed";
         }
 
         private String safeCode(RuntimeException exception) {

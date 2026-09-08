@@ -102,7 +102,7 @@ public class Attachment {
         if (!this.objectKey.equals(objectKey)) {
             throw new IllegalArgumentException("Object key does not match the registered attachment");
         }
-        if (status == AttachmentStatus.UPLOADED) {
+        if (status == AttachmentStatus.UPLOADED || status == AttachmentStatus.READY) {
             if (this.etag.equals(etag)) {
                 return;
             }
@@ -118,7 +118,12 @@ public class Attachment {
         this.size = size;
         this.etag = requireText(etag, "etag");
         this.detectedMediaType = requireText(detectedMediaType, "detectedMediaType");
-        transition(AttachmentStatus.UPLOADED, null, now);
+        if (purpose == AttachmentPurpose.CHAT_ATTACHMENT && detectedMediaType.startsWith("image/")) {
+            transition(AttachmentStatus.READY, null, now);
+            lastUsedAt = now;
+        } else {
+            transition(AttachmentStatus.UPLOADED, null, now);
+        }
     }
 
     void markProcessing(Instant now) {

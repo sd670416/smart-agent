@@ -11,6 +11,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.beans.factory.annotation.Value;
 
 @Configuration(proxyBeanMethods = false)
 @ConditionalOnProperty(prefix = "agent.persistence", name = "enabled", havingValue = "true", matchIfMissing = true)
@@ -23,10 +24,13 @@ class ChatConfiguration {
             ToolRegistry toolRegistry,
             ToolExecutor toolExecutor,
             ObjectMapper objectMapper,
-            ObjectProvider<KnowledgeSearchService> knowledgeSearchService) {
+            ObjectProvider<KnowledgeSearchService> knowledgeSearchService,
+            @Value("${agent.attachment.public-base-url:}") String attachmentPublicBaseUrl,
+            ObjectProvider<com.smart.agent.attachment.AttachmentService> attachmentService) {
         return new ChatOrchestrator(
                 conversationService, runService, modelGateway, toolRegistry, toolExecutor, objectMapper,
-                knowledgeSearchService.getIfAvailable());
+                knowledgeSearchService.getIfAvailable(), com.smart.agent.chat.ChatOrchestrator.MAX_RUN_DURATION,
+                attachmentService.getIfAvailable(), attachmentPublicBaseUrl);
     }
 
     @Bean

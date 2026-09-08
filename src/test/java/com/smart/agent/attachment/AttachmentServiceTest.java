@@ -39,8 +39,8 @@ class AttachmentServiceTest {
         Attachment completed = service.completeUpload(command);
         Attachment repeated = service.completeUpload(command);
 
-        assertThat(completed.status()).isEqualTo(AttachmentStatus.UPLOADED);
-        assertThat(repeated.status()).isEqualTo(AttachmentStatus.UPLOADED);
+        assertThat(completed.status()).isEqualTo(AttachmentStatus.READY);
+        assertThat(repeated.status()).isEqualTo(AttachmentStatus.READY);
         assertThat(repeated.etag()).isEqualTo("etag-1");
     }
 
