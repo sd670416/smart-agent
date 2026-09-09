@@ -29,6 +29,11 @@ public class JpaAgentRunRepository implements AgentRunRepository {
     }
 
     @Override
+    public Optional<AgentRun> findById(String id) {
+        return Optional.ofNullable(entityManager.find(AgentRun.class, id));
+    }
+
+    @Override
     public Optional<AgentRun> findByIdAndTenantIdAndUserId(String tenantId, String userId, String id) {
         return entityManager.createQuery("select r from AgentRun r where r.id = :id and r.tenantId = :tenantId and r.userId = :userId",
                         AgentRun.class)

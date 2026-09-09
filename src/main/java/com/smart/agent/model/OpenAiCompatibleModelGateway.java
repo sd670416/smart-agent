@@ -34,6 +34,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxSink;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.smart.agent.model.audit.ModelCallAuditService;
 
 public class OpenAiCompatibleModelGateway implements ModelGateway {
     private static final Logger log = LoggerFactory.getLogger(OpenAiCompatibleModelGateway.class);
@@ -42,9 +43,12 @@ public class OpenAiCompatibleModelGateway implements ModelGateway {
     private final StreamingChatModel model;
     private final Duration readTimeout;
     private final SystemInstructionCatalog instructionCatalog;
+    private final ModelCallAuditService audit;
+    private final String modelName;
+    private final String providerUrl;
 
     public OpenAiCompatibleModelGateway(StreamingChatModel model, Duration readTimeout) {
-        this(model, readTimeout, new SystemInstructionCatalog());
+        this(model, readTimeout, new SystemInstructionCatalog(), null, "unknown", "unknown");
     }
 
     OpenAiCompatibleModelGateway(
@@ -52,6 +56,18 @@ public class OpenAiCompatibleModelGateway implements ModelGateway {
         this.model = model;
         this.readTimeout = readTimeout;
         this.instructionCatalog = instructionCatalog;
+        this.audit = null; this.modelName = "unknown"; this.providerUrl = "unknown";
+    }
+
+    public OpenAiCompatibleModelGateway(StreamingChatModel model, Duration readTimeout, ModelCallAuditService audit,
+            String modelName, String providerUrl) {
+        this(model, readTimeout, new SystemInstructionCatalog(), audit, modelName, providerUrl);
+    }
+
+    private OpenAiCompatibleModelGateway(StreamingChatModel model, Duration readTimeout,
+            SystemInstructionCatalog instructionCatalog, ModelCallAuditService audit, String modelName, String providerUrl) {
+        this.model=model;this.readTimeout=readTimeout;this.instructionCatalog=instructionCatalog;this.audit=audit;
+        this.modelName=modelName;this.providerUrl=providerUrl;
     }
 
     @Override
@@ -62,12 +78,16 @@ public class OpenAiCompatibleModelGateway implements ModelGateway {
     }
 
     private void invokeModel(ModelRequest request, FluxSink<ModelEvent> sink) {
+        long auditStarted = System.nanoTime();
+        String auditId = audit == null ? null : audit.start(request, modelName, providerUrl);
         AtomicBoolean terminated = new AtomicBoolean();
         sink.onCancel(() -> terminated.set(true));
         final PreparedRequest prepared;
         try {
             prepared = prepareRequest(request);
         } catch (RequestRejectedException error) {
+            if (audit != null) audit.failure(auditId,
+                    Duration.ofNanos(System.nanoTime() - auditStarted).toMillis(), error);
             completeWith(sink, terminated, new ModelEvent.Failed(error.code, error.getMessage()));
             return;
         }
@@ -96,14 +116,22 @@ public class OpenAiCompatibleModelGateway implements ModelGateway {
                 public void onCompleteResponse(ChatResponse response) {
                     safelyHandleCallback(sink, terminated, () -> completeResponse(
                             response, prepared.schemas, sink, terminated, emittedCallIds, streamedText));
+                    if (audit != null && response != null) {
+                        int in=response.tokenUsage()==null||response.tokenUsage().inputTokenCount()==null?0:response.tokenUsage().inputTokenCount();
+                        int out=response.tokenUsage()==null||response.tokenUsage().outputTokenCount()==null?0:response.tokenUsage().outputTokenCount();
+                        audit.success(auditId,Duration.ofNanos(System.nanoTime()-auditStarted).toMillis(),in,out,
+                                "textLength="+(response.aiMessage().text()==null?0:response.aiMessage().text().length())+",toolCalls="+response.aiMessage().toolExecutionRequests().size());
+                    }
                 }
 
                 @Override
                 public void onError(Throwable error) {
+                    if (audit != null) audit.failure(auditId,Duration.ofNanos(System.nanoTime()-auditStarted).toMillis(),error);
                     completeWith(sink, terminated, failureFor(error));
                 }
             });
         } catch (RuntimeException error) {
+            if (audit != null) audit.failure(auditId,Duration.ofNanos(System.nanoTime()-auditStarted).toMillis(),error);
             completeWith(sink, terminated, failureFor(error));
         }
     }
@@ -178,8 +206,7 @@ public class OpenAiCompatibleModelGateway implements ModelGateway {
         messages.add(SystemMessage.from(instruction));
         for (ModelRequest.ConversationEntry message : request.redactedConversationMessages()) {
             if (message instanceof ModelRequest.ToolResultMessage toolResult) {
-                messages.add(ToolExecutionResultMessage.from(toolResult.callId(), toolResult.toolKey(),
-                        formatUntrustedToolResult(toolResult)));
+                messages.add(UserMessage.from(formatUntrustedToolResult(toolResult)));
             } else {
                 ModelRequest.ConversationMessage conversation = (ModelRequest.ConversationMessage) message;
                 if ("assistant".equals(conversation.role())) {

@@ -24,6 +24,9 @@ management:
       exposure:
         include: health,info,prometheus
 agent:
+  business:
+    mode: ${AGENT_BUSINESS_MODE:smart-boot}
+    base-url: ${SMART_BOOT_BASE_URL:http://localhost:8888}
   persistence:
     enabled: ${AGENT_PERSISTENCE_ENABLED:true}
   qdrant:
@@ -44,3 +47,5 @@ agent:
     chat-model: ${AGENT_CHAT_MODEL:local-test-model}
     connect-timeout: ${AGENT_MODEL_CONNECT_TIMEOUT:5s}
     read-timeout: ${AGENT_MODEL_READ_TIMEOUT:30s}
+server:
+  max-http-request-header-size: ${AGENT_MAX_HTTP_REQUEST_HEADER_SIZE:64KB}

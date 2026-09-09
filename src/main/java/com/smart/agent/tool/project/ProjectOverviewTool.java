@@ -26,7 +26,7 @@ public class ProjectOverviewTool implements AgentTool<ProjectOverviewInput, Proj
 
     @Override
     public String requiredPermission() {
-        return "project:read";
+        return "menu:project";
     }
 
     @Override
