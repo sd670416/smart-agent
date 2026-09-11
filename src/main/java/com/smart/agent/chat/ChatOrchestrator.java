@@ -20,6 +20,8 @@ import com.smart.agent.security.AgentUserContext;
 import com.smart.agent.tool.AgentTool;
 import com.smart.agent.tool.ToolExecutor;
 import com.smart.agent.tool.ToolRegistry;
+import com.smart.agent.tool.web.WebSearchPolicy;
+import com.smart.agent.tool.web.WebSearchResult;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -335,9 +337,10 @@ public class ChatOrchestrator {
                 }
             } else if (event instanceof ModelEvent.ToolRequested requested) {
                 turnTools.add(requested);
-                persistDebug("TOOL_REQUEST", requested.toolKey(), requested.argumentsJson());
+                String debugArguments = safeDebugToolRequest(requested.toolKey(), requested.argumentsJson());
+                persistDebug("TOOL_REQUEST", requested.toolKey(), debugArguments);
                 emit(ChatEvent.debug(run.id(), traceId, "TOOL_REQUEST", Map.of(
-                        "toolKey", requested.toolKey(), "arguments", requested.argumentsJson())));
+                        "toolKey", requested.toolKey(), "arguments", debugArguments)));
             } else if (event instanceof ModelEvent.Completed completed) {
                 turnCompleted = completed;
                 persistDebug("MODEL_RESPONSE", null, completed.text());
@@ -416,10 +419,11 @@ public class ChatOrchestrator {
                 Object result = awaitTool(toolFuture);
                 if (terminated.get() || sink.isCancelled()) return false;
                 String serializedResult = objectMapper.writeValueAsString(result);
-                persistDebug("TOOL_RESULT", request.toolKey(), serializedResult);
-                emit(ChatEvent.debug(run.id(), traceId, "TOOL_RESULT", Map.of(
-                        "toolKey", request.toolKey(), "result", serializedResult)));
                 long durationMillis = Duration.ofNanos(System.nanoTime() - toolStarted).toMillis();
+                String debugResult = safeDebugToolResult(request.toolKey(), result, serializedResult, durationMillis);
+                persistDebug("TOOL_RESULT", request.toolKey(), debugResult);
+                emit(ChatEvent.debug(run.id(), traceId, "TOOL_RESULT", Map.of(
+                        "toolKey", request.toolKey(), "result", debugResult)));
                 String risk = toolRegistry.require(request.toolKey()).risk().name();
                 int resultSize = serializedResult.getBytes(java.nio.charset.StandardCharsets.UTF_8).length;
                 synchronized (terminalLock) {
@@ -642,6 +646,41 @@ public class ChatOrchestrator {
             }
         }
 
+        private String safeDebugToolRequest(String toolKey, String arguments) {
+            if (!"web.search".equals(toolKey)) return arguments;
+            try {
+                JsonNode input = objectMapper.readTree(arguments);
+                String query = input.path("query").asText("");
+                new WebSearchPolicy().validate(query);
+                com.fasterxml.jackson.databind.node.ObjectNode safe = objectMapper.createObjectNode();
+                safe.put("query", query.trim().replaceAll("\\s+", " "));
+                if (input.path("maxResults").isIntegralNumber()) {
+                    safe.put("maxResults", input.path("maxResults").intValue());
+                }
+                if (input.path("freshness").isTextual()) {
+                    safe.put("freshness", input.path("freshness").textValue());
+                }
+                return safe.toString();
+            } catch (RuntimeException | com.fasterxml.jackson.core.JsonProcessingException ignored) {
+                return "{\"query\":\"[已拦截的敏感查询]\"}";
+            }
+        }
+
+        private String safeDebugToolResult(
+                String toolKey, Object result, String serializedResult, long durationMillis) {
+            if (!"web.search".equals(toolKey) || !(result instanceof WebSearchResult webResult)) {
+                return serializedResult;
+            }
+            com.fasterxml.jackson.databind.node.ObjectNode safe = objectMapper.createObjectNode();
+            safe.put("query", webResult.query());
+            safe.put("searchedAt", webResult.searchedAt());
+            safe.put("summary", webResult.summary());
+            safe.put("provider", webResult.provider());
+            safe.put("durationMillis", durationMillis);
+            safe.set("sources", objectMapper.valueToTree(webResult.sources()));
+            return safe.toString();
+        }
+
         private String modelFailureCode(String code) {
             if (code != null && code.contains("TIMEOUT")) return "AGENT_MODEL_TIMEOUT";
             if ("MODEL_TOOL_ARGUMENTS_INVALID".equals(code)) return "AGENT_QUERY_INVALID_REQUEST";
@@ -725,6 +764,9 @@ public class ChatOrchestrator {
         private <T> T awaitTool(CompletableFuture<T> future) {
             try {
                 return future.join();
+            } catch (java.util.concurrent.CompletionException exception) {
+                if (exception.getCause() instanceof RuntimeException runtime) throw runtime;
+                throw exception;
             } finally {
                 activeToolOperation.compareAndSet(future, null);
             }

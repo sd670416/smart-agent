@@ -60,8 +60,10 @@ public class ToolExecutor implements AutoCloseable {
         long startedAt = System.nanoTime();
         try {
             ToolContext toolContext = ToolContext.from(userContext);
-            if (!userContext.permissions().contains(tool.requiredPermission())) {
-                throw failure("AGENT_TOOL_FORBIDDEN", HttpStatus.FORBIDDEN, "Tool permission is required", tool, startedAt,
+            if (tool.risk() != ToolRisk.L0 && !userContext.permissions().contains(tool.requiredPermission())) {
+                String forbiddenCode = "web.search".equals(tool.key())
+                        ? "AGENT_WEB_SEARCH_FORBIDDEN" : "AGENT_TOOL_FORBIDDEN";
+                throw failure(forbiddenCode, HttpStatus.FORBIDDEN, "Tool permission is required", tool, startedAt,
                         ToolExecutionOutcome.DENIED, 0);
             }
             Object typedInput = deserializeInput(input, tool.inputType());

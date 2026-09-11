@@ -33,7 +33,8 @@ public class ToolRegistry {
     public List<AgentTool<?, ?>> allowedReadOnlyTools(AgentUserContext context) {
         return tools.values().stream()
                 .filter(tool -> tool.risk() == ToolRisk.L0 || tool.risk() == ToolRisk.L1)
-                .filter(tool -> context.permissions().contains(tool.requiredPermission()))
+                .filter(tool -> tool.risk() == ToolRisk.L0
+                        || context.permissions().contains(tool.requiredPermission()))
                 .toList();
     }
 }

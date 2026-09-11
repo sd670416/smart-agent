@@ -6,6 +6,10 @@ import static org.mockito.Mockito.mock;
 
 import com.smart.agent.tool.project.ProjectBusinessClient;
 import com.smart.agent.tool.project.ProjectContractsTool;
+import com.smart.agent.tool.web.WebSearchPolicy;
+import com.smart.agent.tool.web.WebSearchProperties;
+import com.smart.agent.tool.web.WebSearchResult;
+import com.smart.agent.tool.web.WebSearchTool;
 import dev.langchain4j.agent.tool.ToolExecutionRequest;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.ChatMessage;
@@ -355,6 +359,28 @@ class ModelGatewayContractTest {
 
         assertThat(eventsOf(gateway, contractsRequest))
                 .containsExactly(new ModelEvent.Completed("合同查询完成", 1, 1));
+        assertThat(captured.get()).isNotNull();
+    }
+
+    @Test
+    void registeredWebSearchSchemaCanReachProvider() {
+        AtomicReference<ChatRequest> captured = new AtomicReference<>();
+        ModelGateway gateway = capturingModel(captured, handler ->
+                handler.onCompleteResponse(response("联网工具可用", 1, 1)));
+        WebSearchTool tool = new WebSearchTool(
+                new WebSearchProperties(true, "auto", 5, Duration.ofSeconds(15)),
+                new WebSearchPolicy(),
+                input -> new WebSearchResult(input.query(), "now", "result", List.of(), "test"));
+        ModelRequest webSearchRequest = new ModelRequest(
+                "run-web-search-schema",
+                "v1",
+                List.of(new ModelRequest.ConversationMessage("user", "查询天气")),
+                List.of(new ModelRequest.AllowedToolSpecification(
+                        tool.key(), tool.description(), tool.argumentsSchemaJson())),
+                List.of());
+
+        assertThat(eventsOf(gateway, webSearchRequest))
+                .containsExactly(new ModelEvent.Completed("联网工具可用", 1, 1));
         assertThat(captured.get()).isNotNull();
     }
 

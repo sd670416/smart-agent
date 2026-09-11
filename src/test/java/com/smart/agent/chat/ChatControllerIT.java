@@ -64,6 +64,7 @@ import org.springframework.test.web.reactive.server.WebTestClient;
         "spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration",
         "agent.persistence.enabled=false",
         "agent.qdrant.enabled=false",
+        "agent.web-search.enabled=true",
         "AGENT_LOCAL_CONTEXT_SECRET=task-8-test-context-secret"
 })
 @Import(ChatControllerIT.TestBeans.class)
@@ -253,6 +254,50 @@ class ChatControllerIT {
         assertThat(stepRepository.findByTenantIdAndUserIdAndRunIdOrderBySequence(
                 "tenant-1", "user-1", run.id())).extracting(AgentRunStep::safeOutputSummary)
                 .anySatisfy(summary -> assertThat(summary).contains("INVALID_INPUT").doesNotContain("not-json"));
+    }
+
+    @Test
+    void redactsSensitiveWebSearchFromDebugEventsAndPersistedSteps() {
+        List<ChatEvent> events = chatOrchestrator.stream(
+                        new ChatCommand(conversationId, "web-search-sensitive", null),
+                        new AgentUserContext("tenant-1", "user-1", "identity-1",
+                                Set.of("ai:web-search"), Set.of(), Set.of()),
+                        "trace-web-sensitive")
+                .collectList().block(Duration.ofSeconds(5));
+
+        assertThat(events.getLast().code()).isEqualTo("AGENT_WEB_SEARCH_SENSITIVE_INPUT");
+        assertThat(events.getLast().text()).contains("不能发送到公网").doesNotContain("private-token");
+        assertThat(events).allSatisfy(event -> assertThat(String.valueOf(event))
+                .doesNotContain("private-token", "Bearer"));
+        AgentRun run = runRepository.findByTenantIdAndUserIdAndConversationId(
+                "tenant-1", "user-1", conversationId).getFirst();
+        assertThat(stepRepository.findByTenantIdAndUserIdAndRunIdOrderBySequence(
+                "tenant-1", "user-1", run.id()))
+                .extracting(step -> String.valueOf(step.safeInputSummary()) + String.valueOf(step.safeOutputSummary()))
+                .allSatisfy(summary -> assertThat(summary).doesNotContain("private-token", "Bearer"))
+                .anySatisfy(summary -> assertThat(summary).contains("web.search", "已拦截"));
+    }
+
+    @Test
+    void persistsSafeWebSearchProviderDurationAndSources() {
+        List<ChatEvent> events = chatOrchestrator.stream(
+                        new ChatCommand(conversationId, "web-search-success", null),
+                        new AgentUserContext("tenant-1", "user-1", "identity-1",
+                                Set.of("ai:web-search"), Set.of(), Set.of()),
+                        "trace-web-success")
+                .collectList().block(Duration.ofSeconds(5));
+
+        assertThat(events.getLast().type()).isEqualTo("message_end");
+        AgentRun run = runRepository.findByTenantIdAndUserIdAndConversationId(
+                "tenant-1", "user-1", conversationId).getFirst();
+        assertThat(stepRepository.findByTenantIdAndUserIdAndRunIdOrderBySequence(
+                "tenant-1", "user-1", run.id()))
+                .filteredOn(step -> "AI_DEBUG_TOOL_RESULT".equals(step.type()))
+                .singleElement()
+                .satisfies(step -> assertThat(step.safeOutputSummary())
+                        .contains("\"provider\":\"zhipu\"", "durationMillis", "天津天气",
+                                "https://weather.example/tianjin")
+                        .doesNotContain("test-key", "Authorization"));
     }
 
     @Test
@@ -639,6 +684,25 @@ class ChatControllerIT {
             return new ScenarioModelGateway();
         }
 
+        @Bean
+        @Primary
+        com.smart.agent.tool.web.WebSearchProviderRouter testWebSearchProviderRouter() {
+            com.smart.agent.tool.web.WebSearchProperties web = new com.smart.agent.tool.web.WebSearchProperties(
+                    true, "zhipu", 5, Duration.ofSeconds(15));
+            com.smart.agent.model.ModelGatewayProperties model = new com.smart.agent.model.ModelGatewayProperties(
+                    "openai-compatible", "http://localhost/v1", "test-key", "test-model",
+                    Duration.ofSeconds(1), Duration.ofSeconds(2));
+            com.smart.agent.tool.web.WebSearchProvider unused = input ->
+                    new com.smart.agent.tool.web.WebSearchResult(input.query(), "now", "unused", List.of(), "openai");
+            com.smart.agent.tool.web.WebSearchProvider zhipu = input ->
+                    new com.smart.agent.tool.web.WebSearchResult(
+                            input.query(), "2026-09-11T17:00:00+08:00", "天津今天晴。",
+                            List.of(new com.smart.agent.tool.web.WebSearchSource(
+                                    "天津天气", "https://weather.example/tianjin", "今日晴朗", "2026-09-11")),
+                            "zhipu");
+            return new com.smart.agent.tool.web.WebSearchProviderRouter(web, model, unused, zhipu);
+        }
+
         static final class ScenarioModelGateway implements ModelGateway {
             private final AtomicInteger subscriptions = new AtomicInteger();
             private final AtomicBoolean disposed = new AtomicBoolean();
@@ -672,6 +736,18 @@ class ChatControllerIT {
                 if (question.equals("tool-limit")) {
                     return Flux.just(new ModelEvent.ToolRequested("repeat", "project.getOverview",
                             "{\"projectId\":\"project-1\"}"));
+                }
+                if (question.equals("web-search-sensitive")) {
+                    return Flux.just(new ModelEvent.ToolRequested("web-sensitive", "web.search",
+                            "{\"query\":\"Authorization: Bearer private-token\",\"maxResults\":5}"));
+                }
+                if (question.equals("web-search-success")) {
+                    if (request.redactedConversationMessages().getLast() instanceof ModelRequest.ToolResultMessage) {
+                        return Flux.just(new ModelEvent.Completed("天津天气查询完成", 3, 4));
+                    }
+                    return Flux.just(new ModelEvent.ToolRequested("web-success", "web.search",
+                            "{\"query\":\"天津今日天气\",\"maxResults\":5}"),
+                            new ModelEvent.Completed("", 2, 1));
                 }
                 if (question.equals("json-only")) {
                     return Flux.just(new ModelEvent.Completed("{\"projectCode\":\"20260709001\"}", 2, 3));

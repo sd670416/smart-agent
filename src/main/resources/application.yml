@@ -24,6 +24,12 @@ management:
       exposure:
         include: health,info,prometheus
 agent:
+  time-zone: ${AGENT_TIME_ZONE:Asia/Shanghai}
+  web-search:
+    enabled: ${AGENT_WEB_SEARCH_ENABLED:false}
+    provider: ${AGENT_WEB_SEARCH_PROVIDER:auto}
+    max-results: ${AGENT_WEB_SEARCH_MAX_RESULTS:5}
+    timeout: ${AGENT_WEB_SEARCH_TIMEOUT:15s}
   business:
     mode: ${AGENT_BUSINESS_MODE:smart-boot}
     base-url: ${SMART_BOOT_BASE_URL:http://localhost:8888}

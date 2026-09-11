@@ -17,6 +17,17 @@ import com.smart.agent.tool.project.ProjectOverviewInput;
 import com.smart.agent.tool.project.ProjectOverviewResult;
 import com.smart.agent.tool.project.ProjectOverviewTool;
 import java.time.Duration;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneId;
+import com.smart.agent.tool.system.CurrentTimeInput;
+import com.smart.agent.tool.system.CurrentTimeResult;
+import com.smart.agent.tool.system.CurrentTimeTool;
+import com.smart.agent.tool.web.WebSearchInput;
+import com.smart.agent.tool.web.WebSearchPolicy;
+import com.smart.agent.tool.web.WebSearchProperties;
+import com.smart.agent.tool.web.WebSearchResult;
+import com.smart.agent.tool.web.WebSearchTool;
 import java.util.Map;
 import java.util.Set;
 import org.junit.jupiter.api.AfterEach;
@@ -69,6 +80,43 @@ class ToolExecutorTest {
                 .hasMessageContaining("permission");
 
         verifyNoInteractions(projectBusinessClient);
+    }
+
+    @Test
+    void executesLevelZeroTimeToolWithoutBusinessPermission() {
+        ToolExecutor levelZeroExecutor = new ToolExecutor(
+                new ToolRegistry(Set.of(new CurrentTimeTool(
+                        Clock.fixed(Instant.parse("2026-09-11T06:30:00Z"), ZoneId.of("UTC")),
+                        ZoneId.of("Asia/Shanghai")))),
+                agentRunService, Duration.ofMillis(50));
+        try {
+            Object result = levelZeroExecutor.execute(
+                    "system.current_time", new CurrentTimeInput(null), context(Set.of(), Set.of()));
+
+            assertThat(result).isInstanceOf(CurrentTimeResult.class);
+            assertThat(((CurrentTimeResult) result).time()).isEqualTo("14:30:00");
+        } finally {
+            levelZeroExecutor.close();
+        }
+    }
+
+    @Test
+    void usesWebSearchSpecificCodeWhenPermissionIsMissing() {
+        ToolExecutor webExecutor = new ToolExecutor(
+                new ToolRegistry(Set.of(new WebSearchTool(
+                        new WebSearchProperties(true, "auto", 5, Duration.ofSeconds(15)),
+                        new WebSearchPolicy(),
+                        input -> new WebSearchResult(input.query(), "now", "result", java.util.List.of(), "test")))),
+                agentRunService, Duration.ofMillis(50));
+        try {
+            assertThatThrownBy(() -> webExecutor.execute(
+                    "web.search", new WebSearchInput("天气", 5, null), context(Set.of(), Set.of())))
+                    .isInstanceOf(AgentException.class)
+                    .satisfies(error -> assertThat(((AgentException) error).code())
+                            .isEqualTo("AGENT_WEB_SEARCH_FORBIDDEN"));
+        } finally {
+            webExecutor.close();
+        }
     }
 
     @Test
