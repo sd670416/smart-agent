@@ -32,9 +32,11 @@ agent:
     mode: local-hash
   model:
     mode: openai-compatible
-    base-url: https://api.iruidong.com/v1
-    api-key: "rk-4ffe99a27082d8147800e278e834679891f17c3fb487d659da0407a04cc1d021"
-    chat-model: glm-4.6
+#    base-url: https://api.iruidong.com/v1
+    base-url: http://192.168.0.179:8080/v1
+#    api-key: "rk-4ffe99a27082d8147800e278e834679891f17c3fb487d659da0407a04cc1d021"
+    api-key: "sk-75f39d4c9e8eb71b913532cc4a233b923a6ad9a6f9568deb6ebd8619c8906eb8"
+    chat-model: gpt-5.6-sol
     connect-timeout: 10s
     read-timeout: 120s
 

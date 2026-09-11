@@ -42,6 +42,8 @@ public class ChatOrchestrator {
     static final int MAX_MODEL_TURNS = 6;
     static final int MAX_TOOL_CALLS = 5;
     static final int MAX_CITATIONS = 20;
+    static final int MAX_HISTORY_MESSAGES = 20;
+    static final int MAX_HISTORY_BYTES = 32 * 1024;
     static final Duration MAX_RUN_DURATION = Duration.ofSeconds(90);
 
     private final ConversationService conversationService;
@@ -152,12 +154,14 @@ public class ChatOrchestrator {
                         context.tenantId(), context.userId(), command.conversationId(), traceId));
                 status = AgentRunStatus.RECEIVED;
                 validateAttachments();
+                List<ModelRequest.ConversationEntry> history = withinBudget(this::loadConversationHistory);
                 String attachmentUrls = attachmentReferences().stream()
                         .collect(java.util.stream.Collectors.joining("\n"));
                 Message userMessage = withinBudget(() -> conversationService.appendMessage(
                         context.tenantId(), context.userId(), command.conversationId(), Message.Role.USER,
                         command.question(), attachmentUrls));
                 emit(ChatEvent.messageStart(run.id(), traceId, userMessage.id()));
+                messages.addAll(history);
                 messages.add(new ModelRequest.ConversationMessage("user", modelQuestion(), attachmentParts()));
                 validatePageProject();
                 moveTo(AgentRunStatus.ROUTING);
@@ -287,8 +291,20 @@ public class ChatOrchestrator {
 
         private boolean isRelevantTool(AgentTool<?, ?> tool) {
             if (!tool.key().startsWith("project.")) return true;
-            String question = command.question().toLowerCase(java.util.Locale.ROOT);
+            StringBuilder contextText = new StringBuilder(command.question());
+            messages.stream().filter(ModelRequest.ConversationMessage.class::isInstance)
+                    .map(ModelRequest.ConversationMessage.class::cast)
+                    .forEach(message -> contextText.append('\n').append(message.content()));
+            String question = contextText.toString().toLowerCase(java.util.Locale.ROOT);
             return question.contains("项目") || question.contains("project") || question.contains("当前")
+                    || question.contains("合同") || question.contains("材料") || question.contains("劳务")
+                    || question.contains("机械") || question.contains("分包") || question.contains("付款")
+                    || question.contains("回款")
+                    || question.contains("统计") || question.contains("数量") || question.contains("多少")
+                    || question.contains("筛选") || question.contains("查询") || question.contains("搜索")
+                    || question.contains("分组") || question.contains("排序") || question.contains("预算")
+                    || question.contains("立项") || question.contains("已建") || question.contains("已立")
+                    || question.contains("查看更多") || question.contains("下一页")
                     || command.pageContext() != null && command.pageContext().projectId() != null;
         }
 
@@ -315,17 +331,21 @@ public class ChatOrchestrator {
                     turnDeltas.append(delta.text());
                     if (turnDeltas.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8).length > 64 * 1024) {
                         fail("AGENT_ANSWER_TOO_LARGE", AgentRunStatus.FAILED);
-                    } else {
-                        emit(ChatEvent.delta(run.id(), traceId, delta.text()));
                     }
                 }
             } else if (event instanceof ModelEvent.ToolRequested requested) {
                 turnTools.add(requested);
+                persistDebug("TOOL_REQUEST", requested.toolKey(), requested.argumentsJson());
+                emit(ChatEvent.debug(run.id(), traceId, "TOOL_REQUEST", Map.of(
+                        "toolKey", requested.toolKey(), "arguments", requested.argumentsJson())));
             } else if (event instanceof ModelEvent.Completed completed) {
                 turnCompleted = completed;
+                persistDebug("MODEL_RESPONSE", null, completed.text());
+                emit(ChatEvent.debug(run.id(), traceId, "MODEL_RESPONSE", Map.of(
+                        "text", completed.text() == null ? "" : completed.text(),
+                        "inputTokens", completed.inputTokens(), "outputTokens", completed.outputTokens())));
             } else if (event instanceof ModelEvent.Failed failed) {
-                String safeModelCode = failed.code() != null && failed.code().contains("TIMEOUT")
-                        ? "AGENT_MODEL_TIMEOUT" : "AGENT_MODEL_FAILED";
+                String safeModelCode = modelFailureCode(failed.code());
                 runService.recordStep(context.tenantId(), context.userId(), run.id(), "MODEL",
                         "{\"turn\":" + modelTurns + "}", "{\"outcome\":\"FAILED\",\"code\":\""
                                 + safeModelCode + "\"}");
@@ -396,6 +416,9 @@ public class ChatOrchestrator {
                 Object result = awaitTool(toolFuture);
                 if (terminated.get() || sink.isCancelled()) return false;
                 String serializedResult = objectMapper.writeValueAsString(result);
+                persistDebug("TOOL_RESULT", request.toolKey(), serializedResult);
+                emit(ChatEvent.debug(run.id(), traceId, "TOOL_RESULT", Map.of(
+                        "toolKey", request.toolKey(), "result", serializedResult)));
                 long durationMillis = Duration.ofNanos(System.nanoTime() - toolStarted).toMillis();
                 String risk = toolRegistry.require(request.toolKey()).risk().name();
                 int resultSize = serializedResult.getBytes(java.nio.charset.StandardCharsets.UTF_8).length;
@@ -426,9 +449,13 @@ public class ChatOrchestrator {
                 return true;
             } catch (AgentException exception) {
                 if (terminated.get()) return false;
+                persistDebug("TOOL_ERROR", request.toolKey(), exception.code() + ": " + exception.getMessage());
+                emit(ChatEvent.debug(run.id(), traceId, "TOOL_ERROR", Map.of(
+                        "toolKey", request.toolKey(), "error", exception.code(), "message", exception.getMessage())));
                 if (!recordFailedTool(request.toolKey(), safeToolOutcome(exception), toolStarted)) return false;
-                fail(exception.code(), exception.status().value() == 403
-                        ? AgentRunStatus.PERMISSION_DENIED : AgentRunStatus.FAILED);
+                    fail(exception.code(), exception.status().value() == 403
+                            ? AgentRunStatus.PERMISSION_DENIED : AgentRunStatus.FAILED,
+                            exception.getMessage());
                 return false;
             } catch (ToolAuditPersistenceException exception) {
                 if (terminated.get()) return false;
@@ -437,6 +464,10 @@ public class ChatOrchestrator {
                 return false;
             } catch (RuntimeException exception) {
                 if (terminated.get()) return false;
+                persistDebug("TOOL_ERROR", request.toolKey(), "RUNTIME_ERROR: "
+                        + (exception.getMessage() == null ? "" : exception.getMessage()));
+                emit(ChatEvent.debug(run.id(), traceId, "TOOL_ERROR", Map.of(
+                        "toolKey", request.toolKey(), "error", "RUNTIME_ERROR", "message", exception.getMessage() == null ? "" : exception.getMessage())));
                 if (!recordFailedTool(request.toolKey(),
                         isTimeout(exception) ? "TIMED_OUT" : "INVALID_INPUT", toolStarted)) return false;
                 fail(isTimeout(exception) ? "AGENT_RUN_TIMEOUT" : "AGENT_TOOL_INVALID_INPUT",
@@ -444,6 +475,8 @@ public class ChatOrchestrator {
                 return false;
             } catch (Exception exception) {
                 if (terminated.get()) return false;
+                persistDebug("TOOL_ERROR", request.toolKey(), "INVALID_INPUT: "
+                        + (exception.getMessage() == null ? "" : exception.getMessage()));
                 if (!recordFailedTool(request.toolKey(), "INVALID_INPUT", toolStarted)) return false;
                 fail("AGENT_TOOL_INVALID_INPUT", AgentRunStatus.FAILED);
                 return false;
@@ -502,9 +535,11 @@ public class ChatOrchestrator {
                 fail("AGENT_ANSWER_TOO_LARGE", AgentRunStatus.FAILED);
                 return;
             }
-            if (turnDeltas.isEmpty()) {
-                emit(ChatEvent.delta(run.id(), traceId, answer));
+            if (isStandaloneToolArguments(answer)) {
+                fail("AGENT_MODEL_PROTOCOL_ERROR", AgentRunStatus.FAILED);
+                return;
             }
+            emit(ChatEvent.delta(run.id(), traceId, answer));
             try {
                 synchronized (terminalLock) {
                     if (terminated.get() || sink.isCancelled()) return;
@@ -568,11 +603,15 @@ public class ChatOrchestrator {
         }
 
         private void fail(String code, AgentRunStatus terminalStatus) {
+            fail(code, terminalStatus, null);
+        }
+
+        private void fail(String code, AgentRunStatus terminalStatus, String detail) {
             synchronized (terminalLock) {
                 if (!terminated.compareAndSet(false, true)) return;
                 modelSubscription.dispose();
                 cancelActiveTool();
-                String message = errorMessage(code);
+                String message = errorMessage(code, detail);
                 if (run != null && status != null && !isTerminal(status)) {
                     try {
                         run = runService.finishTerminal(context.tenantId(), context.userId(), run.id(), status,
@@ -592,17 +631,56 @@ public class ChatOrchestrator {
             }
         }
 
+        private void persistDebug(String type, String toolKey, String content) {
+            try {
+                String value = content == null ? "" : content;
+                if (value.length() > 20000) value = value.substring(0, 20000);
+                runService.recordStep(context.tenantId(), context.userId(), run.id(), "AI_DEBUG_" + type,
+                        toolKey, value);
+            } catch (RuntimeException ignored) {
+                // Debug persistence must not affect the chat response.
+            }
+        }
+
+        private String modelFailureCode(String code) {
+            if (code != null && code.contains("TIMEOUT")) return "AGENT_MODEL_TIMEOUT";
+            if ("MODEL_TOOL_ARGUMENTS_INVALID".equals(code)) return "AGENT_QUERY_INVALID_REQUEST";
+            if ("MODEL_TOOL_SCHEMA_INVALID".equals(code)) return "AGENT_QUERY_UNAVAILABLE";
+            return "AGENT_MODEL_FAILED";
+        }
+
+        private List<ModelRequest.ConversationEntry> loadConversationHistory() {
+            List<Message> persisted = conversationService.find(
+                    context.tenantId(), context.userId(), command.conversationId()).messages().stream()
+                    .filter(message -> message.role() == Message.Role.USER || message.role() == Message.Role.ASSISTANT)
+                    .toList();
+            List<ModelRequest.ConversationEntry> reversed = new ArrayList<>();
+            int bytes = 0;
+            for (int index = persisted.size() - 1;
+                    index >= 0 && reversed.size() < MAX_HISTORY_MESSAGES; index--) {
+                Message message = persisted.get(index);
+                int messageBytes = utf8Size(message.content());
+                if (!reversed.isEmpty() && bytes + messageBytes > MAX_HISTORY_BYTES) break;
+                reversed.add(new ModelRequest.ConversationMessage(
+                        message.role() == Message.Role.USER ? "user" : "assistant", message.content()));
+                bytes += messageBytes;
+            }
+            java.util.Collections.reverse(reversed);
+            return reversed;
+        }
+
         private String errorMessage(String code) {
-            if ("AGENT_MODEL_FAILED".equals(code) && !command.attachmentIds().isEmpty()) {
-                return "当前模型暂不支持图片分析，请改用文字提问或切换支持视觉能力的模型。";
+            return AgentErrorMessageCatalog.message(code, !command.attachmentIds().isEmpty());
+        }
+
+        private String errorMessage(String code, String detail) {
+            if (detail != null && !detail.isBlank()
+                    && ("AGENT_QUERY_FIELD_UNKNOWN".equals(code)
+                    || "AGENT_QUERY_VALUE_INVALID".equals(code)
+                    || "AGENT_QUERY_OPERATOR_INVALID".equals(code))) {
+                return AgentErrorMessageCatalog.queryClarification(code, detail);
             }
-            if ("AGENT_MODEL_TIMEOUT".equals(code) || "AGENT_RUN_TIMEOUT".equals(code)) {
-                return "本次请求处理超时，请稍后重试。";
-            }
-            if ("AGENT_PERSISTENCE_FAILED".equals(code)) {
-                return "消息保存失败，请稍后重试。";
-            }
-            return "Agent request failed";
+            return errorMessage(code);
         }
 
         private String safeCode(RuntimeException exception) {
@@ -659,6 +737,26 @@ public class ChatOrchestrator {
 
         private int utf8Size(String value) {
             return value.getBytes(java.nio.charset.StandardCharsets.UTF_8).length;
+        }
+
+        private boolean isStandaloneToolArguments(String answer) {
+            String candidate = answer.trim();
+            if (candidate.startsWith("```") && candidate.endsWith("```")) {
+                candidate = candidate.replaceFirst("^```(?:json)?\\s*", "")
+                        .replaceFirst("\\s*```$", "").trim();
+            }
+            try {
+                JsonNode node = objectMapper.readTree(candidate);
+                if (node == null || !node.isObject() || node.isEmpty()) return false;
+                java.util.Set<String> toolFields = java.util.Set.of(
+                        "projectId", "projectCode", "projectName", "contractType",
+                        "keyword", "status", "page", "pageSize");
+                java.util.Iterator<String> fields = node.fieldNames();
+                while (fields.hasNext()) if (!toolFields.contains(fields.next())) return false;
+                return true;
+            } catch (com.fasterxml.jackson.core.JsonProcessingException ignored) {
+                return false;
+            }
         }
 
         private boolean isTimeout(Throwable error) {

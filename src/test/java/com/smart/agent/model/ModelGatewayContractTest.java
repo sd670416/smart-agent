@@ -2,7 +2,10 @@ package com.smart.agent.model;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
+import static org.mockito.Mockito.mock;
 
+import com.smart.agent.tool.project.ProjectBusinessClient;
+import com.smart.agent.tool.project.ProjectContractsTool;
 import dev.langchain4j.agent.tool.ToolExecutionRequest;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.ChatMessage;
@@ -258,6 +261,55 @@ class ModelGatewayContractTest {
     }
 
     @Test
+    void openAiGatewayAcceptsNestedProjectQuerySchemaAndArguments() {
+        String arguments = "{\"filter\":{\"logic\":\"and\",\"conditions\":[{"
+                + "\"field\":\"projectStatus\",\"operator\":\"eq\",\"value\":\"已立项\"}]}}";
+        AtomicReference<ChatRequest> captured = new AtomicReference<>();
+        ModelGateway gateway = capturingModel(captured, handler -> {
+            handler.onCompleteToolCall(new CompleteToolCall(0, ToolExecutionRequest.builder()
+                    .id("query-call-1")
+                    .name("project.query")
+                    .arguments(arguments)
+                    .build()));
+            handler.onCompleteResponse(response("", 0, 0));
+        });
+
+        assertThat(eventsOf(gateway, nestedSchemaRequest())).containsExactly(
+                new ModelEvent.ToolRequested("query-call-1", "project.query", arguments),
+                new ModelEvent.Completed("", 0, 0));
+        assertThat(captured.get()).isNotNull();
+    }
+
+    @Test
+    void openAiGatewayRejectsUnknownNestedToolArgument() {
+        ModelGateway gateway = new OpenAiCompatibleModelGateway(streamingModel(handler ->
+                handler.onCompleteToolCall(new CompleteToolCall(0, ToolExecutionRequest.builder()
+                        .id("query-call-2")
+                        .name("project.query")
+                        .arguments("{\"filter\":{\"logic\":\"and\",\"conditions\":[{"
+                                + "\"field\":\"projectStatus\",\"operator\":\"eq\","
+                                + "\"value\":\"已立项\",\"sql\":\"select secret\"}]}}")
+                        .build()))), Duration.ofSeconds(1));
+
+        assertThat(eventsOf(gateway, nestedSchemaRequest())).containsExactly(
+                new ModelEvent.Failed("MODEL_TOOL_ARGUMENTS_INVALID", "Model requested invalid tool arguments"));
+    }
+
+    @Test
+    void openAiGatewayRejectsMissingNestedRequiredToolArgument() {
+        ModelGateway gateway = new OpenAiCompatibleModelGateway(streamingModel(handler ->
+                handler.onCompleteToolCall(new CompleteToolCall(0, ToolExecutionRequest.builder()
+                        .id("query-call-3")
+                        .name("project.query")
+                        .arguments("{\"filter\":{\"logic\":\"and\",\"conditions\":[{"
+                                + "\"field\":\"projectStatus\",\"value\":\"已立项\"}]}}")
+                        .build()))), Duration.ofSeconds(1));
+
+        assertThat(eventsOf(gateway, nestedSchemaRequest())).containsExactly(
+                new ModelEvent.Failed("MODEL_TOOL_ARGUMENTS_INVALID", "Model requested invalid tool arguments"));
+    }
+
+    @Test
     void openAiGatewayRejectsProviderToolOutsideRequestAllowList() {
         ModelGateway gateway = new OpenAiCompatibleModelGateway(streamingModel(handler ->
                 handler.onCompleteToolCall(new CompleteToolCall(0, ToolExecutionRequest.builder()
@@ -285,6 +337,25 @@ class ModelGatewayContractTest {
         assertThat(eventsOf(gateway, unsupportedSchema)).containsExactly(
                 new ModelEvent.Failed("MODEL_TOOL_SCHEMA_INVALID", "Model tool schema is invalid"));
         assertThat(captured.get()).isNull();
+    }
+
+    @Test
+    void registeredProjectContractsSchemaCanReachProvider() {
+        AtomicReference<ChatRequest> captured = new AtomicReference<>();
+        ModelGateway gateway = capturingModel(captured, handler ->
+                handler.onCompleteResponse(response("合同查询完成", 1, 1)));
+        ProjectContractsTool tool = new ProjectContractsTool(mock(ProjectBusinessClient.class));
+        ModelRequest contractsRequest = new ModelRequest(
+                "run-contracts-schema",
+                "v1",
+                List.of(new ModelRequest.ConversationMessage("user", "查询合同信息")),
+                List.of(new ModelRequest.AllowedToolSpecification(
+                        tool.key(), tool.description(), tool.argumentsSchemaJson())),
+                List.of());
+
+        assertThat(eventsOf(gateway, contractsRequest))
+                .containsExactly(new ModelEvent.Completed("合同查询完成", 1, 1));
+        assertThat(captured.get()).isNotNull();
     }
 
     @Test
@@ -371,6 +442,25 @@ class ModelGatewayContractTest {
                         "project.getOverview",
                         "Get a project overview",
                         "{\"type\":\"object\",\"properties\":{\"projectId\":{\"type\":\"string\"}},\"required\":[\"projectId\"],\"additionalProperties\":false}")),
+                List.of());
+    }
+
+    private static ModelRequest nestedSchemaRequest() {
+        String schema = "{\"type\":\"object\",\"description\":\"项目通用查询\",\"properties\":{"
+                + "\"filter\":{\"type\":\"object\",\"description\":\"筛选条件组\",\"properties\":{"
+                + "\"logic\":{\"type\":\"string\",\"description\":\"条件关系\"},"
+                + "\"conditions\":{\"type\":\"array\",\"description\":\"筛选条件\",\"items\":{"
+                + "\"type\":\"object\",\"properties\":{"
+                + "\"field\":{\"type\":\"string\"},\"operator\":{\"type\":\"string\"},"
+                + "\"value\":{}},\"required\":[\"field\",\"operator\"],"
+                + "\"additionalProperties\":false}}},\"required\":[\"logic\",\"conditions\"],"
+                + "\"additionalProperties\":false}},\"required\":[\"filter\"],"
+                + "\"additionalProperties\":false}";
+        return new ModelRequest(
+                "run-nested-schema",
+                "v1",
+                List.of(new ModelRequest.ConversationMessage("user", "查询已立项项目")),
+                List.of(new ModelRequest.AllowedToolSpecification("project.query", "项目通用查询", schema)),
                 List.of());
     }
 

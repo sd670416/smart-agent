@@ -14,8 +14,9 @@ public class ProjectBusinessClientConfiguration {
             havingValue = "smart-boot", matchIfMissing = true)
     ProjectBusinessClient smartBootProjectBusinessClient(
             ObjectMapper objectMapper,
-            @Value("${agent.business.base-url:http://localhost:8888}") String baseUrl) {
+            @Value("${agent.business.base-url:http://localhost:8888}") String baseUrl,
+            @Value("${AGENT_LOCAL_CONTEXT_SECRET}") String internalSecret) {
         WebClient client = WebClient.builder().baseUrl(baseUrl).build();
-        return new SmartBootProjectBusinessClient(client, objectMapper);
+        return new SmartBootProjectBusinessClient(client, objectMapper, internalSecret);
     }
 }

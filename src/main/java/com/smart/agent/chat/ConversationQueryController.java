@@ -5,6 +5,8 @@ import com.smart.agent.conversation.ConversationService;
 import com.smart.agent.run.AgentRun;
 import com.smart.agent.run.AgentRunRepository;
 import com.smart.agent.run.AgentRunService;
+import com.smart.agent.run.AgentRunStep;
+import com.smart.agent.run.AgentRunStepRepository;
 import com.smart.agent.security.AgentUserContext;
 import java.util.List;
 import org.springframework.web.bind.annotation.*;
@@ -19,8 +21,10 @@ public class ConversationQueryController {
     private final ConversationService conversations;
     private final AgentRunRepository runs;
     private final AgentRunService runService;
-    public ConversationQueryController(ConversationService conversations, AgentRunRepository runs, AgentRunService runService) {
-        this.conversations = conversations; this.runs = runs; this.runService = runService;
+    private final AgentRunStepRepository steps;
+    public ConversationQueryController(ConversationService conversations, AgentRunRepository runs, AgentRunService runService,
+            AgentRunStepRepository steps) {
+        this.conversations = conversations; this.runs = runs; this.runService = runService; this.steps = steps;
     }
     @GetMapping("/{id}")
     @Transactional(readOnly = true)
@@ -67,8 +71,49 @@ public class ConversationQueryController {
 
     public static class CreateConversationRequest { public String title; }
     @GetMapping("/{id}/runs")
-    public List<AgentRun> runs(@PathVariable String id, @RequestAttribute("com.smart.agent.security.AgentUserContext") AgentUserContext c) {
-        return runs.findByTenantIdAndUserIdAndConversationId(c.tenantId(), c.userId(), id);
+    @Transactional(readOnly = true)
+    public List<RunSummary> runs(@PathVariable String id, @RequestAttribute("com.smart.agent.security.AgentUserContext") AgentUserContext c) {
+        return runs.findByTenantIdAndUserIdAndConversationId(c.tenantId(), c.userId(), id).stream()
+                .map(RunSummary::new).collect(Collectors.toList());
+    }
+    @GetMapping("/{id}/runs/{runId}/steps")
+    @Transactional(readOnly = true)
+    public List<RunStepSummary> steps(@PathVariable String id, @PathVariable String runId,
+            @RequestAttribute("com.smart.agent.security.AgentUserContext") AgentUserContext c) {
+        runs.findByIdAndTenantIdAndUserId(c.tenantId(), c.userId(), runId)
+                .filter(run -> id.equals(run.conversationId()))
+                .orElseThrow(() -> new IllegalArgumentException("Agent run not found"));
+        return steps.findByTenantIdAndUserIdAndRunIdOrderBySequence(c.tenantId(), c.userId(), runId).stream()
+                .map(RunStepSummary::new).collect(Collectors.toList());
+    }
+
+    public static final class RunSummary {
+        private final String id;
+        private final String traceId;
+        private final String status;
+        RunSummary(AgentRun run) {
+            this.id = run.id(); this.traceId = run.traceId(); this.status = run.status().name();
+        }
+        public String getId() { return id; }
+        public String getTraceId() { return traceId; }
+        public String getStatus() { return status; }
+    }
+
+    public static final class RunStepSummary {
+        private final long sequence;
+        private final String type;
+        private final String status;
+        private final String safeInputSummary;
+        private final String safeOutputSummary;
+        RunStepSummary(AgentRunStep step) {
+            this.sequence = step.sequence(); this.type = step.type(); this.status = step.status();
+            this.safeInputSummary = step.safeInputSummary(); this.safeOutputSummary = step.safeOutputSummary();
+        }
+        public long getSequence() { return sequence; }
+        public String getType() { return type; }
+        public String getStatus() { return status; }
+        public String getSafeInputSummary() { return safeInputSummary; }
+        public String getSafeOutputSummary() { return safeOutputSummary; }
     }
     @PostMapping("/{id}/runs/{runId}/cancel")
     public AgentRun cancel(@PathVariable String runId, @RequestAttribute("com.smart.agent.security.AgentUserContext") AgentUserContext c) {

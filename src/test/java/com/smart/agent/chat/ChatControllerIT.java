@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.smart.agent.conversation.Conversation;
 import com.smart.agent.conversation.ConversationRepository;
 import com.smart.agent.conversation.ConversationService;
+import com.smart.agent.conversation.Message;
 import com.smart.agent.run.AgentRun;
 import com.smart.agent.run.AgentRunRepository;
 import com.smart.agent.run.AgentRunService;
@@ -28,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -61,6 +63,7 @@ import org.springframework.test.web.reactive.server.WebTestClient;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
         "spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration",
         "agent.persistence.enabled=false",
+        "agent.qdrant.enabled=false",
         "AGENT_LOCAL_CONTEXT_SECRET=task-8-test-context-secret"
 })
 @Import(ChatControllerIT.TestBeans.class)
@@ -87,6 +90,7 @@ class ChatControllerIT {
     @Autowired private ObjectMapper objectMapper;
     @Autowired private KnowledgeSearchService knowledgeSearchService;
     @Autowired private InMemoryAgentRunStepRepository stepRepository;
+    @Autowired private ChatOrchestrator chatOrchestrator;
 
     private String conversationId;
 
@@ -127,6 +131,68 @@ class ChatControllerIT {
         assertThat(run.toolExecutionSummaries()).contains("project.getOverview").doesNotContain("projectName");
         assertThat(run.inputTokens()).isPositive();
         assertThat(run.outputTokens()).isPositive();
+    }
+
+    @Test
+    void includesPreviousConversationMessagesInFollowingModelRequest() {
+        streamQuestion("我想查看项目 XG0000001");
+        streamQuestion("这个项目还有哪些具体信息");
+
+        ModelRequest secondRequest = scenarioModelGateway.requests().get(1);
+        assertThat(secondRequest.redactedConversationMessages())
+                .extracting(ModelRequest.ConversationEntry::content)
+                .containsExactly("我想查看项目 XG0000001", "answer", "这个项目还有哪些具体信息");
+    }
+
+    @Test
+    void doesNotExposeStreamedToolArgumentsAsChatText() {
+        List<ChatEvent> events = chatOrchestrator.stream(
+                        new ChatCommand(conversationId, "partial-tool-json", null),
+                        new AgentUserContext("tenant-1", "user-1", "identity-1", Set.of("menu:project"),
+                                Set.of("project-1"), Set.of()), "trace-tool-json")
+                .collectList().block(Duration.ofSeconds(5));
+
+        assertThat(events).extracting(ChatEvent::text).doesNotContain("{\"projectId\":\"project-1\"}");
+        assertThat(events).anyMatch(event -> event.type().equals("tool_start"));
+    }
+
+    @Test
+    void keepsContractToolAvailableForContextualFollowUp() {
+        streamQuestion("查看项目 20260709001 的详细信息");
+        streamQuestion("帮我查询一下合同信息");
+
+        assertThat(scenarioModelGateway.requests().get(1).allowedToolSpecifications())
+                .extracting(ModelRequest.AllowedToolSpecification::key)
+                .contains("project.getContracts");
+    }
+
+    @Test
+    void offersSemanticProjectQueryForNaturalLanguageFiltersAndStatistics() {
+        streamQuestion("统计今年创建且已经立项的项目数量");
+
+        assertThat(scenarioModelGateway.requests().getFirst().allowedToolSpecifications())
+                .extracting(ModelRequest.AllowedToolSpecification::key)
+                .contains("project.query");
+    }
+
+    @Test
+    void rejectsStandaloneToolArgumentJsonAsFinalAnswer() {
+        List<ChatEvent> events = chatOrchestrator.stream(new ChatCommand(conversationId, "json-only", null),
+                        new AgentUserContext("tenant-1", "user-1", "identity-1", Set.of(), Set.of(), Set.of()),
+                        "trace-json-only")
+                .collectList().block(Duration.ofSeconds(5));
+
+        assertThat(events).noneMatch(event -> "{\"projectCode\":\"20260709001\"}".equals(event.text()));
+        assertThat(conversationService.find("tenant-1", "user-1", conversationId).messages())
+                .extracting(Message::content)
+                .doesNotContain("{\"projectCode\":\"20260709001\"}");
+    }
+
+    private void streamQuestion(String question) {
+        chatOrchestrator.stream(new ChatCommand(conversationId, question, null),
+                        new AgentUserContext("tenant-1", "user-1", "identity-1", Set.of("menu:project"),
+                                Set.of("project-1"), Set.of("space-1")), UUID.randomUUID().toString())
+                .collectList().block(Duration.ofSeconds(5));
     }
 
     @Test
@@ -249,7 +315,7 @@ class ChatControllerIT {
     }
 
     @Test
-    void forwardsFirstDeltaBeforeModelCompletion() {
+    void buffersDeltaUntilModelCompletion() {
         Flux<ChatEvent> events = orchestrator.stream(new ChatCommand(conversationId, "slow-stream", null),
                 new AgentUserContext("tenant-1", "user-1", "identity-1", Set.of(), Set.of(), Set.of()),
                 "trace-stream");
@@ -259,16 +325,22 @@ class ChatControllerIT {
                 deltaBeforeComplete.set(true);
             }
         }).collectList().block(Duration.ofSeconds(5));
-        assertThat(deltaBeforeComplete).isTrue();
+        assertThat(deltaBeforeComplete).isFalse();
+        assertThat(streamed).anyMatch(event -> event.type().equals("message_delta")
+                && "first".equals(event.text()));
         assertThat(streamed.getLast().type()).isEqualTo("message_end");
     }
 
     @Test
     void cancellationAfterDeltaDisposesModelAndPreventsLaterPersistence() {
-        orchestrator.stream(new ChatCommand(conversationId, "cancel-after-delta", null),
+        Disposable subscription = orchestrator.stream(new ChatCommand(conversationId, "cancel-after-delta", null),
                         new AgentUserContext("tenant-1", "user-1", "identity-1", Set.of(), Set.of(), Set.of()),
                         "trace-cancel-active")
-                .take(5).blockLast(Duration.ofSeconds(5));
+                .subscribe();
+        for (int index = 0; index < 50 && scenarioModelGateway.subscriptions() == 0; index++) {
+            try { Thread.sleep(10); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+        }
+        subscription.dispose();
         awaitStatus(AgentRunStatus.CANCELLED);
         assertThat(scenarioModelGateway.subscriptions()).isOne();
         assertThat(scenarioModelGateway.disposed()).isTrue();
@@ -513,6 +585,11 @@ class ChatControllerIT {
     @TestConfiguration(proxyBeanMethods = false)
     static class TestBeans {
         @Bean
+        com.smart.agent.model.audit.ModelCallLogRepository modelCallLogRepository() {
+            return mock(com.smart.agent.model.audit.ModelCallLogRepository.class);
+        }
+
+        @Bean
         InMemoryConversationRepository conversationRepository() {
             return new InMemoryConversationRepository();
         }
@@ -568,9 +645,11 @@ class ChatControllerIT {
             private final AtomicBoolean completedEmitted = new AtomicBoolean();
             private final AtomicBoolean typedToolResult = new AtomicBoolean();
             private final AtomicInteger modelCalls = new AtomicInteger();
+            private final List<ModelRequest> requests = new java.util.concurrent.CopyOnWriteArrayList<>();
 
             @Override
             public Flux<ModelEvent> stream(ModelRequest request) {
+                requests.add(request);
                 modelCalls.incrementAndGet();
                 String question = request.redactedConversationMessages().getFirst().content();
                 if (question.equals("malformed-tool")) {
@@ -593,6 +672,16 @@ class ChatControllerIT {
                 if (question.equals("tool-limit")) {
                     return Flux.just(new ModelEvent.ToolRequested("repeat", "project.getOverview",
                             "{\"projectId\":\"project-1\"}"));
+                }
+                if (question.equals("json-only")) {
+                    return Flux.just(new ModelEvent.Completed("{\"projectCode\":\"20260709001\"}", 2, 3));
+                }
+                if (question.equals("partial-tool-json") && request.redactedConversationMessages().size() == 1) {
+                    return Flux.just(
+                            new ModelEvent.TextDelta("{\"projectId\":\"project-1\"}"),
+                            new ModelEvent.ToolRequested("partial-call", "project.getOverview",
+                                    "{\"projectId\":\"project-1\"}"),
+                            new ModelEvent.Completed("{\"projectId\":\"project-1\"}", 2, 3));
                 }
                 if (question.equals("multi-tools") && request.redactedConversationMessages().size() == 1) {
                     return Flux.just(
@@ -624,9 +713,11 @@ class ChatControllerIT {
             boolean completedEmitted() { return completedEmitted.get(); }
             boolean sawTypedToolResult() { return typedToolResult.get(); }
             int modelCalls() { return modelCalls.get(); }
+            List<ModelRequest> requests() { return List.copyOf(requests); }
             void reset() {
                 subscriptions.set(0); disposed.set(false); completedEmitted.set(false); typedToolResult.set(false);
                 modelCalls.set(0);
+                requests.clear();
             }
         }
 

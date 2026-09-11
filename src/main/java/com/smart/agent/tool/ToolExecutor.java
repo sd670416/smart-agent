@@ -127,6 +127,9 @@ public class ToolExecutor implements AutoCloseable {
             future.cancel(true);
             throw exception;
         } catch (ExecutionException exception) {
+            if (exception.getCause() instanceof AgentException agentException) {
+                throw agentException;
+            }
             throw new ToolExecutionException();
         }
     }

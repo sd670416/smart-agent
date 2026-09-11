@@ -7,9 +7,9 @@ spring:
   profiles:
     default: local
   datasource:
-    url: ${AGENT_DB_URL:jdbc:mysql://localhost:3307/smart_agent?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai}
-    username: ${AGENT_DB_USERNAME:smart_agent}
-    password: ${AGENT_DB_PASSWORD:smart_agent_dev}
+    url: ${AGENT_DB_URL:jdbc:mysql://localhost:3306/smart_agent?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai}
+    username: ${AGENT_DB_USERNAME:root}
+    password: ${AGENT_DB_PASSWORD:root}
   jpa:
     open-in-view: false
     hibernate:

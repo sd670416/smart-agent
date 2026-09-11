@@ -14,6 +14,7 @@ public class JpaAgentRunStepRepository implements AgentRunStepRepository {
     @Override @Transactional
     public AgentRunStep save(AgentRunStep step) { entityManager.persist(step); return step; }
     @Override
+    @Transactional(readOnly = true)
     public List<AgentRunStep> findByTenantIdAndUserIdAndRunIdOrderBySequence(
             String tenantId, String userId, String runId) {
         return entityManager.createQuery("select s from AgentRunStep s where s.tenantId=:tenant and s.userId=:user "

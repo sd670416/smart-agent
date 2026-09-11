@@ -13,7 +13,10 @@ import dev.langchain4j.data.message.ImageContent;
 import dev.langchain4j.data.message.ToolExecutionResultMessage;
 import dev.langchain4j.model.chat.StreamingChatModel;
 import dev.langchain4j.model.chat.request.ChatRequest;
+import dev.langchain4j.model.chat.request.json.JsonArraySchema;
 import dev.langchain4j.model.chat.request.json.JsonObjectSchema;
+import dev.langchain4j.model.chat.request.json.JsonRawSchema;
+import dev.langchain4j.model.chat.request.json.JsonSchemaElement;
 import dev.langchain4j.model.chat.response.ChatResponse;
 import dev.langchain4j.model.chat.response.CompleteToolCall;
 import dev.langchain4j.model.chat.response.StreamingChatResponseHandler;
@@ -185,7 +188,7 @@ public class OpenAiCompatibleModelGateway implements ModelGateway {
                     new ModelEvent.Failed("MODEL_TOOL_ARGUMENTS_INVALID", "Model requested invalid tool arguments"));
             return;
         }
-        sink.next(new ModelEvent.ToolRequested(tool.id(), tool.name(), tool.arguments()));
+        sink.next(new ModelEvent.ToolRequested(tool.id(), schema.internalKey, tool.arguments()));
     }
 
     private PreparedRequest prepareRequest(ModelRequest request) {
@@ -195,10 +198,13 @@ public class OpenAiCompatibleModelGateway implements ModelGateway {
         Map<String, SupportedToolSchema> schemas = new HashMap<>();
         List<ToolSpecification> toolSpecifications = new ArrayList<>();
         for (ModelRequest.AllowedToolSpecification specification : request.allowedToolSpecifications()) {
-            SupportedToolSchema schema = SupportedToolSchema.from(specification);
-            if (schemas.putIfAbsent(specification.key(), schema) != null) {
+            String providerName = providerToolName(specification.key());
+            SupportedToolSchema schema = SupportedToolSchema.from(specification, providerName);
+            if (schemas.putIfAbsent(providerName, schema) != null) {
                 throw new RequestRejectedException("MODEL_TOOL_SCHEMA_INVALID", "Model tool schema is invalid");
             }
+            // Keep accepting the internal name in tests and with providers that do not rewrite names.
+            schemas.putIfAbsent(specification.key(), schema);
             toolSpecifications.add(schema.toolSpecification);
         }
 
@@ -226,6 +232,11 @@ public class OpenAiCompatibleModelGateway implements ModelGateway {
         }
         return new PreparedRequest(
                 ChatRequest.builder().messages(messages).toolSpecifications(toolSpecifications).build(), Map.copyOf(schemas));
+    }
+
+    private static String providerToolName(String internalKey) {
+        if (internalKey == null || internalKey.isBlank()) return "tool";
+        return internalKey.replace('.', '_');
     }
 
     private static String formatUntrustedEvidence(ModelRequest.RetrievedEvidence evidence) {
@@ -307,48 +318,25 @@ public class OpenAiCompatibleModelGateway implements ModelGateway {
     }
 
     private record SupportedToolSchema(
+            String internalKey,
             ToolSpecification toolSpecification,
-            Map<String, String> propertyTypes,
-            Set<String> requiredProperties,
-            boolean additionalProperties) {
+            SupportedSchemaNode schema) {
 
-        private static SupportedToolSchema from(ModelRequest.AllowedToolSpecification specification) {
+        private static SupportedToolSchema from(ModelRequest.AllowedToolSpecification specification, String providerName) {
             try {
                 JsonNode root = OBJECT_MAPPER.readTree(specification.argumentsSchemaJson());
-                requireObject(root);
-                rejectUnknownFields(root, Set.of("type", "properties", "required", "additionalProperties"));
-                if (!"object".equals(root.path("type").asText())) {
+                SupportedSchemaNode schema = SupportedSchemaNode.from(root, 0);
+                if (!"object".equals(schema.type)) {
                     throw new IllegalArgumentException();
                 }
-                JsonObjectSchema.Builder builder = JsonObjectSchema.builder();
-                Map<String, String> propertyTypes = new HashMap<>();
-                JsonNode properties = root.path("properties");
-                if (!properties.isMissingNode()) {
-                    requireObject(properties);
-                    properties.fields().forEachRemaining(entry -> {
-                        JsonNode property = entry.getValue();
-                        requireObject(property);
-                        rejectUnknownFields(property, Set.of("type"));
-                        String type = property.path("type").asText();
-                        addProperty(builder, entry.getKey(), type);
-                        propertyTypes.put(entry.getKey(), type);
-                    });
-                }
-                Set<String> required = requiredProperties(root.path("required"), propertyTypes.keySet());
-                if (!required.isEmpty()) {
-                    builder.required(required.toArray(String[]::new));
-                }
-                boolean additionalProperties = additionalProperties(root.path("additionalProperties"));
-                builder.additionalProperties(additionalProperties);
                 return new SupportedToolSchema(
+                        specification.key(),
                         ToolSpecification.builder()
-                                .name(specification.key())
+                                .name(providerName)
                                 .description(specification.description())
-                                .parameters(builder.build())
+                                .parameters((JsonObjectSchema) schema.modelSchema)
                                 .build(),
-                        Map.copyOf(propertyTypes),
-                        Set.copyOf(required),
-                        additionalProperties);
+                        schema);
             } catch (RuntimeException | java.io.IOException error) {
                 throw new RequestRejectedException("MODEL_TOOL_SCHEMA_INVALID", "Model tool schema is invalid");
             }
@@ -357,29 +345,99 @@ public class OpenAiCompatibleModelGateway implements ModelGateway {
         private boolean accepts(String arguments) {
             try {
                 JsonNode values = OBJECT_MAPPER.readTree(arguments);
-                if (values == null || !values.isObject()) {
-                    return false;
-                }
-                for (String required : requiredProperties) {
-                    if (!values.has(required) || !matchesType(values.get(required), propertyTypes.get(required))) {
-                        return false;
-                    }
-                }
-                var fields = values.fields();
-                while (fields.hasNext()) {
-                    var entry = fields.next();
-                    String type = propertyTypes.get(entry.getKey());
-                    if (type == null && !additionalProperties) {
-                        return false;
-                    }
-                    if (type != null && !matchesType(entry.getValue(), type)) {
-                        return false;
-                    }
-                }
-                return true;
+                return values != null && schema.accepts(values, 0);
             } catch (RuntimeException | java.io.IOException error) {
                 return false;
             }
+        }
+    }
+
+    private record SupportedSchemaNode(
+            String type,
+            Map<String, SupportedSchemaNode> properties,
+            Set<String> requiredProperties,
+            SupportedSchemaNode items,
+            boolean additionalProperties,
+            JsonSchemaElement modelSchema) {
+
+        private static final int MAX_DEPTH = 8;
+        private static final int MAX_ARRAY_ITEMS = 100;
+
+        private static SupportedSchemaNode from(JsonNode node, int depth) {
+            requireObject(node);
+            if (depth > MAX_DEPTH) throw new IllegalArgumentException();
+            if (node.isEmpty()) {
+                return new SupportedSchemaNode("any", Map.of(), Set.of(), null, true,
+                        JsonRawSchema.from("{}"));
+            }
+            rejectUnknownFields(node, Set.of(
+                    "type", "description", "properties", "required", "additionalProperties", "items"));
+            String type = node.path("type").asText();
+            String description = optionalDescription(node.path("description"));
+            return switch (type) {
+                case "object" -> objectNode(node, description, depth);
+                case "array" -> arrayNode(node, description, depth);
+                case "string", "integer", "number", "boolean" -> primitiveNode(node, type);
+                default -> throw new IllegalArgumentException();
+            };
+        }
+
+        private static SupportedSchemaNode objectNode(JsonNode node, String description, int depth) {
+            rejectFieldsForType(node, Set.of("type", "description", "properties", "required", "additionalProperties"));
+            JsonNode propertyNodes = node.path("properties");
+            if (!propertyNodes.isMissingNode()) requireObject(propertyNodes);
+            Map<String, SupportedSchemaNode> properties = new HashMap<>();
+            JsonObjectSchema.Builder builder = JsonObjectSchema.builder();
+            if (description != null) builder.description(description);
+            if (!propertyNodes.isMissingNode()) {
+                propertyNodes.fields().forEachRemaining(entry -> {
+                    SupportedSchemaNode property = from(entry.getValue(), depth + 1);
+                    properties.put(entry.getKey(), property);
+                    builder.addProperty(entry.getKey(), property.modelSchema);
+                });
+            }
+            Set<String> required = requiredProperties(node.path("required"), properties.keySet());
+            if (!required.isEmpty()) builder.required(required.toArray(String[]::new));
+            boolean additional = additionalProperties(node.path("additionalProperties"));
+            builder.additionalProperties(additional);
+            return new SupportedSchemaNode("object", Map.copyOf(properties), Set.copyOf(required), null,
+                    additional, builder.build());
+        }
+
+        private static SupportedSchemaNode arrayNode(JsonNode node, String description, int depth) {
+            rejectFieldsForType(node, Set.of("type", "description", "items"));
+            JsonNode itemNode = node.path("items");
+            if (itemNode.isMissingNode()) throw new IllegalArgumentException();
+            SupportedSchemaNode items = from(itemNode, depth + 1);
+            JsonArraySchema.Builder builder = JsonArraySchema.builder().items(items.modelSchema);
+            if (description != null) builder.description(description);
+            return new SupportedSchemaNode("array", Map.of(), Set.of(), items, false, builder.build());
+        }
+
+        private static SupportedSchemaNode primitiveNode(JsonNode node, String type) {
+            rejectFieldsForType(node, Set.of("type", "description"));
+            return new SupportedSchemaNode(type, Map.of(), Set.of(), null, false,
+                    JsonRawSchema.from(node.toString()));
+        }
+
+        private boolean accepts(JsonNode value, int depth) {
+            if (depth > MAX_DEPTH || !matchesType(value, type)) return false;
+            if ("any".equals(type)) return true;
+            if ("array".equals(type)) {
+                if (value.size() > MAX_ARRAY_ITEMS) return false;
+                for (JsonNode item : value) if (!items.accepts(item, depth + 1)) return false;
+                return true;
+            }
+            if (!"object".equals(type)) return true;
+            for (String required : requiredProperties) if (!value.has(required)) return false;
+            var fields = value.fields();
+            while (fields.hasNext()) {
+                var entry = fields.next();
+                SupportedSchemaNode property = properties.get(entry.getKey());
+                if (property == null && !additionalProperties) return false;
+                if (property != null && !property.accepts(entry.getValue(), depth + 1)) return false;
+            }
+            return true;
         }
 
         private static void requireObject(JsonNode node) {
@@ -396,14 +454,14 @@ public class OpenAiCompatibleModelGateway implements ModelGateway {
             });
         }
 
-        private static void addProperty(JsonObjectSchema.Builder builder, String name, String type) {
-            switch (type) {
-                case "string" -> builder.addStringProperty(name);
-                case "integer" -> builder.addIntegerProperty(name);
-                case "number" -> builder.addNumberProperty(name);
-                case "boolean" -> builder.addBooleanProperty(name);
-                default -> throw new IllegalArgumentException();
-            }
+        private static void rejectFieldsForType(JsonNode node, Set<String> supportedFields) {
+            rejectUnknownFields(node, supportedFields);
+        }
+
+        private static String optionalDescription(JsonNode description) {
+            if (description.isMissingNode()) return null;
+            if (!description.isTextual() || description.textValue().isBlank()) throw new IllegalArgumentException();
+            return description.textValue();
         }
 
         private static Set<String> requiredProperties(JsonNode required, Set<String> properties) {
@@ -434,6 +492,9 @@ public class OpenAiCompatibleModelGateway implements ModelGateway {
 
         private static boolean matchesType(JsonNode value, String type) {
             return switch (type) {
+                case "any" -> true;
+                case "object" -> value.isObject();
+                case "array" -> value.isArray();
                 case "string" -> value.isTextual();
                 case "integer" -> value.isIntegralNumber();
                 case "number" -> value.isNumber();

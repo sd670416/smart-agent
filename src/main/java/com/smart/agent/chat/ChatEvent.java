@@ -35,6 +35,10 @@ public record ChatEvent(
         return new ChatEvent("tool_result", runId, traceId, null, "SUCCEEDED", null, toolKey, Map.of());
     }
 
+    static ChatEvent debug(String runId, String traceId, String code, Map<String, Object> data) {
+        return new ChatEvent("ai_debug", runId, traceId, null, code, null, null, data);
+    }
+
     static ChatEvent citation(String runId, String traceId, Map<String, Object> data) {
         return new ChatEvent("citation", runId, traceId, null, null, null, null, Map.copyOf(data));
     }
@@ -48,7 +52,7 @@ public record ChatEvent(
     }
 
     static ChatEvent error(String runId, String traceId, String code) {
-        return error(runId, traceId, code, "Agent request failed");
+        return error(runId, traceId, code, AgentErrorMessageCatalog.message(code, false));
     }
 
     static ChatEvent error(String runId, String traceId, String code, String text) {

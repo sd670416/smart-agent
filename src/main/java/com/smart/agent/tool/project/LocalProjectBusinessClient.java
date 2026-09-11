@@ -26,4 +26,7 @@ public class LocalProjectBusinessClient implements ProjectBusinessClient {
     @Override public AccessibleProjectsResult listAccessible(ToolContext context, AccessibleProjectsInput input) {
         return new AccessibleProjectsResult(input.page(), input.pageSize(), 0, false, List.of());
     }
+    @Override public ProjectQueryResult query(ToolContext context, ProjectQueryInput input) {
+        return ProjectQueryResult.empty(input.page(), input.pageSize());
+    }
 }
