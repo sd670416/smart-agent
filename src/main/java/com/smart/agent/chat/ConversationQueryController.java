@@ -37,16 +37,22 @@ public class ConversationQueryController {
     @GetMapping
     public List<ConversationSummary> list(@RequestAttribute("com.smart.agent.security.AgentUserContext") AgentUserContext c) {
         return conversations.list(c.tenantId(), c.userId()).stream()
-                .map(item -> new ConversationSummary(item.id(), item.title()))
+                .map(ConversationSummary::new)
                 .collect(Collectors.toList());
     }
 
     public static final class ConversationSummary {
         private final String id;
         private final String title;
-        public ConversationSummary(String id, String title) { this.id = id; this.title = title; }
+        private final java.time.Instant updatedAt;
+        public ConversationSummary(Conversation conversation) {
+            this.id = conversation.id();
+            this.title = conversation.title();
+            this.updatedAt = conversation.updatedAt();
+        }
         public String getId() { return id; }
         public String getTitle() { return title; }
+        public java.time.Instant getUpdatedAt() { return updatedAt; }
     }
 
     @PostMapping
@@ -61,7 +67,7 @@ public class ConversationQueryController {
                                @RequestAttribute("com.smart.agent.security.AgentUserContext") AgentUserContext c) {
         String title = request == null ? null : request.title;
         Conversation conversation = conversations.rename(c.tenantId(), c.userId(), id, title);
-        return new ConversationSummary(conversation.id(), conversation.title());
+        return new ConversationSummary(conversation);
     }
 
     @DeleteMapping("/{id}")
@@ -91,12 +97,17 @@ public class ConversationQueryController {
         private final String id;
         private final String traceId;
         private final String status;
+        private final java.time.Instant createdAt;
+        private final java.time.Instant updatedAt;
         RunSummary(AgentRun run) {
             this.id = run.id(); this.traceId = run.traceId(); this.status = run.status().name();
+            this.createdAt = run.createdAt(); this.updatedAt = run.updatedAt();
         }
         public String getId() { return id; }
         public String getTraceId() { return traceId; }
         public String getStatus() { return status; }
+        public java.time.Instant getCreatedAt() { return createdAt; }
+        public java.time.Instant getUpdatedAt() { return updatedAt; }
     }
 
     public static final class RunStepSummary {

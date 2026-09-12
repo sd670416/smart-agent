@@ -25,6 +25,7 @@ import com.smart.agent.tool.web.WebSearchResult;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -131,6 +132,7 @@ public class ChatOrchestrator {
         private final reactor.core.Disposable.Swap modelSubscription = Disposables.swap();
         private final AtomicReference<CompletableFuture<?>> activeToolOperation = new AtomicReference<>();
         private final List<ModelRequest.ConversationEntry> messages = new ArrayList<>();
+        private final Map<String, CachedToolResult> toolResultCache = new HashMap<>();
         private long sequence;
         private AgentRun run;
         private AgentRunStatus status;
@@ -395,17 +397,33 @@ public class ChatOrchestrator {
         }
 
         private boolean executeTool(ModelEvent.ToolRequested request) {
-            if (toolCalls >= MAX_TOOL_CALLS) {
-                fail("AGENT_TOOL_CALL_LIMIT", AgentRunStatus.FAILED);
-                return false;
-            }
-            toolCalls++;
             long toolStarted = System.nanoTime();
             try {
                 JsonNode input = objectMapper.readTree(request.argumentsJson());
                 if (input == null || !input.isObject()) {
                     throw new IllegalArgumentException("tool input must be an object");
                 }
+                String normalizedArguments = objectMapper.writeValueAsString(input);
+                String cacheKey = request.toolKey() + "\n" + normalizedArguments;
+                CachedToolResult cached = toolResultCache.get(cacheKey);
+                if (cached != null) {
+                    moveTo(AgentRunStatus.TOOL_SELECTING);
+                    emit(ChatEvent.toolStart(run.id(), traceId, request.toolKey()));
+                    moveTo(AgentRunStatus.TOOL_EXECUTING);
+                    emit(ChatEvent.status(run.id(), traceId, status));
+                    messages.add(new ModelRequest.ToolResultMessage(
+                            request.callId(), request.toolKey(), normalizedArguments, cached.serializedResult()));
+                    persistDebug("TOOL_RESULT", request.toolKey(), cached.debugResult());
+                    emit(ChatEvent.debug(run.id(), traceId, "TOOL_RESULT", Map.of(
+                            "toolKey", request.toolKey(), "result", cached.debugResult(), "cached", true)));
+                    emit(ChatEvent.toolResult(run.id(), traceId, request.toolKey()));
+                    return true;
+                }
+                if (toolCalls >= MAX_TOOL_CALLS) {
+                    fail("AGENT_TOOL_CALL_LIMIT", AgentRunStatus.FAILED);
+                    return false;
+                }
+                toolCalls++;
                 moveTo(AgentRunStatus.TOOL_SELECTING);
                 emit(ChatEvent.toolStart(run.id(), traceId, request.toolKey()));
                 CompletableFuture<Object> toolFuture;
@@ -443,11 +461,9 @@ public class ChatOrchestrator {
                     } catch (RuntimeException persistenceFailure) {
                         throw new ToolAuditPersistenceException(persistenceFailure);
                     }
-                    messages.add(new ModelRequest.ConversationMessage(
-                            "assistant", "Requested permitted tool " + request.toolKey()
-                                    + " with call " + request.callId()));
+                    toolResultCache.put(cacheKey, new CachedToolResult(serializedResult, debugResult));
                     messages.add(new ModelRequest.ToolResultMessage(
-                            request.callId(), request.toolKey(), serializedResult));
+                            request.callId(), request.toolKey(), normalizedArguments, serializedResult));
                     emit(ChatEvent.toolResult(run.id(), traceId, request.toolKey()));
                 }
                 return true;
@@ -609,6 +625,8 @@ public class ChatOrchestrator {
         private void fail(String code, AgentRunStatus terminalStatus) {
             fail(code, terminalStatus, null);
         }
+
+        private record CachedToolResult(String serializedResult, String debugResult) {}
 
         private void fail(String code, AgentRunStatus terminalStatus, String detail) {
             synchronized (terminalLock) {

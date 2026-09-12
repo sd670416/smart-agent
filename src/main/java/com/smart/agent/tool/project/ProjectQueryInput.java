@@ -58,6 +58,11 @@ public record ProjectQueryInput(List<String> select, ProjectQueryFilter filter, 
             case "\u9879\u76ee\u72b6\u6001", "\u72b6\u6001" -> "projectStatus";
             case "\u9879\u76ee\u7c7b\u578b", "\u7c7b\u578b" -> "projectType";
             case "\u9879\u76ee\u9884\u7b97", "\u9884\u7b97" -> "projectBudget";
+            case "\u6240\u5c5e\u7ec4\u7ec7" -> "organizationName";
+            case "\u9879\u76ee\u6027\u8d28" -> "projectNature";
+            case "\u8054\u8425\u5355\u4f4d", "\u8054\u8425\u516c\u53f8" -> "affiliatedCompanyName";
+            case "\u5efa\u8bbe\u5355\u4f4d" -> "constructionCompany";
+            case "\u9879\u76ee\u7ecf\u7406", "\u9879\u76ee\u8d1f\u8d23\u4eba" -> "personInChargeName";
             case "\u521b\u5efa\u65f6\u95f4", "\u521b\u5efa\u65e5\u671f" -> "createDate";
             case "\u66f4\u65b0\u65f6\u95f4", "\u66f4\u65b0\u65e5\u671f" -> "updateDate";
             default -> value.trim();

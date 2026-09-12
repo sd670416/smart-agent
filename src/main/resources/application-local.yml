@@ -17,9 +17,16 @@ agent:
   persistence:
     enabled: true
 
+  # 公开互联网查询默认关闭。启用前需配置 ai:web-search 权限，且当前模型账号支持原生联网。
+  web-search:
+    enabled: false
+    provider: auto
+    max-results: 5
+    timeout: 15s
+
   qdrant:
     enabled: true
-    host: 192.168.0.179
+    host: 192.168.18.179
     grpc-port: 6334
     api-key: "b3947db2ce4ca4a59cbe1e262d2cf91240ca955bf3ef08ae35aec23e2991e9d7"
     tls: false
@@ -33,7 +40,7 @@ agent:
   model:
     mode: openai-compatible
 #    base-url: https://api.iruidong.com/v1
-    base-url: http://192.168.0.179:8080/v1
+    base-url: http://192.168.18.179:8080/v1
 #    api-key: "rk-4ffe99a27082d8147800e278e834679891f17c3fb487d659da0407a04cc1d021"
     api-key: "sk-75f39d4c9e8eb71b913532cc4a233b923a6ad9a6f9568deb6ebd8619c8906eb8"
     chat-model: gpt-5.6-sol

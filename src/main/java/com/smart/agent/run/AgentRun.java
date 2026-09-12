@@ -160,6 +160,8 @@ public class AgentRun {
     }
 
     public String traceId() { return traceId; }
+    public Instant createdAt() { return createdAt; }
+    public Instant updatedAt() { return updatedAt; }
     public String safeErrorCode() { return safeErrorCode; }
     public int inputTokens() { return inputTokens; }
     public int outputTokens() { return outputTokens; }

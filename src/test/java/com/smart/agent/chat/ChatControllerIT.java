@@ -317,6 +317,21 @@ class ChatControllerIT {
     }
 
     @Test
+    void reusesIdenticalToolResultWithinOneRun() {
+        List<ChatEvent> events = chatOrchestrator.stream(
+                        new ChatCommand(conversationId, "duplicate-time-tool", null),
+                        new AgentUserContext("tenant-1", "user-1", "identity-1", Set.of(), Set.of(), Set.of()),
+                        "trace-duplicate-time")
+                .collectList().block(Duration.ofSeconds(5));
+
+        assertThat(events.getLast().type()).isEqualTo("message_end");
+        AgentRun run = runRepository.findByTenantIdAndUserIdAndConversationId(
+                "tenant-1", "user-1", conversationId).getFirst();
+        assertThat(run.toolExecutionSummaries().lines()).hasSize(1);
+        assertThat(scenarioModelGateway.modelCalls()).isEqualTo(3);
+    }
+
+    @Test
     void executesMultipleToolsInArrivalOrderAndCountsEveryModelTurn() {
         List<String> events = stream("multi-tools", Set.of("project:read"), Set.of("project-1"));
         assertThat(events.stream().filter(event -> event.contains("\"type\":\"tool_start\"")).toList())
@@ -736,6 +751,14 @@ class ChatControllerIT {
                 if (question.equals("tool-limit")) {
                     return Flux.just(new ModelEvent.ToolRequested("repeat", "project.getOverview",
                             "{\"projectId\":\"project-1\"}"));
+                }
+                if (question.equals("duplicate-time-tool")) {
+                    long results = request.redactedConversationMessages().stream()
+                            .filter(ModelRequest.ToolResultMessage.class::isInstance).count();
+                    if (results < 2) return Flux.just(new ModelEvent.ToolRequested(
+                            "time-" + results, "system.current_time", "{\"timezone\":\"Asia/Shanghai\"}"),
+                            new ModelEvent.Completed("", 2, 1));
+                    return Flux.just(new ModelEvent.Completed("已按当前时间完成查询。", 2, 3));
                 }
                 if (question.equals("web-search-sensitive")) {
                     return Flux.just(new ModelEvent.ToolRequested("web-sensitive", "web.search",

@@ -97,7 +97,7 @@ Expected: FAIL，原因是策略类型不存在。
 
 `WebSearchTool.requiredPermission()` 返回 `ai:web-search`，风险等级 L1。`agent.web-search.enabled=false` 时返回 `AGENT_WEB_SEARCH_DISABLED`；工具只向 Provider 传递清洗后的单轮 query。
 
-- [ ] **Step 5: 验证并形成阶段检查点**
+- [x] **Step 5: 验证并形成阶段检查点**
 
 Run: `mvn -Dtest=WebSearchPolicyTest,WebSearchToolTest test`
 
@@ -132,7 +132,7 @@ Expected: FAIL。
 
 通过独立 WebClient 调用 OpenAI 原生联网端点；只发送 query、模型和 Web Search 工具配置。非 2xx、限流与超时分别映射为 `AGENT_WEB_SEARCH_FAILED`、`AGENT_WEB_SEARCH_RATE_LIMITED`、`AGENT_WEB_SEARCH_TIMEOUT`。
 
-- [ ] **Step 4: 验证并形成阶段检查点**
+- [x] **Step 4: 验证并形成阶段检查点**
 
 Run: `mvn -Dtest=OpenAiWebSearchProviderTest,WebSearchToolTest test`
 
@@ -223,11 +223,11 @@ Expected: PASS。刷新会话确认联网处理信息仍显示后暂停。
 - Consumes: `WebSearchResult.sources` 与已持久化调试步骤。
 - Produces: 聊天中的来源列表和安全外链。
 
-- [ ] **Step 1: 写历史来源恢复失败测试**
+- [x] **Step 1: 写历史来源恢复失败测试**
 
 构造包含来源的实时事件与历史步骤，断言刷新前后生成相同来源数据；危险协议 URL 不进入可点击链接。
 
-- [ ] **Step 2: 验证测试失败**
+- [x] **Step 2: 验证测试失败**
 
 Run: `node --test src/views/ai/assistant/composables/conversation-events.test.js`
 
@@ -235,15 +235,15 @@ Workdir: `../smart-web`
 
 Expected: FAIL，原因是来源尚未映射。
 
-- [ ] **Step 3: 实现来源展示**
+- [x] **Step 3: 实现来源展示**
 
 在助手回答下展示来源标题与域名；仅允许 `https:`，链接使用新窗口和 `rel="noopener noreferrer"`。不新增嵌套卡片，不展示 provider 调试字段。
 
-- [ ] **Step 4: 增加配置说明**
+- [x] **Step 4: 增加配置说明**
 
 在 `application-local.yml` 增加关闭状态的示例配置，在 README 说明 OpenAI/智谱启用条件、权限与安全限制，不写入真实密钥。
 
-- [ ] **Step 5: 完整验证**
+- [x] **Step 5: 完整验证**
 
 Run: `mvn test`
 
@@ -254,3 +254,5 @@ Run: `pnpm build:test`
 Workdir: `../smart-web`
 
 Expected: 两端构建通过。人工验收当前时间、天气、公开政策、今年项目、内部合同禁止出网、OpenAI/智谱切换、刷新回显和来源链接。
+
+进度（2026-09-12）：聊天回答下方已增加“公开来源”，实时事件与刷新后的持久化步骤使用同一套来源转换；只允许 HTTPS 链接点击，危险协议仅显示不可点击标题，最多展示 10 条并按 URL 去重。补充了默认关闭的本地配置示例及 OpenAI/智谱、权限和禁止内部数据出网说明。联网相关后端定向测试 24 项通过，前端来源测试 3 项通过，`pnpm build:test` 构建成功。`mvn test` 全量测试仍有既有失败，集中在附件状态旧断言、工具权限名旧断言、模型消息角色/旧英文提示断言，以及关闭持久化时的测试装配；未为通过旧测试而回退当前生产规则。人工端到端验收需在前后端重启并配置 `ai:web-search` 权限、显式启用联网后执行。

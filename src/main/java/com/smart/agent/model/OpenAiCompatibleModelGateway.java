@@ -212,7 +212,14 @@ public class OpenAiCompatibleModelGateway implements ModelGateway {
         messages.add(SystemMessage.from(instruction));
         for (ModelRequest.ConversationEntry message : request.redactedConversationMessages()) {
             if (message instanceof ModelRequest.ToolResultMessage toolResult) {
-                messages.add(UserMessage.from(formatUntrustedToolResult(toolResult)));
+                ToolExecutionRequest providerRequest = ToolExecutionRequest.builder()
+                        .id(toolResult.callId())
+                        .name(providerToolName(toolResult.toolKey()))
+                        .arguments(toolResult.argumentsJson())
+                        .build();
+                messages.add(AiMessage.from(providerRequest));
+                messages.add(ToolExecutionResultMessage.from(
+                        providerRequest, formatUntrustedToolResult(toolResult)));
             } else {
                 ModelRequest.ConversationMessage conversation = (ModelRequest.ConversationMessage) message;
                 if ("assistant".equals(conversation.role())) {

@@ -55,11 +55,17 @@ public record ModelRequest(
         public AttachmentPart { requireText(url, "url"); }
     }
 
-    public record ToolResultMessage(String callId, String toolKey, String content) implements ConversationEntry {
+    public record ToolResultMessage(String callId, String toolKey, String argumentsJson,
+                                    String content) implements ConversationEntry {
         public ToolResultMessage {
             requireText(callId, "callId");
             requireText(toolKey, "toolKey");
+            requireText(argumentsJson, "argumentsJson");
             requireText(content, "content");
+        }
+
+        public ToolResultMessage(String callId, String toolKey, String content) {
+            this(callId, toolKey, "{}", content);
         }
     }
 

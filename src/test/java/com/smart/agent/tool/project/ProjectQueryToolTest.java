@@ -12,6 +12,17 @@ import org.junit.jupiter.api.Test;
 
 class ProjectQueryToolTest {
     @Test
+    void normalizesChineseProjectOverviewFieldNames() {
+        ProjectQueryInput input = new ProjectQueryInput(
+                List.of("所属组织", "项目性质", "联营单位", "项目类型", "建设单位", "项目经理", "项目状态", "项目预算"),
+                null, List.of(), List.of(), List.of(), 1, 20);
+
+        assertThat(input.select()).containsExactly(
+                "organizationName", "projectNature", "affiliatedCompanyName", "projectType",
+                "constructionCompany", "personInChargeName", "projectStatus", "projectBudget");
+    }
+
+    @Test
     void normalizesChineseAggregationAliasAndMatchingOrderField() {
         ProjectQueryInput input = new ProjectQueryInput(
                 List.of(), null, List.of("projectType"),
@@ -39,7 +50,10 @@ class ProjectQueryToolTest {
         assertThat(tool.requiredPermission()).isEqualTo("menu:project");
         assertThat(tool.risk()).isEqualTo(ToolRisk.L1);
         assertThat(tool.argumentsSchemaJson())
-                .contains("projectName", "filter", "conditions", "groupBy", "aggregations", "orderBy")
+                .contains("projectName", "projectCode", "organizationName", "projectNature",
+                        "affiliatedCompanyName", "projectType", "constructionCompany",
+                        "personInChargeName", "projectStatus", "projectBudget",
+                        "filter", "conditions", "groupBy", "aggregations", "orderBy")
                 .doesNotContain("tenantId", "userId", "projectIds", "sql", "column");
         verify(client).query(context, input);
     }

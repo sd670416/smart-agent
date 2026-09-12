@@ -100,6 +100,11 @@ public class Conversation {
         return title;
     }
 
+    @JsonProperty("updatedAt")
+    public Instant updatedAt() {
+        return updatedAt;
+    }
+
     public void rename(String title) {
         this.title = requireText(title, "title").trim();
         if (this.title.length() > 255) {

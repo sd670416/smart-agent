@@ -9,7 +9,7 @@ import org.springframework.stereotype.Component;
 public class ProjectQueryTool implements AgentTool<ProjectQueryInput, ProjectQueryResult> {
     private static final String SCHEMA = """
             {"type":"object","properties":{
-              "select":{"type":"array","description":"要返回的项目业务字段，如 projectName、projectCode、projectStatus、projectType、projectBudget、createDate","items":{"type":"string"}},
+              "select":{"type":"array","description":"要返回的项目业务字段。普通项目概况默认不传；如需指定，可用 projectName、projectCode、organizationName、projectNature、affiliatedCompanyName、projectType、constructionCompany、personInChargeName、projectStatus、projectBudget、createDate","items":{"type":"string"}},
               "filter":{"type":"object","properties":{
                 "logic":{"type":"string"},
                 "conditions":{"type":"array","items":{"type":"object","properties":{"field":{"type":"string"},"operator":{"type":"string"},"value":{}},"required":["field","operator"],"additionalProperties":false}},

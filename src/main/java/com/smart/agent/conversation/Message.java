@@ -117,6 +117,11 @@ public class Message {
         return Arrays.stream(attachmentsJson.split("\\n", -1)).filter(value -> !value.isBlank()).toList();
     }
 
+    @JsonProperty("createdAt")
+    public Instant createdAt() {
+        return createdAt;
+    }
+
     @PrePersist
     void initializeTimestamp() {
         if (createdAt == null) {

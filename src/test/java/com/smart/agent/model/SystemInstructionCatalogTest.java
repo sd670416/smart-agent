@@ -15,4 +15,12 @@ class SystemInstructionCatalogTest {
                 .contains("只发送本轮经过清洗的公开搜索词")
                 .contains("始终使用简体中文");
     }
+
+    @Test
+    void requestsCompleteDefaultProjectOverviewColumns() {
+        String instruction = new SystemInstructionCatalog().resolve("v1").orElseThrow();
+
+        assertThat(instruction).contains(
+                "项目名称、项目编号、所属组织、项目性质、联营单位、项目类型、建设单位、项目经理、项目状态、项目预算");
+    }
 }

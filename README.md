@@ -18,6 +18,25 @@
 
 当前阶段只服务现有工程管理系统，并通过 `smart-boot` 的 AI 业务适配接口继承用户身份、项目范围和数据权限。
 
+## 系统时间与联网查询
+
+智能助手提供 `system.current_time` 和 `web.search` 两个只读工具。时间工具用于当前时间及“今天、今年、最近 N 天”等相对日期，不访问公网。联网工具用于天气、新闻、公开政策法规、汇率等公开信息，并在回答下展示公开来源。
+
+联网查询默认关闭。启用前需要给相应角色配置 `ai:web-search` 权限，并确认当前模型账号支持原生联网能力：
+
+```yaml
+agent:
+  web-search:
+    enabled: true
+    provider: auto
+    max-results: 5
+    timeout: 15s
+```
+
+`provider: auto` 会根据当前 `agent.model.base-url` 和 `chat-model` 选择 OpenAI 或智谱；也可以显式配置为 `openai` 或 `zhipu`。密钥继续使用 `agent.model.api-key`，不要写入前端或提交到版本库。
+
+内部项目、合同、人员、供应商、Token、权限、数据库结构、附件原文和知识库原文禁止发送到公网。联网工具只发送本轮经过清洗的公开搜索词；敏感查询会在调用供应商前被拒绝。
+
 ## 本地开发
 
 本机开发时复制环境模板即可。`local` profile 会把项目根目录中被忽略的 `.env` 作为可选 Spring 配置导入；Compose 则通过 `--env-file` 使用同一文件。默认 `AGENT_DOCKER_BIND_HOST=127.0.0.1`，MySQL `3307`、Redis `6380`、Qdrant HTTP `6333` 和 gRPC `6334` 只在 Docker 主机本机可访问。

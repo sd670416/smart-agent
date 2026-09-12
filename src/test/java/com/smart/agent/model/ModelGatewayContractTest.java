@@ -185,8 +185,8 @@ class ModelGatewayContractTest {
                 "run-tool-result", "v1",
                 List.of(
                         new ModelRequest.ConversationMessage("user", "question"),
-                        new ModelRequest.ConversationMessage("assistant", "requested tool"),
-                        new ModelRequest.ToolResultMessage("call-1", "project.getOverview", "{\"name\":\"x\"}")),
+                        new ModelRequest.ToolResultMessage("call-1", "project.getOverview",
+                                "{\"projectId\":\"project-1\"}", "{\"name\":\"x\"}")),
                 List.of(), List.of());
 
         eventsOf(gateway, history);
@@ -196,8 +196,14 @@ class ModelGatewayContractTest {
                         ChatMessageType.TOOL_EXECUTION_RESULT);
         ToolExecutionResultMessage result = (ToolExecutionResultMessage) captured.get().messages().getLast();
         assertThat(result.id()).isEqualTo("call-1");
-        assertThat(result.toolName()).isEqualTo("project.getOverview");
+        assertThat(result.toolName()).isEqualTo("project_getOverview");
         assertThat(result.text()).contains("UNTRUSTED_TOOL_RESULT", "provenance=tool");
+        AiMessage toolCall = (AiMessage) captured.get().messages().get(2);
+        assertThat(toolCall.toolExecutionRequests()).singleElement().satisfies(request -> {
+            assertThat(request.id()).isEqualTo("call-1");
+            assertThat(request.name()).isEqualTo("project_getOverview");
+            assertThat(request.arguments()).isEqualTo("{\"projectId\":\"project-1\"}");
+        });
     }
 
     @Test
