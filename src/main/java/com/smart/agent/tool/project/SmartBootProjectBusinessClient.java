@@ -121,22 +121,26 @@ public class SmartBootProjectBusinessClient implements ProjectBusinessClient {
         String timestamp = String.valueOf(Instant.now().getEpochSecond());
         String roles = canonical(context.roleIds());
         String permissions = canonical(context.permissions());
+        String projects = canonical(context.projectIds());
         headers.set("X-Agent-Internal-Timestamp", timestamp);
         headers.set("X-Agent-Tenant-Id", context.tenantId());
         headers.set("X-Agent-User-Id", context.userId());
         headers.set("X-Agent-Identity-Id", context.identityId());
         headers.set("X-Agent-Role-Ids", roles);
         headers.set("X-Agent-Permissions", permissions);
-        headers.set("X-Agent-Internal-Signature", sign(timestamp, method, path, context, roles, permissions));
+        headers.set("X-Agent-Project-Ids", projects);
+        headers.set("X-Agent-Internal-Signature", sign(
+                timestamp, method, path, context, roles, permissions, projects));
     }
 
     private String sign(String timestamp, String method, String path, ToolContext context,
-                        String roles, String permissions) {
+                        String roles, String permissions, String projects) {
         try {
             Mac mac = Mac.getInstance("HmacSHA256");
             mac.init(new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
             String canonical = timestamp + "\n" + method + "\n" + path + "\n" + context.tenantId()
-                    + "\n" + context.userId() + "\n" + context.identityId() + "\n" + roles + "\n" + permissions;
+                    + "\n" + context.userId() + "\n" + context.identityId() + "\n" + roles + "\n" + permissions
+                    + "\n" + projects;
             return Base64.getUrlEncoder().withoutPadding().encodeToString(
                     mac.doFinal(canonical.getBytes(StandardCharsets.UTF_8)));
         } catch (Exception e) {

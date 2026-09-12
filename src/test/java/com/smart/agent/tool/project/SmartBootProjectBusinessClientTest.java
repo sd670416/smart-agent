@@ -37,11 +37,13 @@ class SmartBootProjectBusinessClientTest {
         AtomicReference<String> signature = new AtomicReference<>();
         AtomicReference<String> roles = new AtomicReference<>();
         AtomicReference<String> permissions = new AtomicReference<>();
+        AtomicReference<String> projects = new AtomicReference<>();
         DisposableServer server = HttpServer.create().port(0).handle((request, response) -> {
             timestamp.set(request.requestHeaders().get("X-Agent-Internal-Timestamp"));
             signature.set(request.requestHeaders().get("X-Agent-Internal-Signature"));
             roles.set(request.requestHeaders().get("X-Agent-Role-Ids"));
             permissions.set(request.requestHeaders().get("X-Agent-Permissions"));
+            projects.set(request.requestHeaders().get("X-Agent-Project-Ids"));
             return response.header("Content-Type", "application/json")
                     .sendString(reactor.core.publisher.Mono.just(
                             "{\"projectId\":\"p-1\",\"projectName\":\"上德项目一\",\"status\":\"1\",\"statusName\":\"在建\","
@@ -66,8 +68,9 @@ class SmartBootProjectBusinessClientTest {
             assertThat(timestamp.get()).isNotBlank();
             assertThat(roles.get()).isEqualTo("role-a,role-b");
             assertThat(permissions.get()).isEqualTo("menu:project:base,menu:project:contract");
+            assertThat(projects.get()).isEqualTo("p-1");
             assertThat(signature.get()).isEqualTo(sign(timestamp.get(), "POST", "/internal/ai/tools/project-overview",
-                    "tenant", "user", "identity", roles.get(), permissions.get()));
+                    "tenant", "user", "identity", roles.get(), permissions.get(), projects.get()));
         } finally {
             server.disposeNow();
         }
@@ -141,11 +144,12 @@ class SmartBootProjectBusinessClientTest {
     }
 
     private String sign(String timestamp, String method, String path, String tenantId, String userId,
-                        String identityId, String roles, String permissions) throws Exception {
+                        String identityId, String roles, String permissions, String projects) throws Exception {
         Mac mac = Mac.getInstance("HmacSHA256");
         mac.init(new SecretKeySpec(SECRET.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
         byte[] content = (timestamp + "\n" + method + "\n" + path + "\n" + tenantId + "\n" + userId
-                + "\n" + identityId + "\n" + roles + "\n" + permissions).getBytes(StandardCharsets.UTF_8);
+                + "\n" + identityId + "\n" + roles + "\n" + permissions + "\n" + projects)
+                .getBytes(StandardCharsets.UTF_8);
         return java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(mac.doFinal(content));
     }
 }
