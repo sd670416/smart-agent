@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -63,7 +64,7 @@ class ToolExecutorTest {
         Object result = executor.execute(
                 "project.getOverview",
                 new ProjectOverviewInput("project-1"),
-                context(Set.of("project:read"), Set.of("project-1")));
+                context(Set.of("menu:project"), Set.of("project-1")));
 
         assertThat(result).isEqualTo(new ProjectOverviewResult("project-1", "示例项目", "IN_PROGRESS", 0.42));
         ArgumentCaptor<ToolContext> context = ArgumentCaptor.forClass(ToolContext.class);
@@ -120,21 +121,25 @@ class ToolExecutorTest {
     }
 
     @Test
-    void deniesProjectOutsideTrustedScopeBeforeCallingBusinessClient() {
+    void rejectsIdentifierThatDoesNotMatchAnAccessibleProject() {
+        when(projectBusinessClient.listAccessible(any(), any()))
+                .thenReturn(new com.smart.agent.tool.project.AccessibleProjectsResult(
+                        1, 20, 0, false, java.util.List.of()));
+
         assertThatThrownBy(() -> executor.execute(
                         "project.getOverview",
                         new ProjectOverviewInput("project-2"),
-                        context(Set.of("project:read"), Set.of("project-1"))))
+                        context(Set.of("menu:project"), Set.of("project-1"))))
                 .isInstanceOf(AgentException.class)
-                .hasMessageContaining("project scope");
+                .hasMessageContaining("No accessible project");
 
-        verifyNoInteractions(projectBusinessClient);
+        verify(projectBusinessClient, never()).getOverview(any(), any());
     }
 
     @Test
     void rejectsUnknownToolWithoutCallingBusinessClient() {
         assertThatThrownBy(() -> executor.execute(
-                        "project.delete", Map.of(), context(Set.of("project:read"), Set.of("project-1"))))
+                        "project.delete", Map.of(), context(Set.of("menu:project"), Set.of("project-1"))))
                 .isInstanceOf(AgentException.class)
                 .hasMessageContaining("Unknown tool");
 
@@ -146,7 +151,7 @@ class ToolExecutorTest {
         assertThatThrownBy(() -> executor.execute(
                         "project.getOverview",
                         Map.of("projectId", "project-1", "forgedScope", "project-2"),
-                        context(Set.of("project:read"), Set.of("project-1"))))
+                        context(Set.of("menu:project"), Set.of("project-1"))))
                 .isInstanceOf(AgentException.class)
                 .hasMessage("Invalid tool input");
 
@@ -163,7 +168,7 @@ class ToolExecutorTest {
         assertThatThrownBy(() -> executor.execute(
                         "project.getOverview",
                         new ProjectOverviewInput("project-1"),
-                        context(Set.of("project:read"), Set.of("project-1"))))
+                        context(Set.of("menu:project"), Set.of("project-1"))))
                 .isInstanceOf(AgentException.class)
                 .hasMessage("Tool execution timed out")
                 .satisfies(exception -> assertThat(exception.getMessage()).doesNotContain("secret business failure"));
@@ -177,7 +182,7 @@ class ToolExecutorTest {
         assertThatThrownBy(() -> executor.execute(
                         "project.getOverview",
                         new ProjectOverviewInput("project-1"),
-                        context(Set.of("project:read"), Set.of("project-1"))))
+                        context(Set.of("menu:project"), Set.of("project-1"))))
                 .isInstanceOf(AgentException.class)
                 .hasMessage("Tool result exceeds size limit");
     }
@@ -190,7 +195,7 @@ class ToolExecutorTest {
         executor.execute(
                 "project.getOverview",
                 new ProjectOverviewInput("project-1"),
-                context(Set.of("project:read"), Set.of("project-1")));
+                context(Set.of("menu:project"), Set.of("project-1")));
 
         ArgumentCaptor<ToolExecutionSummary> summary = ArgumentCaptor.forClass(ToolExecutionSummary.class);
         verify(agentRunService).recordToolExecution(summary.capture());
