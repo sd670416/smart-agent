@@ -35,9 +35,13 @@ class SmartBootProjectBusinessClientTest {
     void signsProjectOverviewRequests() throws Exception {
         AtomicReference<String> timestamp = new AtomicReference<>();
         AtomicReference<String> signature = new AtomicReference<>();
+        AtomicReference<String> roles = new AtomicReference<>();
+        AtomicReference<String> permissions = new AtomicReference<>();
         DisposableServer server = HttpServer.create().port(0).handle((request, response) -> {
             timestamp.set(request.requestHeaders().get("X-Agent-Internal-Timestamp"));
             signature.set(request.requestHeaders().get("X-Agent-Internal-Signature"));
+            roles.set(request.requestHeaders().get("X-Agent-Role-Ids"));
+            permissions.set(request.requestHeaders().get("X-Agent-Permissions"));
             return response.header("Content-Type", "application/json")
                     .sendString(reactor.core.publisher.Mono.just(
                             "{\"projectId\":\"p-1\",\"projectName\":\"上德项目一\",\"status\":\"1\",\"statusName\":\"在建\","
@@ -51,7 +55,8 @@ class SmartBootProjectBusinessClientTest {
                     new SmartBootProjectBusinessClient(webClient, new ObjectMapper(), SECRET);
 
             ProjectOverviewResult result = client.getOverview(
-                    new ToolContext("tenant", "user", "identity", Set.of("p-1")), "p-1");
+                    new ToolContext("tenant", "user", "identity", Set.of("role-b", "role-a"), Set.of("p-1"),
+                            Set.of("menu:project:contract", "menu:project:base")), "p-1");
 
             assertThat(result.projectName()).isEqualTo("上德项目一");
             assertThat(result.statusName()).isEqualTo("在建");
@@ -59,7 +64,10 @@ class SmartBootProjectBusinessClientTest {
             assertThat(result.projectBudget()).isEqualByComparingTo("300000");
             assertThat(result.projectTypeName()).isEqualTo("房建");
             assertThat(timestamp.get()).isNotBlank();
-            assertThat(signature.get()).isEqualTo(sign(timestamp.get(), "POST", "/internal/ai/tools/project-overview"));
+            assertThat(roles.get()).isEqualTo("role-a,role-b");
+            assertThat(permissions.get()).isEqualTo("menu:project:base,menu:project:contract");
+            assertThat(signature.get()).isEqualTo(sign(timestamp.get(), "POST", "/internal/ai/tools/project-overview",
+                    "tenant", "user", "identity", roles.get(), permissions.get()));
         } finally {
             server.disposeNow();
         }
@@ -132,10 +140,12 @@ class SmartBootProjectBusinessClientTest {
         }
     }
 
-    private String sign(String timestamp, String method, String path) throws Exception {
+    private String sign(String timestamp, String method, String path, String tenantId, String userId,
+                        String identityId, String roles, String permissions) throws Exception {
         Mac mac = Mac.getInstance("HmacSHA256");
         mac.init(new SecretKeySpec(SECRET.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
-        byte[] content = (timestamp + "\n" + method + "\n" + path).getBytes(StandardCharsets.UTF_8);
+        byte[] content = (timestamp + "\n" + method + "\n" + path + "\n" + tenantId + "\n" + userId
+                + "\n" + identityId + "\n" + roles + "\n" + permissions).getBytes(StandardCharsets.UTF_8);
         return java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(mac.doFinal(content));
     }
 }
