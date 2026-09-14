@@ -7,8 +7,20 @@ public record ProjectQueryFilter(String logic, List<ProjectQueryCondition> condi
     public ProjectQueryFilter {
         logic = logic == null ? "AND" : logic.trim().toUpperCase(java.util.Locale.ROOT);
         conditions = conditions == null ? List.of() : conditions.stream().map(c -> c == null ? null
-                : new ProjectQueryCondition(c.field(), c.operator() == null ? null
-                : c.operator().trim().toLowerCase(java.util.Locale.ROOT), c.value())).toList();
+                : new ProjectQueryCondition(c.field(), normalizeOperator(c.operator()), c.value())).toList();
         groups = groups == null ? List.of() : List.copyOf(groups);
+    }
+
+    private static String normalizeOperator(String operator) {
+        if (operator == null) return null;
+        String value = operator.trim().toLowerCase(java.util.Locale.ROOT);
+        return switch (value) {
+            case ">=" -> "gte";
+            case "<=" -> "lte";
+            case ">" -> "gt";
+            case "<" -> "lt";
+            case "=" -> "eq";
+            default -> value;
+        };
     }
 }

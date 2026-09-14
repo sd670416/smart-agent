@@ -34,6 +34,19 @@ class ProjectQueryToolTest {
     }
 
     @Test
+    void normalizesSymbolicComparisonOperatorsToQueryDslNames() {
+        ProjectQueryFilter filter = new ProjectQueryFilter("AND", List.of(
+                new ProjectQueryCondition("createDate", ">=", "2026-01-01"),
+                new ProjectQueryCondition("createDate", "<=", "2026-12-31"),
+                new ProjectQueryCondition("projectBudget", ">", 1),
+                new ProjectQueryCondition("projectBudget", "<", 10),
+                new ProjectQueryCondition("projectName", "=", "示例")), List.of());
+
+        assertThat(filter.conditions()).extracting(ProjectQueryCondition::operator)
+                .containsExactly("gte", "lte", "gt", "lt", "eq");
+    }
+
+    @Test
     void exposesOnlyBusinessQueryDslAndDelegatesWithTrustedContext() {
         ProjectBusinessClient client = mock(ProjectBusinessClient.class);
         ProjectQueryTool tool = new ProjectQueryTool(client);

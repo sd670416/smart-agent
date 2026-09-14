@@ -30,7 +30,7 @@ public class ProjectQueryTool implements AgentTool<ProjectQueryInput, ProjectQue
     @Override public String requiredPermission() { return "menu:project"; }
     @Override public ToolRisk risk() { return ToolRisk.L1; }
     @Override public String description() {
-        return "按任意项目业务字段组合筛选、排序、分页、分组和统计当前用户有权访问的项目；不支持系统字段";
+        return "按任意项目业务字段组合筛选、排序、分页、分组和统计当前用户有权访问的项目；筛选操作符使用 eq、ne、contains、startsWith、endsWith、gt、gte、lt、lte、in、notIn、between、isNull、isNotNull；不支持系统字段";
     }
     @Override public String argumentsSchemaJson() { return SCHEMA; }
     @Override public ProjectQueryResult execute(ProjectQueryInput input, ToolContext context) {
