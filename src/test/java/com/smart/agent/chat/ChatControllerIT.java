@@ -92,6 +92,7 @@ class ChatControllerIT {
     @Autowired private KnowledgeSearchService knowledgeSearchService;
     @Autowired private InMemoryAgentRunStepRepository stepRepository;
     @Autowired private ChatOrchestrator chatOrchestrator;
+    @Autowired private TestBeans.TestProjectBusinessClient testProjectBusinessClient;
 
     private String conversationId;
 
@@ -99,7 +100,26 @@ class ChatControllerIT {
     void createConversation() {
         runRepository.clear();
         scenarioModelGateway.reset();
+        testProjectBusinessClient.reset();
         conversationId = conversationService.create("tenant-1", "user-1", "项目问答").id();
+    }
+
+    @Test
+    void streamsCompleteProjectArchiveWithAllowedSections() {
+        List<String> events = stream("查看 A001 项目的完整详情", Set.of("menu:project"), Set.of("project-1"));
+
+        assertThat(events).anyMatch(event -> event.contains("基础信息"));
+        assertThat(events).anyMatch(event -> event.contains("资金情况"));
+        assertThat(events.stream()
+                .filter(event -> event.contains("\"type\":\"message_delta\""))
+                .toList())
+                .noneMatch(event -> event.contains("tenantId")
+                        || event.contains("projectId") || event.contains("原始状态编码"));
+        assertThat(testProjectBusinessClient.archiveCalls()).isEqualTo(1);
+        AgentRun run = runRepository.findByTenantIdAndUserIdAndConversationId(
+                "tenant-1", "user-1", conversationId).getFirst();
+        assertThat(run.status()).isEqualTo(AgentRunStatus.COMPLETED);
+        assertThat(run.toolExecutionSummaries()).contains("project.getArchiveDetail");
     }
 
     @Test
@@ -109,7 +129,7 @@ class ChatControllerIT {
                         Set.of("project:read"), Set.of("project-1"), Set.of("space-1")))
                 .bodyValue(Map.of(
                         "conversationId", conversationId,
-                        "question", "查询项目 project-1 概况",
+                        "content", "查询项目 project-1 概况",
                         "pageContext", Map.of("projectId", "project-1")))
                 .exchange()
                 .expectStatus().isOk()
@@ -202,7 +222,7 @@ class ChatControllerIT {
                 .header("X-Agent-Context", signedContextToken(Set.of(), Set.of(), Set.of()))
                 .bodyValue(Map.of(
                         "conversationId", conversationId,
-                        "question", "hello",
+                        "content", "hello",
                         "tenantId", "attacker",
                         "permissions", List.of("project:read")))
                 .exchange()
@@ -216,7 +236,7 @@ class ChatControllerIT {
                 .header("X-Agent-Context", signedContextToken(Set.of(), Set.of(), Set.of()))
                 .bodyValue(Map.of(
                         "conversationId", conversationId,
-                        "question", "hello",
+                        "content", "hello",
                         "pageContext", Map.of("projectId", "project-1")))
                 .exchange().expectStatus().isOk()
                 .returnResult(String.class).getResponseBody().collectList().block(Duration.ofSeconds(5));
@@ -233,7 +253,7 @@ class ChatControllerIT {
         List<String> events = webTestClient.post().uri("/agent/chat/stream")
                 .header("X-Agent-Context", signedContextToken(
                         Set.of("knowledge:read"), Set.of("project-1"), Set.of("space-1")))
-                .bodyValue(Map.of("conversationId", conversationId, "question", "查询知识文档规范",
+                .bodyValue(Map.of("conversationId", conversationId, "content", "查询知识文档规范",
                         "pageContext", Map.of("projectId", "project-1")))
                 .exchange().expectStatus().isOk().returnResult(String.class)
                 .getResponseBody().collectList().block(Duration.ofSeconds(5));
@@ -352,7 +372,7 @@ class ChatControllerIT {
         List<String> events = webTestClient.post().uri("/agent/chat/stream")
                 .header("X-Agent-Context", signedContextToken(
                         Set.of("knowledge:read"), Set.of("project-1"), Set.of("space-1")))
-                .bodyValue(Map.of("conversationId", conversationId, "question", "many citation 文档",
+                .bodyValue(Map.of("conversationId", conversationId, "content", "many citation 文档",
                         "pageContext", Map.of("projectId", "project-1")))
                 .exchange().returnResult(String.class).getResponseBody().collectList().block(Duration.ofSeconds(5));
         assertThat(events.stream().filter(event -> event.contains("\"type\":\"citation\"")).toList()).hasSize(20);
@@ -598,7 +618,7 @@ class ChatControllerIT {
     private List<String> stream(String question, Set<String> permissions, Set<String> projectIds) {
         return webTestClient.post().uri("/agent/chat/stream")
                 .header("X-Agent-Context", signedContextToken(permissions, projectIds, Set.of()))
-                .bodyValue(Map.of("conversationId", conversationId, "question", question))
+                .bodyValue(Map.of("conversationId", conversationId, "content", question))
                 .exchange().expectStatus().isOk().returnResult(String.class)
                 .getResponseBody().collectList().block(Duration.ofSeconds(5));
     }
@@ -623,20 +643,26 @@ class ChatControllerIT {
             Set<String> permissions, Set<String> projectIds, Set<String> knowledgeSpaceIds) {
         try {
             ObjectMapper mapper = new ObjectMapper();
+            String header = Base64.getUrlEncoder().withoutPadding().encodeToString(
+                    "{\"alg\":\"HS256\",\"typ\":\"JWT\"}".getBytes(StandardCharsets.UTF_8));
+            long now = Instant.now().getEpochSecond();
             byte[] payload = mapper.writeValueAsBytes(Map.of(
                     "tenantId", "tenant-1",
                     "userId", "user-1",
                     "identityId", "identity-1",
+                    "roleIds", Set.of("role-1"),
                     "permissions", permissions,
                     "projectIds", projectIds,
-                    "knowledgeSpaceIds", knowledgeSpaceIds,
-                    "exp", Instant.now().plusSeconds(300).getEpochSecond()));
+                    "issuedAt", now,
+                    "expiresAt", now + 300,
+                    "nonce", UUID.randomUUID().toString()));
             String encodedPayload = Base64.getUrlEncoder().withoutPadding().encodeToString(payload);
+            String unsigned = header + "." + encodedPayload;
             Mac mac = Mac.getInstance("HmacSHA256");
             mac.init(new SecretKeySpec(CONTEXT_SECRET.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
             String signature = Base64.getUrlEncoder().withoutPadding()
-                    .encodeToString(mac.doFinal(encodedPayload.getBytes(StandardCharsets.UTF_8)));
-            return encodedPayload + "." + signature;
+                    .encodeToString(mac.doFinal(unsigned.getBytes(StandardCharsets.UTF_8)));
+            return unsigned + "." + signature;
         } catch (Exception exception) {
             throw new AssertionError(exception);
         }
@@ -697,6 +723,42 @@ class ChatControllerIT {
         @Primary
         ScenarioModelGateway scenarioModelGateway() {
             return new ScenarioModelGateway();
+        }
+
+        @Bean
+        @Primary
+        TestProjectBusinessClient testProjectBusinessClient() {
+            return new TestProjectBusinessClient();
+        }
+
+        static final class TestProjectBusinessClient
+                extends com.smart.agent.tool.project.LocalProjectBusinessClient {
+            private final AtomicInteger archiveCalls = new AtomicInteger();
+
+            @Override
+            public com.smart.agent.tool.project.ProjectArchiveDetailResult getArchiveDetail(
+                    com.smart.agent.tool.ToolContext context, String projectId) {
+                archiveCalls.incrementAndGet();
+                return new com.smart.agent.tool.project.ProjectArchiveDetailResult(projectId, "示例项目", List.of(
+                        new com.smart.agent.tool.project.ProjectArchiveDetailResult.Section(
+                                "base", "基础信息", "AVAILABLE", Map.of(),
+                                List.of(Map.of("项目名称", "示例项目", "项目编号", "A001")), null),
+                        new com.smart.agent.tool.project.ProjectArchiveDetailResult.Section(
+                                "finance", "资金情况", "AVAILABLE", Map.of("合同金额", 100),
+                                List.of(), null)));
+            }
+
+            @Override
+            public com.smart.agent.tool.project.AccessibleProjectsResult listAccessible(
+                    com.smart.agent.tool.ToolContext context,
+                    com.smart.agent.tool.project.AccessibleProjectsInput input) {
+                return new com.smart.agent.tool.project.AccessibleProjectsResult(1, 20, 1, false, List.of(
+                        new com.smart.agent.tool.project.AccessibleProjectItem(
+                                "project-1", "示例项目", "A001", "2", "已立项", null, null, null)));
+            }
+
+            int archiveCalls() { return archiveCalls.get(); }
+            void reset() { archiveCalls.set(0); }
         }
 
         @Bean
@@ -774,6 +836,16 @@ class ChatControllerIT {
                 }
                 if (question.equals("json-only")) {
                     return Flux.just(new ModelEvent.Completed("{\"projectCode\":\"20260709001\"}", 2, 3));
+                }
+                if (question.equals("查看 A001 项目的完整详情")) {
+                    if (request.redactedConversationMessages().getLast()
+                            instanceof ModelRequest.ToolResultMessage) {
+                        return Flux.just(new ModelEvent.Completed(
+                                "### 基础信息\n| 项目名称 | 项目编号 |\n|---|---|\n| 示例项目 | A001 |\n"
+                                        + "### 资金情况\n| 合同金额 |\n|---|\n| 100 |", 30, 40));
+                    }
+                    return Flux.just(new ModelEvent.ToolRequested("archive-1", "project.getArchiveDetail",
+                            "{\"projectCode\":\"A001\"}"), new ModelEvent.Completed("", 10, 5));
                 }
                 if (question.equals("partial-tool-json") && request.redactedConversationMessages().size() == 1) {
                     return Flux.just(
