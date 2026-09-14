@@ -10,6 +10,12 @@ import java.util.List;
 @ConditionalOnProperty(prefix = "agent.business", name = "mode", havingValue = "local")
 public class LocalProjectBusinessClient implements ProjectBusinessClient {
     @Override
+    public ProjectArchiveDetailResult getArchiveDetail(ToolContext context, String projectId) {
+        ProjectOverviewResult project = getOverview(context, projectId);
+        return new ProjectArchiveDetailResult(project.projectId(), project.projectName(), java.util.List.of());
+    }
+
+    @Override
     public ProjectOverviewResult getOverview(ToolContext context, String projectId) {
         if (!context.canAccessProject(projectId)) {
             throw new IllegalArgumentException("Project is outside trusted scope");

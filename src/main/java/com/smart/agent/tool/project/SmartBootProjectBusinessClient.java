@@ -18,16 +18,48 @@ import java.util.Base64;
 import java.util.List;
 
 public class SmartBootProjectBusinessClient implements ProjectBusinessClient {
+    private static final int DEFAULT_ARCHIVE_MAX_BYTES = 64 * 1024;
     private static final Logger log = LoggerFactory.getLogger(SmartBootProjectBusinessClient.class);
     private final WebClient client;
     private final ObjectMapper mapper;
     private final String secret;
+    private final int archiveMaxBytes;
 
     public SmartBootProjectBusinessClient(WebClient client, ObjectMapper mapper,
                                           @Value("${AGENT_LOCAL_CONTEXT_SECRET}") String secret) {
+        this(client, mapper, secret, DEFAULT_ARCHIVE_MAX_BYTES);
+    }
+
+    public SmartBootProjectBusinessClient(WebClient client, ObjectMapper mapper, String secret,
+                                          int archiveMaxBytes) {
         this.client = client;
         this.mapper = mapper;
         this.secret = secret;
+        if (archiveMaxBytes <= 0) throw new IllegalArgumentException("archiveMaxBytes must be positive");
+        this.archiveMaxBytes = archiveMaxBytes;
+    }
+
+    @Override
+    public ProjectArchiveDetailResult getArchiveDetail(ToolContext context, String projectId) {
+        if (!context.canAccessProject(projectId)) throw new SecurityException("project access denied");
+        String path = "/internal/ai/tools/project-archive-detail";
+        String response = client.post().uri(path).headers(headers -> sign(headers, "POST", path, context))
+                .bodyValue(new Request(context.tenantId(), context.userId(), projectId)).retrieve()
+                .bodyToMono(String.class).block();
+        if (response == null) {
+            throw new AgentException("AGENT_TOOL_EXECUTION_FAILED", HttpStatus.BAD_GATEWAY,
+                    "Project archive response is empty");
+        }
+        if (response.getBytes(StandardCharsets.UTF_8).length > archiveMaxBytes) {
+            throw new AgentException("AGENT_PROJECT_ARCHIVE_TOO_LARGE", HttpStatus.BAD_GATEWAY,
+                    "Project archive exceeds size limit");
+        }
+        try {
+            return mapper.readValue(response, ProjectArchiveDetailResult.class);
+        } catch (Exception exception) {
+            throw new AgentException("AGENT_TOOL_EXECUTION_FAILED", HttpStatus.BAD_GATEWAY,
+                    "Project archive response is invalid");
+        }
     }
 
     @Override

@@ -23,4 +23,11 @@ class SystemInstructionCatalogTest {
         assertThat(instruction).contains(
                 "项目名称、项目编号、所属组织、项目性质、联营单位、项目类型、建设单位、项目经理、项目状态、项目预算");
     }
+
+    @Test
+    void routesCompleteProjectDetailToSingleArchiveToolCall() {
+        String instruction = new SystemInstructionCatalog().resolve("v1").orElseThrow();
+
+        assertThat(instruction).contains("project.getArchiveDetail", "项目详情", "完整档案", "不得重复调用");
+    }
 }

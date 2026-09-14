@@ -15,8 +15,9 @@ public class ProjectBusinessClientConfiguration {
     ProjectBusinessClient smartBootProjectBusinessClient(
             ObjectMapper objectMapper,
             @Value("${agent.business.base-url:http://localhost:8888}") String baseUrl,
-            @Value("${AGENT_LOCAL_CONTEXT_SECRET}") String internalSecret) {
+            @Value("${AGENT_LOCAL_CONTEXT_SECRET}") String internalSecret,
+            @Value("${agent.business.project-archive-max-bytes:65536}") int projectArchiveMaxBytes) {
         WebClient client = WebClient.builder().baseUrl(baseUrl).build();
-        return new SmartBootProjectBusinessClient(client, objectMapper, internalSecret);
+        return new SmartBootProjectBusinessClient(client, objectMapper, internalSecret, projectArchiveMaxBytes);
     }
 }

@@ -77,6 +77,59 @@ class SmartBootProjectBusinessClientTest {
     }
 
     @Test
+    void loadsCompleteArchiveFromSignedInternalEndpoint() {
+        AtomicReference<String> path = new AtomicReference<>();
+        AtomicReference<String> body = new AtomicReference<>();
+        DisposableServer server = HttpServer.create().port(0).handle((request, response) -> {
+            path.set(request.uri());
+            return request.receive().aggregate().asString().flatMap(content -> {
+                body.set(content);
+                return response.header("Content-Type", "application/json").sendString(
+                        reactor.core.publisher.Mono.just("{\"projectId\":\"p-1\",\"projectName\":\"项目一\","
+                                + "\"sections\":[{\"key\":\"base\",\"title\":\"基础信息\",\"status\":\"AVAILABLE\","
+                                + "\"summary\":{},\"items\":[{\"项目名称\":\"项目一\"}],\"message\":null}]}"))
+                        .then();
+            });
+        }).bindNow();
+        try {
+            SmartBootProjectBusinessClient client = new SmartBootProjectBusinessClient(
+                    WebClient.builder().baseUrl("http://127.0.0.1:" + server.port()).build(),
+                    new ObjectMapper(), SECRET);
+
+            ProjectArchiveDetailResult result = client.getArchiveDetail(
+                    new ToolContext("tenant", "user", "identity", Set.of("p-1")), "p-1");
+
+            assertThat(path.get()).isEqualTo("/internal/ai/tools/project-archive-detail");
+            assertThat(body.get()).contains("\"projectId\":\"p-1\"");
+            assertThat(result.sections()).hasSize(1);
+            assertThat(result.sections().getFirst().items().getFirst()).containsEntry("项目名称", "项目一");
+        } finally {
+            server.disposeNow();
+        }
+    }
+
+    @Test
+    void rejectsArchiveResponseAboveConfiguredSafetyLimit() {
+        DisposableServer server = HttpServer.create().port(0).handle((request, response) ->
+                response.header("Content-Type", "application/json").sendString(
+                        reactor.core.publisher.Mono.just("{\"projectId\":\"p-1\",\"projectName\":\""
+                                + "x".repeat(200) + "\",\"sections\":[]}"))).bindNow();
+        try {
+            SmartBootProjectBusinessClient client = new SmartBootProjectBusinessClient(
+                    WebClient.builder().baseUrl("http://127.0.0.1:" + server.port()).build(),
+                    new ObjectMapper(), SECRET, 100);
+
+            assertThatThrownBy(() -> client.getArchiveDetail(
+                    new ToolContext("tenant", "user", "identity", Set.of("p-1")), "p-1"))
+                    .isInstanceOf(AgentException.class)
+                    .satisfies(error -> assertThat(((AgentException) error).code())
+                            .isEqualTo("AGENT_PROJECT_ARCHIVE_TOO_LARGE"));
+        } finally {
+            server.disposeNow();
+        }
+    }
+
+    @Test
     void injectsTrustedProjectIdsOnlyInInternalQueryRequest() throws Exception {
         AtomicReference<String> body = new AtomicReference<>();
         DisposableServer server = HttpServer.create().port(0).handle((request, response) ->
