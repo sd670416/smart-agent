@@ -54,6 +54,21 @@ public class AgentRunService {
         return agentRunRepository.save(AgentRun.start(scopedTenantId, scopedUserId, requiredConversationId, traceId));
     }
 
+    /**
+     * 创建运行并写入模型快照。快照在运行开始时刻固化，之后模型配置变更不影响历史记录。
+     */
+    @Transactional
+    public AgentRun start(String tenantId, String userId, String conversationId, String traceId,
+            String modelId, String modelDisplayName, String modelName, Long modelConfigVersion) {
+        String scopedTenantId = requireText(tenantId, "tenantId");
+        String scopedUserId = requireText(userId, "userId");
+        String requiredConversationId = requireText(conversationId, "conversationId");
+        conversationRepository.findByIdAndTenantIdAndUserId(scopedTenantId, scopedUserId, requiredConversationId)
+                .orElseThrow(() -> new IllegalArgumentException("Conversation not found: " + requiredConversationId));
+        return agentRunRepository.save(AgentRun.start(scopedTenantId, scopedUserId, requiredConversationId, traceId,
+                modelId, modelDisplayName, modelName, modelConfigVersion));
+    }
+
     @Transactional
     public AgentRun transition(String tenantId, String userId, String runId, AgentRunStatus expected, AgentRunStatus next) {
         AgentRun run = agentRunRepository.findByIdAndTenantIdAndUserId(

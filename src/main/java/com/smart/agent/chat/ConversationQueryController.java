@@ -44,14 +44,17 @@ public class ConversationQueryController {
     public static final class ConversationSummary {
         private final String id;
         private final String title;
+        private final String modelId;
         private final java.time.Instant updatedAt;
         public ConversationSummary(Conversation conversation) {
             this.id = conversation.id();
             this.title = conversation.title();
+            this.modelId = conversation.modelId();
             this.updatedAt = conversation.updatedAt();
         }
         public String getId() { return id; }
         public String getTitle() { return title; }
+        public String getModelId() { return modelId; }
         public java.time.Instant getUpdatedAt() { return updatedAt; }
     }
 
@@ -59,7 +62,8 @@ public class ConversationQueryController {
     public Conversation create(@RequestBody CreateConversationRequest request,
                                @RequestAttribute("com.smart.agent.security.AgentUserContext") AgentUserContext c) {
         String title = request == null || request.title == null || request.title.trim().isEmpty() ? "新建对话" : request.title.trim();
-        return conversations.create(c.tenantId(), c.userId(), title);
+        String modelId = request == null ? null : request.modelId;
+        return conversations.create(c.tenantId(), c.userId(), title, modelId);
     }
 
     @PutMapping("/{id}")
@@ -70,12 +74,31 @@ public class ConversationQueryController {
         return new ConversationSummary(conversation);
     }
 
+    /**
+     * 切换会话使用的模型。只能操作属于当前租户和当前用户的会话。
+     */
+    @PutMapping("/{id}/model")
+    public ConversationSummary switchModel(@PathVariable String id, @RequestBody SwitchModelRequest request,
+            @RequestAttribute("com.smart.agent.security.AgentUserContext") AgentUserContext c) {
+        String modelId = request == null ? null : request.modelId;
+        Conversation conversation = conversations.switchModel(c.tenantId(), c.userId(), id, modelId);
+        return new ConversationSummary(conversation);
+    }
+
     @DeleteMapping("/{id}")
     public void delete(@PathVariable String id, @RequestAttribute("com.smart.agent.security.AgentUserContext") AgentUserContext c) {
         conversations.delete(c.tenantId(), c.userId(), id);
     }
 
-    public static class CreateConversationRequest { public String title; }
+    public static class CreateConversationRequest {
+        public String title;
+        public String modelId;
+    }
+
+    public static class SwitchModelRequest {
+        public String modelId;
+    }
+
     @GetMapping("/{id}/runs")
     @Transactional(readOnly = true)
     public List<RunSummary> runs(@PathVariable String id, @RequestAttribute("com.smart.agent.security.AgentUserContext") AgentUserContext c) {
@@ -97,15 +120,25 @@ public class ConversationQueryController {
         private final String id;
         private final String traceId;
         private final String status;
+        private final String modelId;
+        private final String modelDisplayName;
+        private final String modelName;
+        private final Long modelConfigVersion;
         private final java.time.Instant createdAt;
         private final java.time.Instant updatedAt;
         RunSummary(AgentRun run) {
             this.id = run.id(); this.traceId = run.traceId(); this.status = run.status().name();
+            this.modelId = run.modelId(); this.modelDisplayName = run.modelDisplayName();
+            this.modelName = run.modelName(); this.modelConfigVersion = run.modelConfigVersion();
             this.createdAt = run.createdAt(); this.updatedAt = run.updatedAt();
         }
         public String getId() { return id; }
         public String getTraceId() { return traceId; }
         public String getStatus() { return status; }
+        public String getModelId() { return modelId; }
+        public String getModelDisplayName() { return modelDisplayName; }
+        public String getModelName() { return modelName; }
+        public Long getModelConfigVersion() { return modelConfigVersion; }
         public java.time.Instant getCreatedAt() { return createdAt; }
         public java.time.Instant getUpdatedAt() { return updatedAt; }
     }

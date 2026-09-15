@@ -3,9 +3,11 @@ package com.smart.agent.model.audit;
 import com.smart.agent.model.ModelRequest;
 import com.smart.agent.run.AgentRunRepository;
 import org.slf4j.Logger; import org.slf4j.LoggerFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
 @Service
+@ConditionalOnProperty(prefix = "agent.persistence", name = "enabled", havingValue = "true", matchIfMissing = true)
 public class ModelCallAuditService {
  private static final Logger log=LoggerFactory.getLogger(ModelCallAuditService.class);
  private final ModelCallLogRepository logs; private final AgentRunRepository runs;

@@ -43,9 +43,23 @@ public class SmartBootProjectBusinessClient implements ProjectBusinessClient {
     public ProjectArchiveDetailResult getArchiveDetail(ToolContext context, String projectId) {
         if (!context.canAccessProject(projectId)) throw new SecurityException("project access denied");
         String path = "/internal/ai/tools/project-archive-detail";
-        String response = client.post().uri(path).headers(headers -> sign(headers, "POST", path, context))
-                .bodyValue(new Request(context.tenantId(), context.userId(), projectId)).retrieve()
-                .bodyToMono(String.class).block();
+        String response;
+        try {
+            response = client.post().uri(path).headers(headers -> sign(headers, "POST", path, context))
+                    .bodyValue(new Request(context.tenantId(), context.userId(), projectId)).retrieve()
+                    .bodyToMono(String.class).block();
+        } catch (WebClientResponseException exception) {
+            String detail = exception.getResponseBodyAsString();
+            if (detail == null || detail.isBlank()) detail = exception.getStatusText();
+            log.warn("项目档案接口调用失败: projectId={}, status={}, detail={}",
+                    projectId, exception.getStatusCode().value(), queryErrorMessage(detail));
+            throw new AgentException("AGENT_TOOL_EXECUTION_FAILED", HttpStatus.BAD_GATEWAY,
+                    queryErrorMessage(detail));
+        } catch (RuntimeException exception) {
+            log.warn("项目档案接口调用异常: projectId={}, error={}",
+                    projectId, exception.getClass().getSimpleName());
+            throw exception;
+        }
         if (response == null) {
             throw new AgentException("AGENT_TOOL_EXECUTION_FAILED", HttpStatus.BAD_GATEWAY,
                     "Project archive response is empty");

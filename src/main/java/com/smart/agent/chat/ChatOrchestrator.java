@@ -11,13 +11,16 @@ import com.smart.agent.knowledge.KnowledgeCitation;
 import com.smart.agent.knowledge.KnowledgeSearchQuery;
 import com.smart.agent.knowledge.KnowledgeSearchService;
 import com.smart.agent.model.ModelEvent;
+import com.smart.agent.model.ModelExecutionHandle;
 import com.smart.agent.model.ModelGateway;
+import com.smart.agent.model.DynamicModelRegistry;
 import com.smart.agent.model.ModelRequest;
 import com.smart.agent.run.AgentRun;
 import com.smart.agent.run.AgentRunService;
 import com.smart.agent.run.AgentRunStatus;
 import com.smart.agent.security.AgentUserContext;
 import com.smart.agent.tool.AgentTool;
+import com.smart.agent.tool.ToolContext;
 import com.smart.agent.tool.ToolExecutor;
 import com.smart.agent.tool.ToolRegistry;
 import com.smart.agent.tool.web.WebSearchPolicy;
@@ -52,6 +55,7 @@ public class ChatOrchestrator {
     private final ConversationService conversationService;
     private final AgentRunService runService;
     private final ModelGateway modelGateway;
+    private final DynamicModelRegistry modelRegistry;
     private final ToolRegistry toolRegistry;
     private final ToolExecutor toolExecutor;
     private final ObjectMapper objectMapper;
@@ -60,6 +64,10 @@ public class ChatOrchestrator {
     private final AttachmentService attachmentService;
     private final String attachmentPublicBaseUrl;
 
+    /**
+     * 兼容构造：直接使用固定网关，不经过模型注册中心。
+     * 保留用于单元测试与尚未接入模型配置中心的场景。
+     */
     public ChatOrchestrator(
             ConversationService conversationService,
             AgentRunService runService,
@@ -67,7 +75,8 @@ public class ChatOrchestrator {
             ToolRegistry toolRegistry,
             ToolExecutor toolExecutor,
             ObjectMapper objectMapper) {
-        this(conversationService, runService, modelGateway, toolRegistry, toolExecutor, objectMapper, null, null, null);
+        this(conversationService, runService, modelGateway, null, toolRegistry, toolExecutor, objectMapper,
+                null, null, null, null);
     }
 
     public ChatOrchestrator(
@@ -78,8 +87,26 @@ public class ChatOrchestrator {
             ToolExecutor toolExecutor,
             ObjectMapper objectMapper,
             KnowledgeSearchService knowledgeSearchService) {
-        this(conversationService, runService, modelGateway, toolRegistry, toolExecutor, objectMapper,
+        this(conversationService, runService, modelGateway, null, toolRegistry, toolExecutor, objectMapper,
                 knowledgeSearchService, MAX_RUN_DURATION, null, null);
+    }
+
+    /**
+     * 生产构造：每轮运行从注册中心取得一次执行句柄，整轮工具循环复用其网关。
+     */
+    public ChatOrchestrator(
+            ConversationService conversationService,
+            AgentRunService runService,
+            DynamicModelRegistry modelRegistry,
+            ToolRegistry toolRegistry,
+            ToolExecutor toolExecutor,
+            ObjectMapper objectMapper,
+            KnowledgeSearchService knowledgeSearchService,
+            Duration runBudget,
+            AttachmentService attachmentService,
+            String attachmentPublicBaseUrl) {
+        this(conversationService, runService, null, modelRegistry, toolRegistry, toolExecutor, objectMapper,
+                knowledgeSearchService, runBudget, attachmentService, attachmentPublicBaseUrl);
     }
 
     ChatOrchestrator(
@@ -91,21 +118,33 @@ public class ChatOrchestrator {
             ObjectMapper objectMapper,
             KnowledgeSearchService knowledgeSearchService,
             Duration runBudget) {
-        this(conversationService, runService, modelGateway, toolRegistry, toolExecutor, objectMapper, knowledgeSearchService, runBudget, null, null);
+        this(conversationService, runService, modelGateway, null, toolRegistry, toolExecutor, objectMapper,
+                knowledgeSearchService, runBudget, null, null);
     }
+
     ChatOrchestrator(ConversationService conversationService, AgentRunService runService, ModelGateway modelGateway,
             ToolRegistry toolRegistry, ToolExecutor toolExecutor, ObjectMapper objectMapper,
             KnowledgeSearchService knowledgeSearchService, Duration runBudget, AttachmentService attachmentService) {
-        this(conversationService, runService, modelGateway, toolRegistry, toolExecutor, objectMapper,
+        this(conversationService, runService, modelGateway, null, toolRegistry, toolExecutor, objectMapper,
                 knowledgeSearchService, runBudget, attachmentService, null);
     }
+
     ChatOrchestrator(ConversationService conversationService, AgentRunService runService, ModelGateway modelGateway,
             ToolRegistry toolRegistry, ToolExecutor toolExecutor, ObjectMapper objectMapper,
             KnowledgeSearchService knowledgeSearchService, Duration runBudget, AttachmentService attachmentService,
             String attachmentPublicBaseUrl) {
+        this(conversationService, runService, modelGateway, null, toolRegistry, toolExecutor, objectMapper,
+                knowledgeSearchService, runBudget, attachmentService, attachmentPublicBaseUrl);
+    }
+
+    ChatOrchestrator(ConversationService conversationService, AgentRunService runService, ModelGateway modelGateway,
+            DynamicModelRegistry modelRegistry, ToolRegistry toolRegistry, ToolExecutor toolExecutor,
+            ObjectMapper objectMapper, KnowledgeSearchService knowledgeSearchService, Duration runBudget,
+            AttachmentService attachmentService, String attachmentPublicBaseUrl) {
         this.conversationService = conversationService;
         this.runService = runService;
         this.modelGateway = modelGateway;
+        this.modelRegistry = modelRegistry;
         this.toolRegistry = toolRegistry;
         this.toolExecutor = toolExecutor;
         this.objectMapper = objectMapper;
@@ -142,6 +181,11 @@ public class ChatOrchestrator {
         private final StringBuilder turnDeltas = new StringBuilder();
         private final List<ModelEvent.ToolRequested> turnTools = new ArrayList<>();
         private ModelEvent.Completed turnCompleted;
+        /** 本轮运行固定的模型执行句柄，运行结束必须释放。 */
+        private ModelExecutionHandle modelHandle;
+        private ModelGateway modelGatewayForRun;
+        private ToolContext.ModelBinding modelBindingForRun;
+        private final AtomicBoolean modelHandleReleased = new AtomicBoolean();
 
         private Session(ChatCommand command, AgentUserContext context, String traceId, FluxSink<ChatEvent> sink) {
             this.command = command;
@@ -154,8 +198,9 @@ public class ChatOrchestrator {
             sink.onCancel(this::cancel);
             sink.onDispose(this::cancel);
             try {
-                run = withinBudget(() -> runService.start(
-                        context.tenantId(), context.userId(), command.conversationId(), traceId));
+                String scopedModelId = resolveModelIdForRun();
+                ModelExecutionHandle handle = acquireModelHandle(scopedModelId);
+                bindRunToModel(handle, scopedModelId);
                 status = AgentRunStatus.RECEIVED;
                 validateAttachments();
                 List<ModelRequest.ConversationEntry> history = withinBudget(this::loadConversationHistory);
@@ -182,6 +227,66 @@ public class ChatOrchestrator {
                             && agentException.status().value() == 403
                                     ? AgentRunStatus.PERMISSION_DENIED : AgentRunStatus.FAILED);
                 }
+            }
+        }
+
+        /**
+         * 会话未绑定模型时回落到系统默认模型，让历史会话也能继续使用。
+         */
+        private String resolveModelIdForRun() {
+            if (modelRegistry == null) {
+                return null;
+            }
+            return withinBudget(() -> conversationService.find(
+                            context.tenantId(), context.userId(), command.conversationId()))
+                    .modelId();
+        }
+
+        /**
+         * 取得本轮执行的模型句柄。配置中心不可用或未配置默认模型时直接失败，
+         * 不回退到无模型或未知模型。
+         */
+        private ModelExecutionHandle acquireModelHandle(String modelId) {
+            if (modelRegistry == null) {
+                return null;
+            }
+            return modelId == null || modelId.isBlank()
+                    ? withinBudget(modelRegistry::acquireDefault)
+                    : withinBudget(() -> modelRegistry.acquire(modelId));
+        }
+
+        private void bindRunToModel(ModelExecutionHandle handle, String modelId) {
+            if (modelRegistry == null) {
+                modelGatewayForRun = modelGateway;
+                run = withinBudget(() -> runService.start(
+                        context.tenantId(), context.userId(), command.conversationId(), traceId));
+                return;
+            }
+            modelHandle = handle;
+            modelGatewayForRun = handle.gateway();
+            ModelExecutionHandle.Snapshot snapshot = handle.snapshot();
+            modelBindingForRun = modelRegistry.bindingFor(snapshot);
+            run = withinBudget(() -> runService.start(context.tenantId(), context.userId(),
+                    command.conversationId(), traceId, snapshot.modelId(), snapshot.displayName(),
+                    snapshot.modelName(), snapshot.configVersion()));
+        }
+
+        /**
+         * 释放本轮模型句柄。完成、失败、取消、超时四条路径都必须调用，重复调用安全。
+         */
+        private void releaseModelHandle() {
+            if (!modelHandleReleased.compareAndSet(false, true)) {
+                return;
+            }
+            ModelExecutionHandle handle = modelHandle;
+            modelHandle = null;
+            if (handle == null) {
+                return;
+            }
+            try {
+                handle.close();
+            } catch (RuntimeException ignored) {
+                // 释放失败不应影响已完成的响应。
             }
         }
 
@@ -283,7 +388,7 @@ public class ChatOrchestrator {
                     .toList();
             ModelRequest request = new ModelRequest(run.id(), "v1", List.copyOf(messages), tools, evidence);
             try {
-                Disposable subscription = modelGateway.stream(request)
+                Disposable subscription = modelGatewayForRun.stream(request)
                         .timeout(remaining())
                         .publishOn(Schedulers.boundedElastic())
                         .subscribe(this::handleModelEventSafely, this::handleModelError, this::finishModelTurnSafely);
@@ -432,7 +537,8 @@ public class ChatOrchestrator {
                     moveTo(AgentRunStatus.TOOL_EXECUTING);
                     emit(ChatEvent.status(run.id(), traceId, status));
                     if (terminated.get() || sink.isCancelled()) return false;
-                    toolFuture = startToolWithinBudget(() -> toolExecutor.execute(request.toolKey(), input, context));
+                    toolFuture = startToolWithinBudget(
+                            () -> toolExecutor.execute(request.toolKey(), input, context, modelBindingForRun));
                 }
                 Object result = awaitTool(toolFuture);
                 if (terminated.get() || sink.isCancelled()) return false;
@@ -578,6 +684,8 @@ public class ChatOrchestrator {
             } catch (RuntimeException persistenceFailure) {
                 fail(isTimeout(persistenceFailure) ? "AGENT_RUN_TIMEOUT" : "AGENT_PERSISTENCE_FAILED",
                         isTimeout(persistenceFailure) ? AgentRunStatus.TIMEOUT : AgentRunStatus.FAILED);
+            } finally {
+                releaseModelHandle();
             }
         }
 
@@ -619,6 +727,7 @@ public class ChatOrchestrator {
                         // The disconnected client cannot receive a second failure.
                     }
                 }
+                releaseModelHandle();
             }
         }
 
@@ -650,6 +759,7 @@ public class ChatOrchestrator {
                     sink.next(ChatEvent.error(run == null ? null : run.id(), traceId, code, message));
                     sink.complete();
                 }
+                releaseModelHandle();
             }
         }
 
@@ -741,8 +851,40 @@ public class ChatOrchestrator {
         }
 
         private String safeCode(RuntimeException exception) {
-            return exception instanceof AgentException agentException
-                    ? agentException.code() : "AGENT_CHAT_FAILED";
+            if (exception instanceof AgentException agentException) {
+                return agentException.code();
+            }
+            if (modelRegistry != null) {
+                String modelCode = modelFailureCodeFor(exception);
+                if (modelCode != null) {
+                    return modelCode;
+                }
+            }
+            return "AGENT_CHAT_FAILED";
+        }
+
+        /**
+         * 把模型注册中心的约束异常翻译成可引导的错误码，
+         * 让用户看到"该换模型"而不是笼统的失败提示。消息本身不进入响应，只用于推断。
+         */
+        private String modelFailureCodeFor(RuntimeException exception) {
+            String message = exception.getMessage();
+            if (message == null || message.isBlank()) {
+                return null;
+            }
+            if (message.contains("已停用")) {
+                return "AGENT_MODEL_DISABLED";
+            }
+            if (message.contains("不存在") || message.contains("已删除")) {
+                return "AGENT_MODEL_NOT_FOUND";
+            }
+            if (message.contains("尚未设置默认模型")) {
+                return "AGENT_MODEL_NOT_CONFIGURED";
+            }
+            if (message.contains("正在更新")) {
+                return "AGENT_MODEL_FAILED";
+            }
+            return null;
         }
 
         private boolean isTerminal(AgentRunStatus current) {

@@ -37,12 +37,19 @@ public class JpaAgentRunRepository implements AgentRunRepository {
     @Override
     @Transactional(readOnly = true)
     public Optional<AgentRun> findByIdAndTenantIdAndUserId(String tenantId, String userId, String id) {
+        // 必须用 getResultList() 而不是 getResultStream()：
+        // Hibernate 6 的 getResultStream() 返回的流由 JDBC ResultSet 直接支撑，
+        // findFirst() 短路后流不会被关闭，ResultSet 会一直悬着，
+        // 同一事务内后续的语句（如 flush 时的 UPDATE）就会撞上
+        // "Operation not allowed after ResultSet closed"。
         return entityManager.createQuery("select r from AgentRun r where r.id = :id and r.tenantId = :tenantId and r.userId = :userId",
                         AgentRun.class)
                 .setParameter("id", id)
                 .setParameter("tenantId", tenantId)
                 .setParameter("userId", userId)
-                .getResultStream()
+                .setMaxResults(1)
+                .getResultList()
+                .stream()
                 .findFirst();
     }
 

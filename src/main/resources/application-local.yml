@@ -26,7 +26,7 @@ agent:
 
   qdrant:
     enabled: true
-    host: 192.168.18.179
+    host: 192.168.0.179
     grpc-port: 6334
     api-key: "b3947db2ce4ca4a59cbe1e262d2cf91240ca955bf3ef08ae35aec23e2991e9d7"
     tls: false
@@ -39,11 +39,12 @@ agent:
     mode: local-hash
   model:
     mode: openai-compatible
-#    base-url: https://api.iruidong.com/v1
-    base-url: http://192.168.18.179:8080/v1
-#    api-key: "rk-4ffe99a27082d8147800e278e834679891f17c3fb487d659da0407a04cc1d021"
-    api-key: "sk-75f39d4c9e8eb71b913532cc4a233b923a6ad9a6f9568deb6ebd8619c8906eb8"
-    chat-model: gpt-5.6-sol
+#    base-url: http://192.168.0.179:8080/v1
+#    api-key: "sk-75f39d4c9e8eb71b913532cc4a233b923a6ad9a6f9568deb6ebd8619c8906eb8"
+#    chat-model: gpt-5.6-sol
+    base-url: https://api.iruidong.com/v1
+    api-key: "rk-4ffe99a27082d8147800e278e834679891f17c3fb487d659da0407a04cc1d021"
+    chat-model: glm-5.3
     connect-timeout: 10s
     read-timeout: 120s
 

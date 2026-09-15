@@ -1,0 +1,53 @@
+CREATE TABLE ai_model_config (
+    id varchar(36) NOT NULL COMMENT '模型配置ID',
+    name varchar(128) NOT NULL COMMENT '模型展示名称',
+    provider_type varchar(32) NOT NULL COMMENT '模型协议类型',
+    deployment_type varchar(16) NOT NULL COMMENT '部署方式：CLOUD云端、LOCAL本地',
+    base_url varchar(512) NOT NULL COMMENT '模型服务地址',
+    model_name varchar(128) NOT NULL COMMENT '实际请求模型名称',
+    encrypted_api_key longtext COMMENT '模型API密钥（接口及日志禁止原文输出）',
+    capabilities varchar(512) NOT NULL COMMENT '模型能力集合',
+    connect_timeout_seconds int NOT NULL COMMENT '连接超时秒数',
+    read_timeout_seconds int NOT NULL COMMENT '响应超时秒数',
+    enabled tinyint(1) NOT NULL DEFAULT 1 COMMENT '是否启用',
+    is_default tinyint(1) NOT NULL DEFAULT 0 COMMENT '是否系统默认模型',
+    sort int NOT NULL DEFAULT 0 COMMENT '显示顺序',
+    remarks varchar(1000) COMMENT '备注',
+    config_version bigint NOT NULL DEFAULT 1 COMMENT '模型配置版本',
+    last_test_status varchar(32) COMMENT '最近测试状态',
+    last_test_time datetime(3) COMMENT '最近测试时间',
+    last_test_summary varchar(2000) COMMENT '最近测试脱敏摘要',
+    is_deleted tinyint(1) NOT NULL DEFAULT 0 COMMENT '是否删除',
+    create_by varchar(36) COMMENT '创建人',
+    update_by varchar(36) COMMENT '修改人',
+    create_time datetime(3) NOT NULL COMMENT '创建时间',
+    update_time datetime(3) NOT NULL COMMENT '修改时间',
+    version bigint NOT NULL DEFAULT 0 COMMENT '乐观锁版本',
+    default_slot tinyint GENERATED ALWAYS AS (
+        CASE WHEN is_deleted = 0 AND is_default = 1 THEN 1 ELSE NULL END
+    ) STORED COMMENT '有效默认模型唯一槽位',
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_ai_model_config_default (default_slot),
+    KEY idx_ai_model_config_enabled_sort (is_deleted, enabled, sort),
+    KEY idx_ai_model_config_name (name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='AI模型配置';
+
+CREATE TABLE ai_model_test_log (
+    id varchar(36) NOT NULL COMMENT '测试日志ID',
+    model_id varchar(36) NOT NULL COMMENT '模型配置ID',
+    tenant_id varchar(36) COMMENT '操作人租户ID',
+    user_id varchar(36) NOT NULL COMMENT '操作用户ID',
+    test_item varchar(32) NOT NULL COMMENT '测试项目',
+    status varchar(32) NOT NULL COMMENT '测试状态',
+    http_status int COMMENT 'HTTP状态码',
+    duration_millis bigint COMMENT '耗时毫秒',
+    response_model_name varchar(128) COMMENT '服务实际返回模型名称',
+    safe_response_summary varchar(2000) COMMENT '脱敏响应摘要',
+    error_type varchar(128) COMMENT '错误类型',
+    safe_error_detail varchar(2000) COMMENT '脱敏错误详情',
+    create_time datetime(3) NOT NULL COMMENT '创建时间',
+    PRIMARY KEY (id),
+    KEY idx_ai_model_test_model_time (model_id, create_time),
+    KEY idx_ai_model_test_user_time (user_id, create_time),
+    CONSTRAINT fk_ai_model_test_model FOREIGN KEY (model_id) REFERENCES ai_model_config (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='AI模型兼容性测试日志';

@@ -3,6 +3,7 @@ package com.smart.agent.chat;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.smart.agent.conversation.ConversationService;
 import com.smart.agent.knowledge.KnowledgeSearchService;
+import com.smart.agent.model.DynamicModelRegistry;
 import com.smart.agent.model.ModelGateway;
 import com.smart.agent.run.AgentRunService;
 import com.smart.agent.tool.ToolExecutor;
@@ -21,14 +22,22 @@ class ChatConfiguration {
             ConversationService conversationService,
             AgentRunService runService,
             ModelGateway modelGateway,
+            ObjectProvider<DynamicModelRegistry> modelRegistry,
             ToolRegistry toolRegistry,
             ToolExecutor toolExecutor,
             ObjectMapper objectMapper,
             ObjectProvider<KnowledgeSearchService> knowledgeSearchService,
             @Value("${agent.attachment.public-base-url:}") String attachmentPublicBaseUrl,
             ObjectProvider<com.smart.agent.attachment.AttachmentService> attachmentService) {
+        DynamicModelRegistry registry = modelRegistry.getIfAvailable();
+        if (registry == null) {
+            return new ChatOrchestrator(
+                    conversationService, runService, modelGateway, toolRegistry, toolExecutor, objectMapper,
+                    knowledgeSearchService.getIfAvailable(), com.smart.agent.chat.ChatOrchestrator.MAX_RUN_DURATION,
+                    attachmentService.getIfAvailable(), attachmentPublicBaseUrl);
+        }
         return new ChatOrchestrator(
-                conversationService, runService, modelGateway, toolRegistry, toolExecutor, objectMapper,
+                conversationService, runService, registry, toolRegistry, toolExecutor, objectMapper,
                 knowledgeSearchService.getIfAvailable(), com.smart.agent.chat.ChatOrchestrator.MAX_RUN_DURATION,
                 attachmentService.getIfAvailable(), attachmentPublicBaseUrl);
     }

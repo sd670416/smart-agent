@@ -90,4 +90,61 @@ class WebSearchToolTest {
                 .satisfies(error -> assertThat(((AgentException) error).code())
                         .isEqualTo("AGENT_WEB_SEARCH_NO_RESULTS"));
     }
+
+    @Test
+    void rejectsSearchWhenTheBoundModelLacksWebSearchCapability() {
+        AtomicReference<ToolContext> received = new AtomicReference<>();
+        WebSearchProvider recording = new WebSearchProvider() {
+            @Override
+            public WebSearchResult search(WebSearchInput input) {
+                return search(input, null);
+            }
+
+            @Override
+            public WebSearchResult search(WebSearchInput input, ToolContext context) {
+                received.set(context);
+                return new WebSearchResult(input.query(), "now", "result", List.of(), "test");
+            }
+        };
+        WebSearchTool tool = new WebSearchTool(
+                new WebSearchProperties(true, "auto", 5, Duration.ofSeconds(15)),
+                new WebSearchPolicy(), recording);
+        ToolContext withoutCapability = CONTEXT.withModelBinding(new ToolContext.ModelBinding(
+                "model-1", "纯对话模型", "chat-only", "https://api.example.com/v1",
+                Set.of(com.smart.agent.model.config.ModelCapability.TOOL_CALLING)));
+
+        assertThatThrownBy(() -> tool.execute(new WebSearchInput("天津天气", 5, null), withoutCapability))
+                .isInstanceOf(AgentException.class)
+                .satisfies(error -> assertThat(((AgentException) error).code())
+                        .isEqualTo("AGENT_MODEL_WEB_SEARCH_REQUIRED"));
+        assertThat(received.get()).isNull();
+    }
+
+    @Test
+    void passesTheRunModelBindingThroughToTheProvider() {
+        AtomicReference<ToolContext> received = new AtomicReference<>();
+        WebSearchProvider recording = new WebSearchProvider() {
+            @Override
+            public WebSearchResult search(WebSearchInput input) {
+                return search(input, null);
+            }
+
+            @Override
+            public WebSearchResult search(WebSearchInput input, ToolContext context) {
+                received.set(context);
+                return new WebSearchResult(input.query(), "now", "result", List.of(), "test");
+            }
+        };
+        WebSearchTool tool = new WebSearchTool(
+                new WebSearchProperties(true, "auto", 5, Duration.ofSeconds(15)),
+                new WebSearchPolicy(), recording);
+        ToolContext withCapability = CONTEXT.withModelBinding(new ToolContext.ModelBinding(
+                "model-1", "智谱GLM", "glm-4.5", "https://open.bigmodel.cn/api/paas/v4",
+                Set.of(com.smart.agent.model.config.ModelCapability.WEB_SEARCH)));
+
+        tool.execute(new WebSearchInput("天津天气", 5, null), withCapability);
+
+        assertThat(received.get().modelBinding().modelName()).isEqualTo("glm-4.5");
+        assertThat(received.get().modelBinding().supportsWebSearch()).isTrue();
+    }
 }

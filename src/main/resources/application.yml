@@ -53,5 +53,11 @@ agent:
     chat-model: ${AGENT_CHAT_MODEL:local-test-model}
     connect-timeout: ${AGENT_MODEL_CONNECT_TIMEOUT:5s}
     read-timeout: ${AGENT_MODEL_READ_TIMEOUT:30s}
+    # 首次启动且数据库尚无任何模型配置时，用以上参数导入一条并设为默认。
+    # 已有记录一律不覆盖，重复启动不会重复导入；导入完成后运行期只读取数据库配置。
+    bootstrap:
+      enabled: ${AGENT_MODEL_BOOTSTRAP_ENABLED:true}
+      # 导入模型声明的能力，逗号分隔，可选 TOOL_CALLING/VISION/FILE_INPUT/WEB_SEARCH/STREAMING。
+      capabilities: ${AGENT_MODEL_BOOTSTRAP_CAPABILITIES:TOOL_CALLING,STREAMING}
 server:
   max-http-request-header-size: ${AGENT_MAX_HTTP_REQUEST_HEADER_SIZE:64KB}

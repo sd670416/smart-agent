@@ -30,12 +30,17 @@ public class JpaConversationRepository implements ConversationRepository {
 
     @Override
     public Optional<Conversation> findByIdAndTenantIdAndUserId(String tenantId, String userId, String id) {
+        // 不能用 getResultStream()：其返回的流由 JDBC ResultSet 直接支撑，
+        // findFirst() 短路后流不会关闭，ResultSet 悬挂会导致同一事务内后续语句报
+        // "Operation not allowed after ResultSet closed"。
+        // 这里带 left join fetch，不能再加 setMaxResults(1)，否则 Hibernate 会退化为内存分页。
         return entityManager.createQuery("select distinct c from Conversation c left join fetch c.messages "
                         + "where c.id = :id and c.tenantId = :tenantId and c.userId = :userId", Conversation.class)
                 .setParameter("id", id)
                 .setParameter("tenantId", tenantId)
                 .setParameter("userId", userId)
-                .getResultStream()
+                .getResultList()
+                .stream()
                 .findFirst();
     }
 

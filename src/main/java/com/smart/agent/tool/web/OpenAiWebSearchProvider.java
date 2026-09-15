@@ -5,7 +5,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.smart.agent.common.error.AgentException;
+import com.smart.agent.model.ModelCredentialSource;
 import com.smart.agent.model.ModelGatewayProperties;
+import com.smart.agent.tool.ToolContext;
 import java.net.SocketTimeoutException;
 import java.net.URI;
 import java.net.http.HttpTimeoutException;
@@ -29,6 +31,7 @@ public final class OpenAiWebSearchProvider implements WebSearchProvider {
     private final WebClient client;
     private final ObjectMapper objectMapper;
     private final ModelGatewayProperties model;
+    private final ModelCredentialSource credentials;
     private final Duration timeout;
     private final Clock clock;
     private final ZoneId timezone;
@@ -37,24 +40,43 @@ public final class OpenAiWebSearchProvider implements WebSearchProvider {
             WebClient client,
             ObjectMapper objectMapper,
             ModelGatewayProperties model,
+            ModelCredentialSource credentials,
             Duration timeout,
             Clock clock,
             ZoneId timezone) {
         this.client = client;
         this.objectMapper = objectMapper;
         this.model = model;
+        this.credentials = credentials == null ? ModelCredentialSource.empty() : credentials;
         this.timeout = timeout;
         this.clock = clock;
         this.timezone = timezone;
     }
 
+    public OpenAiWebSearchProvider(
+            WebClient client,
+            ObjectMapper objectMapper,
+            ModelGatewayProperties model,
+            Duration timeout,
+            Clock clock,
+            ZoneId timezone) {
+        this(client, objectMapper, model, ModelCredentialSource.empty(), timeout, clock, timezone);
+    }
+
+    /** 无上下文调用：按全局配置执行，保留给未接入模型配置中心的场景。 */
     @Override
     public WebSearchResult search(WebSearchInput input) {
+        return search(input, null);
+    }
+
+    @Override
+    public WebSearchResult search(WebSearchInput input, ToolContext context) {
+        ResolvedModel resolved = resolve(context);
         try {
             JsonNode response = client.post()
-                    .uri(endpoint(model.baseUrl()))
-                    .headers(headers -> headers.setBearerAuth(model.apiKey()))
-                    .bodyValue(requestBody(input))
+                    .uri(endpoint(resolved.baseUrl()))
+                    .headers(headers -> headers.setBearerAuth(resolved.apiKey()))
+                    .bodyValue(requestBody(input, resolved.modelName()))
                     .retrieve()
                     .bodyToMono(JsonNode.class)
                     .block(timeout);
@@ -76,14 +98,39 @@ public final class OpenAiWebSearchProvider implements WebSearchProvider {
         }
     }
 
-    private ObjectNode requestBody(WebSearchInput input) {
+    /**
+     * 优先使用本轮会话所选模型；未绑定模型时回退到全局配置，
+     * 保证未接入模型配置中心的部署仍可用。
+     */
+    private ResolvedModel resolve(ToolContext context) {
+        ToolContext.ModelBinding binding = context == null ? null : context.modelBinding();
+        if (binding == null) {
+            return new ResolvedModel(model.baseUrl(), model.apiKey(), model.chatModel());
+        }
+        ModelCredentialSource.Credentials resolved = this.credentials.credentialsFor(binding.modelId());
+        if (resolved == null || resolved.apiKey() == null || resolved.apiKey().isBlank()) {
+            throw new AgentException("AGENT_WEB_SEARCH_PROVIDER_UNSUPPORTED", HttpStatus.BAD_REQUEST,
+                    "Selected model has no usable credentials for web search");
+        }
+        return new ResolvedModel(
+                resolved.baseUrl() == null || resolved.baseUrl().isBlank() ? model.baseUrl() : resolved.baseUrl(),
+                resolved.apiKey(),
+                resolved.modelName() == null || resolved.modelName().isBlank()
+                        ? binding.modelName() : resolved.modelName());
+    }
+
+    private ObjectNode requestBody(WebSearchInput input, String modelName) {
         ObjectNode request = objectMapper.createObjectNode();
-        request.put("model", model.chatModel());
+        request.put("model", modelName);
         request.put("input", input.query());
         request.put("max_output_tokens", Math.max(512, input.maxResults() * 256));
         ArrayNode tools = request.putArray("tools");
         tools.addObject().put("type", "web_search");
         return request;
+    }
+
+    /** 一次请求所用的连接信息，仅在本次调用内存在。 */
+    private record ResolvedModel(String baseUrl, String apiKey, String modelName) {
     }
 
     private WebSearchResult convert(WebSearchInput input, JsonNode response) {

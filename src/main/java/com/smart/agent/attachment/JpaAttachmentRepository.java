@@ -35,7 +35,10 @@ public class JpaAttachmentRepository implements AttachmentRepository {
                 .setParameter("id", id)
                 .setParameter("tenantId", tenantId)
                 .setParameter("userId", userId)
-                .getResultStream().findFirst();
+                .setMaxResults(1)
+                .getResultList()
+                .stream()
+                .findFirst();
     }
 
     @Override

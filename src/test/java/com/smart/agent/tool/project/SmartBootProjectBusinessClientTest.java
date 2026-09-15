@@ -130,6 +130,30 @@ class SmartBootProjectBusinessClientTest {
     }
 
     @Test
+    void preservesSmartBootArchiveFailureDetails() {
+        DisposableServer server = HttpServer.create().port(0).handle((request, response) ->
+                response.status(500).header("Content-Type", "application/json")
+                        .sendString(reactor.core.publisher.Mono.just(
+                                "{\"code\":\"PROJECT_ARCHIVE_FAILED\",\"message\":\"项目档案查询失败\"}"))).bindNow();
+        try {
+            SmartBootProjectBusinessClient client = new SmartBootProjectBusinessClient(
+                    WebClient.builder().baseUrl("http://127.0.0.1:" + server.port()).build(),
+                    new ObjectMapper(), SECRET);
+
+            assertThatThrownBy(() -> client.getArchiveDetail(
+                    new ToolContext("tenant", "user", "identity", Set.of("p-1")), "p-1"))
+                    .isInstanceOf(AgentException.class)
+                    .satisfies(error -> {
+                        AgentException agentError = (AgentException) error;
+                        assertThat(agentError.code()).isEqualTo("AGENT_TOOL_EXECUTION_FAILED");
+                        assertThat(agentError.getMessage()).isEqualTo("项目档案查询失败");
+                    });
+        } finally {
+            server.disposeNow();
+        }
+    }
+
+    @Test
     void injectsTrustedProjectIdsOnlyInInternalQueryRequest() throws Exception {
         AtomicReference<String> body = new AtomicReference<>();
         DisposableServer server = HttpServer.create().port(0).handle((request, response) ->

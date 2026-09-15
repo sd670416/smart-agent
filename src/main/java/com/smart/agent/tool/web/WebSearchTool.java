@@ -43,15 +43,28 @@ public final class WebSearchTool implements AgentTool<WebSearchInput, WebSearchR
             throw new AgentException("AGENT_WEB_SEARCH_DISABLED", HttpStatus.SERVICE_UNAVAILABLE,
                     "Web search is disabled");
         }
+        requireWebSearchCapability(context);
         WebSearchInput normalized = normalize(input);
         policy.validate(normalized.query());
-        WebSearchResult result = provider.search(normalized);
+        WebSearchResult result = provider.search(normalized, context);
         if (result == null || ((result.summary() == null || result.summary().isBlank())
                 && result.sources().isEmpty())) {
             throw new AgentException("AGENT_WEB_SEARCH_NO_RESULTS", HttpStatus.NOT_FOUND,
                     "No reliable public web search results were found");
         }
         return result;
+    }
+
+    /**
+     * 本轮绑定的模型必须声明 WEB_SEARCH 能力，否则直接给出"换模型"的引导，
+     * 不退化成笼统的失败提示，也不使用没有联网能力的模型硬发请求。
+     */
+    private void requireWebSearchCapability(ToolContext context) {
+        ToolContext.ModelBinding binding = context == null ? null : context.modelBinding();
+        if (binding != null && !binding.supportsWebSearch()) {
+            throw new AgentException("AGENT_MODEL_WEB_SEARCH_REQUIRED", HttpStatus.BAD_REQUEST,
+                    "Selected model does not declare WEB_SEARCH capability");
+        }
     }
 
     private WebSearchInput normalize(WebSearchInput input) {

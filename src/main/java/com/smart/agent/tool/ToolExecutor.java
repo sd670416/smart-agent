@@ -57,10 +57,24 @@ public class ToolExecutor implements AutoCloseable {
     }
 
     public Object execute(String toolKey, Object input, AgentUserContext userContext) {
+        return execute(toolKey, input, userContext, null);
+    }
+
+    /**
+     * 带本轮模型绑定执行工具。
+     *
+     * @param modelBinding 本轮运行固定的模型绑定；为 {@code null} 时工具按无模型上下文执行，
+     *                     依赖模型的能力（如联网搜索）会给出"请切换模型"的引导而非静默失败
+     */
+    public Object execute(String toolKey, Object input, AgentUserContext userContext,
+            ToolContext.ModelBinding modelBinding) {
         AgentTool<?, ?> tool = toolRegistry.require(toolKey);
         long startedAt = System.nanoTime();
         try {
             ToolContext toolContext = ToolContext.from(userContext);
+            if (modelBinding != null) {
+                toolContext = toolContext.withModelBinding(modelBinding);
+            }
             if (tool.risk() != ToolRisk.L0 && !userContext.permissions().contains(tool.requiredPermission())) {
                 String forbiddenCode = "web.search".equals(tool.key())
                         ? "AGENT_WEB_SEARCH_FORBIDDEN" : "AGENT_TOOL_FORBIDDEN";

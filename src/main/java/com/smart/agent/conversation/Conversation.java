@@ -35,6 +35,9 @@ public class Conversation {
     @Column(nullable = false, length = 255)
     private String title;
 
+    @Column(name = "model_id", length = 36)
+    private String modelId;
+
     @OneToMany(mappedBy = "conversation", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("sequence ASC")
     @JsonProperty("messages")
@@ -68,6 +71,12 @@ public class Conversation {
                 requireText(userId, "userId"), requireText(title, "title"));
     }
 
+    public static Conversation create(String tenantId, String userId, String title, String modelId) {
+        Conversation conversation = create(tenantId, userId, title);
+        conversation.assignModel(requireText(modelId, "modelId"));
+        return conversation;
+    }
+
     public Message append(Message.Role role, String content) {
         return append(role, content, null);
     }
@@ -98,6 +107,22 @@ public class Conversation {
     @JsonProperty("title")
     public String title() {
         return title;
+    }
+
+    @JsonProperty("modelId")
+    public String modelId() {
+        return modelId;
+    }
+
+    /**
+     * 切换本会话使用的模型。仅本会话生效，历史运行记录中的模型快照不受影响。
+     */
+    public void assignModel(String modelId) {
+        String next = requireText(modelId, "modelId");
+        if (!next.equals(this.modelId)) {
+            this.modelId = next;
+            this.updatedAt = Instant.now();
+        }
     }
 
     @JsonProperty("updatedAt")

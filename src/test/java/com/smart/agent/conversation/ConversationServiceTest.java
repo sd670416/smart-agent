@@ -3,12 +3,19 @@ package com.smart.agent.conversation;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.smart.agent.common.error.AgentException;
+import com.smart.agent.model.config.ModelConfig;
+import com.smart.agent.model.config.ModelConfigRepository;
 import java.lang.reflect.Field;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.ObjectProvider;
 
 class ConversationServiceTest {
 
@@ -76,6 +83,189 @@ class ConversationServiceTest {
         assertThatThrownBy(() -> conversation.append(Message.Role.USER, " ")).isInstanceOf(IllegalArgumentException.class);
     }
 
+    @Test
+    void newConversationInheritsTheSystemDefaultModel() {
+        InMemoryConversationRepository conversations = new InMemoryConversationRepository();
+        InMemoryModelConfigRepository models = new InMemoryModelConfigRepository();
+        ModelConfig defaultModel = model("model-default", true);
+        defaultModel.makeDefault();
+        models.save(defaultModel);
+        ConversationService service = new ConversationService(conversations, provider(models));
+
+        Conversation created = service.create("tenant-1", "user-1", "项目问答");
+
+        assertThat(created.modelId()).isEqualTo("model-default");
+        assertThat(conversations.findByIdAndTenantIdAndUserId("tenant-1", "user-1", created.id())
+                .orElseThrow().modelId()).isEqualTo("model-default");
+    }
+
+    @Test
+    void createsConversationWithoutModelWhenNoDefaultIsConfigured() {
+        InMemoryConversationRepository conversations = new InMemoryConversationRepository();
+        ConversationService service = new ConversationService(
+                conversations, provider(new InMemoryModelConfigRepository()));
+
+        Conversation created = service.create("tenant-1", "user-1", "项目问答");
+
+        assertThat(created.modelId()).isNull();
+    }
+
+    @Test
+    void switchingModelIsPersistedAndSurvivesReload() {
+        InMemoryConversationRepository conversations = new InMemoryConversationRepository();
+        InMemoryModelConfigRepository models = new InMemoryModelConfigRepository();
+        models.save(model("model-a", true));
+        models.save(model("model-b", true));
+        ConversationService service = new ConversationService(conversations, provider(models));
+        Conversation created = service.create("tenant-1", "user-1", "项目问答", "model-a");
+
+        service.switchModel("tenant-1", "user-1", created.id(), "model-b");
+
+        assertThat(conversations.findByIdAndTenantIdAndUserId("tenant-1", "user-1", created.id())
+                .orElseThrow().modelId()).isEqualTo("model-b");
+        assertThat(service.find("tenant-1", "user-1", created.id()).modelId()).isEqualTo("model-b");
+    }
+
+    @Test
+    void rejectsModelSwitchOutsideTheTrustedOwnerScope() {
+        InMemoryConversationRepository conversations = new InMemoryConversationRepository();
+        InMemoryModelConfigRepository models = new InMemoryModelConfigRepository();
+        models.save(model("model-a", true));
+        models.save(model("model-b", true));
+        ConversationService service = new ConversationService(conversations, provider(models));
+        Conversation created = service.create("tenant-1", "user-1", "项目问答", "model-a");
+        int savesBeforeRejectedSwitches = conversations.saveCount();
+
+        assertThatThrownBy(() -> service.switchModel("tenant-2", "user-1", created.id(), "model-b"))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> service.switchModel("tenant-1", "user-2", created.id(), "model-b"))
+                .isInstanceOf(IllegalArgumentException.class);
+
+        assertThat(conversations.saveCount()).isEqualTo(savesBeforeRejectedSwitches);
+        assertThat(service.find("tenant-1", "user-1", created.id()).modelId()).isEqualTo("model-a");
+    }
+
+    @Test
+    void rejectsSwitchingToADisabledModelWithGuidance() {
+        InMemoryConversationRepository conversations = new InMemoryConversationRepository();
+        InMemoryModelConfigRepository models = new InMemoryModelConfigRepository();
+        models.save(model("model-a", true));
+        models.save(model("model-disabled", false));
+        ConversationService service = new ConversationService(conversations, provider(models));
+        Conversation created = service.create("tenant-1", "user-1", "项目问答", "model-a");
+        int savesBeforeRejectedSwitches = conversations.saveCount();
+
+        assertThatThrownBy(() -> service.switchModel("tenant-1", "user-1", created.id(), "model-disabled"))
+                .isInstanceOf(AgentException.class)
+                .satisfies(error -> assertThat(((AgentException) error).code())
+                        .isEqualTo("AGENT_MODEL_DISABLED"));
+
+        assertThat(conversations.saveCount()).isEqualTo(savesBeforeRejectedSwitches);
+        assertThat(service.find("tenant-1", "user-1", created.id()).modelId()).isEqualTo("model-a");
+    }
+
+    @Test
+    void rejectsSwitchingToAnUnknownModel() {
+        InMemoryConversationRepository conversations = new InMemoryConversationRepository();
+        InMemoryModelConfigRepository models = new InMemoryModelConfigRepository();
+        models.save(model("model-a", true));
+        ConversationService service = new ConversationService(conversations, provider(models));
+        Conversation created = service.create("tenant-1", "user-1", "项目问答", "model-a");
+
+        assertThatThrownBy(() -> service.switchModel("tenant-1", "user-1", created.id(), "missing"))
+                .isInstanceOf(AgentException.class)
+                .satisfies(error -> assertThat(((AgentException) error).code())
+                        .isEqualTo("AGENT_MODEL_NOT_FOUND"));
+    }
+
+    private static ModelConfig model(String id, boolean enabled) {
+        ModelConfig config = ModelConfig.create("展示名-" + id,
+                com.smart.agent.model.config.ModelProviderType.OPENAI_COMPATIBLE,
+                com.smart.agent.model.config.ModelDeploymentType.LOCAL,
+                "https://api.example.com/v1", "gpt-4o-mini", "sk-test-" + id,
+                java.util.Set.of(com.smart.agent.model.config.ModelCapability.TOOL_CALLING),
+                Duration.ofSeconds(5), Duration.ofSeconds(30), 0, null);
+        setField(config, "id", id);
+        if (!enabled) {
+            config.setEnabled(false);
+        }
+        return config;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static ObjectProvider<ModelConfigRepository> provider(ModelConfigRepository repository) {
+        return new ObjectProvider<>() {
+            @Override
+            public ModelConfigRepository getObject(Object... args) {
+                return repository;
+            }
+
+            @Override
+            public ModelConfigRepository getIfAvailable() {
+                return repository;
+            }
+
+            @Override
+            public ModelConfigRepository getIfUnique() {
+                return repository;
+            }
+
+            @Override
+            public ModelConfigRepository getObject() {
+                return repository;
+            }
+        };
+    }
+
+    private static final class InMemoryModelConfigRepository implements ModelConfigRepository {
+        private final Map<String, ModelConfig> models = new LinkedHashMap<>();
+
+        @Override
+        public ModelConfig save(ModelConfig config) {
+            models.put(config.id(), config);
+            return config;
+        }
+
+        @Override
+        public Optional<ModelConfig> findById(String id) {
+            return Optional.ofNullable(models.get(id));
+        }
+
+        @Override
+        public Optional<ModelConfig> findDefault() {
+            return models.values().stream().filter(ModelConfig::defaultModel).findFirst();
+        }
+
+        @Override
+        public List<ModelConfig> findEnabled() {
+            return models.values().stream().filter(ModelConfig::enabled).toList();
+        }
+
+        @Override
+        public List<ModelConfig> findAllActive() {
+            return new ArrayList<>(models.values());
+        }
+
+        @Override
+        public List<ModelConfig> findPage(com.smart.agent.model.config.ModelConfigQuery query) {
+            return new ArrayList<>(models.values());
+        }
+
+        @Override
+        public long count(com.smart.agent.model.config.ModelConfigQuery query) {
+            return models.size();
+        }
+
+        @Override
+        public long countReferences(String modelId) {
+            return 0L;
+        }
+
+        @Override
+        public void flush() {
+        }
+    }
+
     private static final class InMemoryConversationRepository implements ConversationRepository {
         private final Map<String, ConversationSnapshot> conversations = new LinkedHashMap<>();
         private int saveCount;
@@ -99,16 +289,20 @@ class ConversationServiceTest {
         }
     }
 
-    private record ConversationSnapshot(String id, String tenantId, String userId, String title,
+    private record ConversationSnapshot(String id, String tenantId, String userId, String title, String modelId,
                                         List<MessageSnapshot> messages) {
         static ConversationSnapshot from(Conversation conversation) {
             return new ConversationSnapshot(conversation.id(), conversation.tenantId(), conversation.userId(),
-                    conversation.title(), conversation.messages().stream().map(MessageSnapshot::from).toList());
+                    conversation.title(), conversation.modelId(),
+                    conversation.messages().stream().map(MessageSnapshot::from).toList());
         }
 
         Conversation restore() {
             Conversation conversation = Conversation.create(tenantId, userId, title);
             setField(conversation, "id", id);
+            if (modelId != null) {
+                setField(conversation, "modelId", modelId);
+            }
             for (MessageSnapshot message : messages) {
                 conversation.append(message.role(), message.content());
             }

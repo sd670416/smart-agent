@@ -81,6 +81,69 @@ class AgentRunServiceTest {
         assertThatThrownBy(() -> AgentRun.start("tenant-1", "user-1", " ")).isInstanceOf(IllegalArgumentException.class);
     }
 
+    @Test
+    void recordsTheModelSnapshotWhenTheRunStarts() {
+        InMemoryConversationRepository conversations = new InMemoryConversationRepository();
+        Conversation conversation = conversations.save(Conversation.create("tenant-1", "user-1", "项目问答"));
+        InMemoryAgentRunRepository runs = new InMemoryAgentRunRepository();
+        AgentRunService service = new AgentRunService(runs, conversations);
+
+        AgentRun run = service.start("tenant-1", "user-1", conversation.id(), "trace-1",
+                "model-1", "智谱GLM", "glm-4.5", 7L);
+
+        assertThat(run.modelId()).isEqualTo("model-1");
+        assertThat(run.modelDisplayName()).isEqualTo("智谱GLM");
+        assertThat(run.modelName()).isEqualTo("glm-4.5");
+        assertThat(run.modelConfigVersion()).isEqualTo(7L);
+        AgentRun persisted = runs.findByIdAndTenantIdAndUserId("tenant-1", "user-1", run.id()).orElseThrow();
+        assertThat(persisted.modelId()).isEqualTo("model-1");
+        assertThat(persisted.modelConfigVersion()).isEqualTo(7L);
+    }
+
+    @Test
+    void keepsTheOriginalSnapshotWhenTheModelConfigurationChangesLater() {
+        InMemoryConversationRepository conversations = new InMemoryConversationRepository();
+        Conversation conversation = conversations.save(Conversation.create("tenant-1", "user-1", "项目问答"));
+        InMemoryAgentRunRepository runs = new InMemoryAgentRunRepository();
+        AgentRunService service = new AgentRunService(runs, conversations);
+
+        AgentRun run = service.start("tenant-1", "user-1", conversation.id(), "trace-1",
+                "model-1", "旧展示名", "glm-4.5", 1L);
+        service.transition("tenant-1", "user-1", run.id(), AgentRunStatus.RECEIVED, AgentRunStatus.ROUTING);
+
+        AgentRun reloaded = runs.findByIdAndTenantIdAndUserId("tenant-1", "user-1", run.id()).orElseThrow();
+        assertThat(reloaded.modelDisplayName()).isEqualTo("旧展示名");
+        assertThat(reloaded.modelConfigVersion()).isEqualTo(1L);
+    }
+
+    @Test
+    void startsWithoutAModelSnapshotWhenNoModelIsBound() {
+        InMemoryConversationRepository conversations = new InMemoryConversationRepository();
+        Conversation conversation = conversations.save(Conversation.create("tenant-1", "user-1", "项目问答"));
+        InMemoryAgentRunRepository runs = new InMemoryAgentRunRepository();
+        AgentRunService service = new AgentRunService(runs, conversations);
+
+        AgentRun run = service.start("tenant-1", "user-1", conversation.id(), "trace-1",
+                null, null, null, null);
+
+        assertThat(run.modelId()).isNull();
+        assertThat(run.modelConfigVersion()).isNull();
+    }
+
+    @Test
+    void rejectsCrossUserModelBoundRunStartWithoutSaving() {
+        InMemoryConversationRepository conversations = new InMemoryConversationRepository();
+        Conversation conversation = conversations.save(Conversation.create("tenant-1", "user-1", "项目问答"));
+        InMemoryAgentRunRepository runs = new InMemoryAgentRunRepository();
+        AgentRunService service = new AgentRunService(runs, conversations);
+
+        assertThatThrownBy(() -> service.start("tenant-1", "user-2", conversation.id(), "trace-1",
+                "model-1", "展示名", "glm-4.5", 1L))
+                .isInstanceOf(IllegalArgumentException.class);
+
+        assertThat(runs.saveCount()).isZero();
+    }
+
     private static final class InMemoryConversationRepository implements ConversationRepository {
         private final Map<String, Conversation> conversations = new LinkedHashMap<>();
 
@@ -129,15 +192,22 @@ class AgentRunServiceTest {
         }
     }
 
-    private record AgentRunSnapshot(String id, String tenantId, String userId, String conversationId, AgentRunStatus status) {
+    private record AgentRunSnapshot(String id, String tenantId, String userId, String conversationId,
+                                    AgentRunStatus status, String modelId, String modelDisplayName,
+                                    String modelName, Long modelConfigVersion) {
         static AgentRunSnapshot from(AgentRun run) {
-            return new AgentRunSnapshot(run.id(), run.tenantId(), run.userId(), run.conversationId(), run.status());
+            return new AgentRunSnapshot(run.id(), run.tenantId(), run.userId(), run.conversationId(), run.status(),
+                    run.modelId(), run.modelDisplayName(), run.modelName(), run.modelConfigVersion());
         }
 
         AgentRun restore() {
             AgentRun run = AgentRun.start(tenantId, userId, conversationId);
             setField(run, "id", id);
             setField(run, "status", status);
+            setField(run, "modelId", modelId);
+            setField(run, "modelDisplayName", modelDisplayName);
+            setField(run, "modelName", modelName);
+            setField(run, "modelConfigVersion", modelConfigVersion);
             return run;
         }
     }

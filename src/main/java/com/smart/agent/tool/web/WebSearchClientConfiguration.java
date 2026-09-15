@@ -1,9 +1,11 @@
 package com.smart.agent.tool.web;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.smart.agent.model.ModelCredentialSource;
 import com.smart.agent.model.ModelGatewayProperties;
 import java.time.Clock;
 import java.time.ZoneId;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -22,10 +24,12 @@ public class WebSearchClientConfiguration {
     OpenAiWebSearchProvider openAiWebSearchProvider(
             ObjectMapper objectMapper,
             ModelGatewayProperties modelProperties,
+            ObjectProvider<ModelCredentialSource> credentialSource,
             WebSearchProperties webSearchProperties,
             @Value("${agent.time-zone:Asia/Shanghai}") String timezone) {
         return new OpenAiWebSearchProvider(
-                WebClient.builder().build(), objectMapper, modelProperties, webSearchProperties.timeout(),
+                WebClient.builder().build(), objectMapper, modelProperties,
+                credentialSource.getIfAvailable(), webSearchProperties.timeout(),
                 Clock.systemUTC(), ZoneId.of(timezone));
     }
 
@@ -33,10 +37,12 @@ public class WebSearchClientConfiguration {
     ZhipuWebSearchProvider zhipuWebSearchProvider(
             ObjectMapper objectMapper,
             ModelGatewayProperties modelProperties,
+            ObjectProvider<ModelCredentialSource> credentialSource,
             WebSearchProperties webSearchProperties,
             @Value("${agent.time-zone:Asia/Shanghai}") String timezone) {
         return new ZhipuWebSearchProvider(
-                WebClient.builder().build(), objectMapper, modelProperties, webSearchProperties.timeout(),
+                WebClient.builder().build(), objectMapper, modelProperties,
+                credentialSource.getIfAvailable(), webSearchProperties.timeout(),
                 Clock.systemUTC(), ZoneId.of(timezone));
     }
 

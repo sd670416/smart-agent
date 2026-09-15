@@ -50,6 +50,18 @@ public class AgentRun {
     @Column(name = "conversation_id", nullable = false, length = 36, updatable = false)
     private String conversationId;
 
+    @Column(name = "model_id", length = 36, updatable = false)
+    private String modelId;
+
+    @Column(name = "model_display_name", length = 128, updatable = false)
+    private String modelDisplayName;
+
+    @Column(name = "model_name", length = 128, updatable = false)
+    private String modelName;
+
+    @Column(name = "model_config_version", updatable = false)
+    private Long modelConfigVersion;
+
     @Column(name = "trace_id", length = 128, updatable = false)
     private String traceId;
 
@@ -108,6 +120,26 @@ public class AgentRun {
                 requireText(conversationId, "conversationId"), traceId);
     }
 
+    /**
+     * 记录本次运行使用的模型快照。仅在运行创建阶段写入，之后配置变更不回改历史记录。
+     */
+    public void bindModel(String modelId, String displayName, String modelName, long configVersion) {
+        this.modelId = requireText(modelId, "modelId");
+        this.modelDisplayName = displayName;
+        this.modelName = modelName;
+        this.modelConfigVersion = configVersion;
+    }
+
+    public static AgentRun start(String tenantId, String userId, String conversationId, String traceId,
+            String modelId, String modelDisplayName, String modelName, Long modelConfigVersion) {
+        AgentRun run = start(tenantId, userId, conversationId, traceId);
+        if (modelId != null && !modelId.isBlank()) {
+            run.bindModel(modelId, modelDisplayName, modelName,
+                    modelConfigVersion == null ? 0L : modelConfigVersion);
+        }
+        return run;
+    }
+
     public void transition(AgentRunStatus next) {
         boolean forcedTerminal = (next == AgentRunStatus.CANCELLED || next == AgentRunStatus.TIMEOUT)
                 && !isTerminal(status);
@@ -160,6 +192,10 @@ public class AgentRun {
     }
 
     public String traceId() { return traceId; }
+    public String modelId() { return modelId; }
+    public String modelDisplayName() { return modelDisplayName; }
+    public String modelName() { return modelName; }
+    public Long modelConfigVersion() { return modelConfigVersion; }
     public Instant createdAt() { return createdAt; }
     public Instant updatedAt() { return updatedAt; }
     public String safeErrorCode() { return safeErrorCode; }

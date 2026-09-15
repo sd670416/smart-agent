@@ -30,5 +30,34 @@ class ToolContextTest {
         assertThat(context.projectIds()).containsExactly("project-1");
         assertThat(context.roleIds()).isEmpty();
         assertThat(context.permissions()).isEmpty();
+        assertThat(context.modelBinding()).isNull();
+    }
+
+    @Test
+    void carriesNoModelBindingByDefaultAndAttachesOneOnDemand() {
+        ToolContext context = ToolContext.from(new AgentUserContext(
+                "tenant", "user", "identity", Set.of(), Set.of("project-1"), Set.of(), Set.of()));
+
+        assertThat(context.modelBindingOptional()).isEmpty();
+
+        ToolContext.ModelBinding binding = new ToolContext.ModelBinding(
+                "model-1", "智谱GLM", "glm-4.5", "https://open.bigmodel.cn/api/paas/v4",
+                Set.of(com.smart.agent.model.config.ModelCapability.WEB_SEARCH));
+        ToolContext bound = context.withModelBinding(binding);
+
+        assertThat(bound.modelBindingOptional()).contains(binding);
+        assertThat(bound.modelBinding().supportsWebSearch()).isTrue();
+        // 附加绑定不应改变权限与项目范围。
+        assertThat(bound.permissions()).isEqualTo(context.permissions());
+        assertThat(bound.projectIds()).isEqualTo(context.projectIds());
+    }
+
+    @Test
+    void treatsUndeclaredCapabilitiesAsUnsupported() {
+        ToolContext.ModelBinding binding = new ToolContext.ModelBinding(
+                "model-1", "纯对话模型", "chat-only", "https://api.example.com/v1", null);
+
+        assertThat(binding.capabilities()).isEmpty();
+        assertThat(binding.supportsWebSearch()).isFalse();
     }
 }
