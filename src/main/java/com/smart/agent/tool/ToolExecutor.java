@@ -24,6 +24,7 @@ import org.springframework.stereotype.Component;
 public class ToolExecutor implements AutoCloseable {
     static final int MAX_RESULT_BYTES = 64 * 1024;
     private static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(5);
+    private static final Duration PROJECT_ARCHIVE_TIMEOUT = Duration.ofSeconds(30);
 
     private final ToolRegistry toolRegistry;
     private final AgentRunService agentRunService;
@@ -121,7 +122,8 @@ public class ToolExecutor implements AutoCloseable {
         AgentTool<Object, Object> tool = (AgentTool<Object, Object>) rawTool;
         Future<Object> future = executorService.submit(() -> tool.execute(input, context));
         try {
-            return future.get(timeout.toNanos(), TimeUnit.NANOSECONDS);
+            Duration executionTimeout = timeoutFor(tool.key());
+            return future.get(executionTimeout.toNanos(), TimeUnit.NANOSECONDS);
         } catch (TimeoutException exception) {
             future.cancel(true);
             throw exception;
@@ -134,6 +136,10 @@ public class ToolExecutor implements AutoCloseable {
             }
             throw new ToolExecutionException();
         }
+    }
+
+    Duration timeoutFor(String toolKey) {
+        return "project.getArchiveDetail".equals(toolKey) ? PROJECT_ARCHIVE_TIMEOUT : timeout;
     }
 
     private int serializeResultSize(Object result) {

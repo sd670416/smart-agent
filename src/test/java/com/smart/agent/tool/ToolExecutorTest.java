@@ -84,6 +84,12 @@ class ToolExecutorTest {
     }
 
     @Test
+    void usesLongerTimeoutOnlyForCompleteProjectArchive() {
+        assertThat(executor.timeoutFor("project.getOverview")).isEqualTo(Duration.ofMillis(50));
+        assertThat(executor.timeoutFor("project.getArchiveDetail")).isEqualTo(Duration.ofSeconds(30));
+    }
+
+    @Test
     void executesLevelZeroTimeToolWithoutBusinessPermission() {
         ToolExecutor levelZeroExecutor = new ToolExecutor(
                 new ToolRegistry(Set.of(new CurrentTimeTool(
