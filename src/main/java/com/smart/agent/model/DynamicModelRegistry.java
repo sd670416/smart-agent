@@ -27,7 +27,7 @@ public class DynamicModelRegistry implements ModelCredentialSource {
         this.factory = factory;
     }
 
-    public ModelExecutionHandle acquire(String modelId) {
+    public synchronized ModelExecutionHandle acquire(String modelId) {
         ModelConfig config = repository.findById(modelId).orElse(null);
         if (config == null) {
             evict(modelId);
@@ -100,7 +100,7 @@ public class DynamicModelRegistry implements ModelCredentialSource {
     }
 
     @PreDestroy
-    void closeAll() {
+    synchronized void closeAll() {
         for (SharedGateway gateway : new ArrayList<>(cache.values())) gateway.retire();
         cache.clear();
     }

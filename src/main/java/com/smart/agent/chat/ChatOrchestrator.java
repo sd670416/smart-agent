@@ -262,8 +262,14 @@ public class ChatOrchestrator {
                         context.tenantId(), context.userId(), command.conversationId(), traceId));
                 return;
             }
-            modelHandle = handle;
-            modelGatewayForRun = handle.gateway();
+            synchronized (terminalLock) {
+                if (terminated.get() || modelHandleReleased.get()) {
+                    handle.close();
+                    throw new IllegalStateException("对话已取消");
+                }
+                modelHandle = handle;
+                modelGatewayForRun = handle.gateway();
+            }
             ModelExecutionHandle.Snapshot snapshot = handle.snapshot();
             modelBindingForRun = modelRegistry.bindingFor(snapshot);
             run = withinBudget(() -> runService.start(context.tenantId(), context.userId(),
@@ -275,11 +281,14 @@ public class ChatOrchestrator {
          * 释放本轮模型句柄。完成、失败、取消、超时四条路径都必须调用，重复调用安全。
          */
         private void releaseModelHandle() {
-            if (!modelHandleReleased.compareAndSet(false, true)) {
-                return;
+            ModelExecutionHandle handle;
+            synchronized (terminalLock) {
+                if (!modelHandleReleased.compareAndSet(false, true)) {
+                    return;
+                }
+                handle = modelHandle;
+                modelHandle = null;
             }
-            ModelExecutionHandle handle = modelHandle;
-            modelHandle = null;
             if (handle == null) {
                 return;
             }

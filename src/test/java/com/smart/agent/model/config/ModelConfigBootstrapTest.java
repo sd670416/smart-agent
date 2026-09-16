@@ -36,7 +36,7 @@ class ModelConfigBootstrapTest {
         assertThat(imported.configVersion()).isEqualTo(1L);
         assertThat(imported.capabilities())
                 .containsExactlyInAnyOrder(ModelCapability.TOOL_CALLING, ModelCapability.STREAMING);
-        // 本地 http 地址必须按本地部署导入，否则会被「云端必须 https」校验拒绝。
+        // 本地 http 地址按本地部署导入，云端模型必须配置 API Key，本地可为空。
         assertThat(imported.deploymentType()).isEqualTo(ModelDeploymentType.LOCAL);
     }
 

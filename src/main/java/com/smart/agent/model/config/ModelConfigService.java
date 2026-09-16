@@ -97,7 +97,7 @@ public class ModelConfigService {
         ModelConfig config = ModelConfig.create(required(request.name(), "模型展示名称"),
                 ModelProviderType.OPENAI_COMPATIBLE,
                 deploymentType,
-                endpoint(request.baseUrl(), deploymentType),
+                endpoint(request.baseUrl()),
                 required(request.modelName(), "实际请求模型名称"),
                 encryptedKey(request.apiKey(), deploymentType),
                 capabilities(request.capabilities()),
@@ -118,7 +118,7 @@ public class ModelConfigService {
         ModelConfig config = ModelConfig.create(required(request.name(), "模型展示名称"),
                 ModelProviderType.OPENAI_COMPATIBLE,
                 deploymentType,
-                endpoint(request.baseUrl(), deploymentType),
+                endpoint(request.baseUrl()),
                 required(request.modelName(), "实际请求模型名称"),
                 encryptedKey(request.apiKey(), deploymentType),
                 capabilities(request.capabilities()),
@@ -137,7 +137,7 @@ public class ModelConfigService {
         ModelConfig current = existing(id);
         ModelDeploymentType deploymentType = requiredDeployment(request.deploymentType());
         current.update(required(request.name(), "模型展示名称"), deploymentType,
-                endpoint(request.baseUrl(), deploymentType),
+                endpoint(request.baseUrl()),
                 required(request.modelName(), "实际请求模型名称"),
                 encryptedKeyForUpdate(request.apiKey(), deploymentType, current),
                 capabilities(request.capabilities()),
@@ -285,10 +285,10 @@ public class ModelConfigService {
     }
 
     /**
-     * 校验服务地址：云端必须 https，本地允许 http/https，
+     * 校验服务地址：允许 http/https（云端与本地一视同仁，用户可自行选择明文内网地址），
      * 并拒绝指向云元数据地址、链路本地地址和泛地址的目标，收敛 SSRF 面。
      */
-    private static String endpoint(String baseUrl, ModelDeploymentType deploymentType) {
+    private static String endpoint(String baseUrl) {
         String value = required(baseUrl, "模型服务地址");
         URI uri;
         try {
@@ -299,9 +299,6 @@ public class ModelConfigService {
         String scheme = uri.getScheme() == null ? "" : uri.getScheme().toLowerCase(Locale.ROOT);
         if (!"http".equals(scheme) && !"https".equals(scheme)) {
             throw new IllegalArgumentException("模型服务地址只支持 http 或 https 协议");
-        }
-        if (deploymentType == ModelDeploymentType.CLOUD && !"https".equals(scheme)) {
-            throw new IllegalArgumentException("云端模型必须使用 https 服务地址");
         }
         String host = uri.getHost();
         if (host == null || host.isBlank()) {

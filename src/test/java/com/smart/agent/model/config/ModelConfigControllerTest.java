@@ -100,7 +100,7 @@ class ModelConfigControllerTest {
                 .andExpect(jsonPath("$.code").value("MODEL_CONFIG_STATE_CONFLICT"));
 
         when(service.setDefault(any(), any()))
-                .thenThrow(new IllegalArgumentException("云端模型必须使用 https 服务地址"));
+                .thenThrow(new IllegalArgumentException("模型服务地址只支持 http 或 https 协议"));
         mvc.perform(put("/agent/models/{id}/default", "model-1").requestAttr(CONTEXT, actor))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("MODEL_CONFIG_INVALID"));
@@ -133,19 +133,18 @@ class ModelConfigControllerTest {
     }
 
     @Test
-    void testsModelWithOptionalImageAttachment() throws Exception {
+    void testsModelAndReturnsChatReply() throws Exception {
         ModelConfig config = sample();
         when(service.testTarget("model-1", actor)).thenReturn(config);
-        when(tester.test(config, "attachment-1", actor)).thenReturn(
+        when(tester.test(config, actor)).thenReturn(
                 new ModelTestResult("model-1", "PASSED", java.time.Instant.now(), List.of(
-                        new ModelTestResult.Item("BASIC", "PASSED", 200, 12, "测试通过"))));
+                        new ModelTestResult.Item("CHAT", "PASSED", 200, 12, "Hi there!"))));
 
-        mvc.perform(post("/agent/models/{id}/test", "model-1").requestAttr(CONTEXT, actor)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"imageAttachmentId\":\"attachment-1\"}"))
+        mvc.perform(post("/agent/models/{id}/test", "model-1").requestAttr(CONTEXT, actor))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("PASSED"))
-                .andExpect(jsonPath("$.items[0].testItem").value("BASIC"));
+                .andExpect(jsonPath("$.items[0].testItem").value("CHAT"))
+                .andExpect(jsonPath("$.items[0].message").value("Hi there!"));
     }
 
     private static ModelConfig sample() {

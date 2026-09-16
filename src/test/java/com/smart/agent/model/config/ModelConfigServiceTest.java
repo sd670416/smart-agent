@@ -57,11 +57,11 @@ class ModelConfigServiceTest {
     }
 
     @Test
-    void requiresHttpsForCloudEndpointsAndBlocksMetadataAddresses() {
-        assertThatThrownBy(() -> service.create(
-                request("明文云端", ModelDeploymentType.CLOUD, "http://api.example.com/v1", "glm", "key"), manager))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("https");
+    void permitsHttpForCloudEndpointsAndBlocksMetadataAddresses() {
+        // 云端不再强制 https：内网网关等场景允许明文 http 地址。
+        ModelConfig cloudOverHttp = service.create(
+                request("内网云端", ModelDeploymentType.CLOUD, "http://gateway.internal:8000/v1", "glm", "key"), manager);
+        assertThat(cloudOverHttp.baseUrl()).isEqualTo("http://gateway.internal:8000/v1");
 
         assertThatThrownBy(() -> service.create(
                 request("元数据地址", ModelDeploymentType.LOCAL, "http://169.254.169.254/latest", "x", null), manager))

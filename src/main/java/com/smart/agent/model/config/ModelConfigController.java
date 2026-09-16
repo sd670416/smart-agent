@@ -107,13 +107,12 @@ public class ModelConfigController {
     }
 
     @PostMapping("/{id}/test")
-    public ModelTestResult test(@PathVariable String id, @RequestBody(required = false) ModelTestRequest request,
-            @RequestAttribute(CONTEXT) AgentUserContext actor) {
+    public ModelTestResult test(@PathVariable String id, @RequestAttribute(CONTEXT) AgentUserContext actor) {
         if (tester == null) {
             throw new IllegalStateException("模型测试服务尚未启用");
         }
         ModelConfig config = service.testTarget(id, actor);
-        return tester.test(config, request == null ? null : request.imageAttachmentId(), actor);
+        return tester.test(config, actor);
     }
 
     @ExceptionHandler(ModelConfigNotFoundException.class)
@@ -157,9 +156,5 @@ public class ModelConfigController {
 
     @JsonIgnoreProperties(ignoreUnknown = false)
     public record EnabledRequest(Boolean enabled) {
-    }
-
-    @JsonIgnoreProperties(ignoreUnknown = false)
-    public record ModelTestRequest(String imageAttachmentId) {
     }
 }

@@ -70,7 +70,7 @@ public class ModelConfigBootstrap implements ApplicationRunner {
 
     /**
      * YAML 无法表达部署方式，按服务地址协议推断：https 视为云端部署，其余（含 http 本地地址）视为本地部署。
-     * 与保存阶段的「云端必须 https」校验保持一致，避免引导数据被自身校验拒绝。
+     * 云端模型还必须配置 API Key，https 地址通常伴随密钥，此推断可让引导数据天然满足校验。
      */
     private static ModelDeploymentType deploymentTypeOf(String baseUrl) {
         return baseUrl != null && baseUrl.trim().toLowerCase(Locale.ROOT).startsWith("https://")
