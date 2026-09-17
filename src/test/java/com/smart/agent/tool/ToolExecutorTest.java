@@ -11,6 +11,8 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.smart.agent.common.error.AgentException;
+import com.smart.agent.model.ModelCredentialSource;
+import com.smart.agent.model.ModelRunContext;
 import com.smart.agent.run.AgentRunService;
 import com.smart.agent.security.AgentUserContext;
 import com.smart.agent.tool.project.ProjectBusinessClient;
@@ -31,6 +33,8 @@ import com.smart.agent.tool.web.WebSearchResult;
 import com.smart.agent.tool.web.WebSearchTool;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -211,6 +215,53 @@ class ToolExecutorTest {
         assertThat(summary.getValue().durationMillis()).isGreaterThanOrEqualTo(0);
         assertThat(summary.getValue().resultSizeBytes()).isPositive();
         assertThat(summary.getValue().toString()).doesNotContain("project-1", "项目名称不应出现在摘要中");
+    }
+
+    /**
+     * 运行期私有凭据必须由 ToolExecutor 在工作线程内建立。
+     *
+     * <p>这是联网工具拿到"与聊天同版本"凭据的唯一通道；一旦这里漏掉，
+     * 工具就会静默回退成按 modelId 回查数据库，P0 的版本一致性问题会重新出现。
+     */
+    @Test
+    void exposesRunScopedCredentialsToTheToolWithoutLeakingThemToTheCallerThread() {
+        AtomicReference<String> observedInsideTool = new AtomicReference<>();
+        AtomicInteger missingInsideTool = new AtomicInteger();
+        AgentTool<ProjectOverviewInput, String> probe = new AgentTool<>() {
+            @Override public String key() { return "test.credentialProbe"; }
+            @Override public Class<ProjectOverviewInput> inputType() { return ProjectOverviewInput.class; }
+            @Override public String requiredPermission() { return "test:probe"; }
+            @Override public ToolRisk risk() { return ToolRisk.L1; }
+            @Override public String execute(ProjectOverviewInput input, ToolContext context) {
+                ModelCredentialSource.Credentials observed = ModelRunContext.credentials();
+                if (observed == null) {
+                    missingInsideTool.incrementAndGet();
+                } else {
+                    observedInsideTool.set(observed.modelName());
+                }
+                return "ok";
+            }
+        };
+        ToolExecutor probeExecutor = new ToolExecutor(
+                new ToolRegistry(Set.of(probe)), agentRunService, Duration.ofMillis(200));
+        try {
+            Object result = probeExecutor.execute("test.credentialProbe", new ProjectOverviewInput("project-1"),
+                    context(Set.of("test:probe"), Set.of()), null,
+                    new ModelCredentialSource.Credentials("https://run.example.com/v1", "sk-run", "glm-4.5"));
+
+            assertThat(result).isEqualTo("ok");
+            assertThat(observedInsideTool).hasValue("glm-4.5");
+            assertThat(missingInsideTool).hasValue(0);
+            // 调用方线程不持有凭据，也不应残留。
+            assertThat(ModelRunContext.credentials()).isNull();
+
+            // 未传凭据时必须显式为空，而不是沿用上一轮的残留值。
+            probeExecutor.execute("test.credentialProbe", new ProjectOverviewInput("project-1"),
+                    context(Set.of("test:probe"), Set.of()));
+            assertThat(missingInsideTool).hasValue(1);
+        } finally {
+            probeExecutor.close();
+        }
     }
 
     private static AgentUserContext context(Set<String> permissions, Set<String> projectIds) {

@@ -10,6 +10,8 @@ class AgentErrorMessageCatalogTest {
     void returnsFriendlyMessagesForKnownAndUnknownErrors() {
         assertThat(AgentErrorMessageCatalog.message("AGENT_PROJECT_NOT_FOUND", false))
                 .isEqualTo("未找到您有权访问的匹配项目，请检查项目名称或编号。");
+        assertThat(AgentErrorMessageCatalog.message("AGENT_PROJECT_MENU_FORBIDDEN", false))
+                .isEqualTo("您当前没有项目报备或项目档案的访问权限，请联系管理员授权。");
         assertThat(AgentErrorMessageCatalog.message("AGENT_TOOL_INVALID_INPUT", false))
                 .isEqualTo("暂时无法识别本次查询条件，请换一种说法后重试。");
         assertThat(AgentErrorMessageCatalog.message("AGENT_QUERY_INVALID_REQUEST", false))

@@ -107,14 +107,76 @@ class ModelBindingContractTest {
     void buildsAToolBindingWithoutExposingTheApiKey() {
         ModelConfig model = repository.add(model("glm-4.5", Set.of(ModelCapability.WEB_SEARCH)));
         try (ModelExecutionHandle handle = registry.acquire(model.id())) {
-            ToolContext.ModelBinding binding = registry.bindingFor(handle.snapshot());
+            ToolContext.ModelBinding binding = registry.bindingFor(handle);
 
             assertThat(binding).isNotNull();
             assertThat(binding.modelId()).isEqualTo(model.id());
             assertThat(binding.modelName()).isEqualTo("glm-4.5");
             assertThat(binding.baseUrl()).isEqualTo("https://open.bigmodel.cn/api/paas/v4");
             assertThat(binding.supportsWebSearch()).isTrue();
+            // 绑定是工具可见结构，任何形态的打印都不得出现密钥。
+            assertThat(binding.toString()).doesNotContain("sk-plain-text-key");
         }
+    }
+
+    /**
+     * 一轮运行中途改地址、模型名与 Key：聊天与联网必须仍用旧版本。
+     * 这是 P0 修的核心——此前联网会按 modelId 重新读库，拿到新版本。
+     */
+    @Test
+    void keepsRunCredentialsPinnedToTheVersionOfTheHandle() {
+        ModelConfig model = repository.add(model("glm-4.5", Set.of(ModelCapability.WEB_SEARCH)));
+        ModelExecutionHandle handle = registry.acquire(model.id());
+
+        model.update("改名后的模型", ModelDeploymentType.CLOUD, "https://other.example.com/v1", "glm-4.6",
+                "sk-rotated-key", Set.of(ModelCapability.WEB_SEARCH), Duration.ofSeconds(9), Duration.ofSeconds(50), 3,
+                null);
+
+        ToolContext.ModelBinding binding = registry.bindingFor(handle);
+        assertThat(binding.baseUrl()).isEqualTo("https://open.bigmodel.cn/api/paas/v4");
+        assertThat(binding.modelName()).isEqualTo("glm-4.5");
+        assertThat(handle.credentials().baseUrl()).isEqualTo("https://open.bigmodel.cn/api/paas/v4");
+        assertThat(handle.credentials().apiKey()).isEqualTo("sk-plain-text-key");
+        assertThat(handle.credentials().modelName()).isEqualTo("glm-4.5");
+
+        handle.close();
+    }
+
+    /** 下一轮运行才拿到新版本：地址、模型名与 Key 一起换代。 */
+    @Test
+    void nextRunPicksUpTheNewCredentialsAfterAConfigChange() {
+        ModelConfig model = repository.add(model("glm-4.5", Set.of(ModelCapability.WEB_SEARCH)));
+        registry.acquire(model.id()).close();
+
+        model.update("改名后的模型", ModelDeploymentType.CLOUD, "https://other.example.com/v1", "glm-4.6",
+                "sk-rotated-key", Set.of(ModelCapability.WEB_SEARCH), Duration.ofSeconds(9), Duration.ofSeconds(50), 3,
+                null);
+
+        try (ModelExecutionHandle next = registry.acquire(model.id())) {
+            assertThat(next.credentials().baseUrl()).isEqualTo("https://other.example.com/v1");
+            assertThat(next.credentials().apiKey()).isEqualTo("sk-rotated-key");
+            assertThat(next.credentials().modelName()).isEqualTo("glm-4.6");
+            assertThat(registry.bindingFor(next).baseUrl()).isEqualTo("https://other.example.com/v1");
+        }
+    }
+
+    /**
+     * 只持有快照的调用方不能拿到新版本地址：
+     * 缓存已被新版本替换时，旧快照的绑定不再给出连接地址。
+     */
+    @Test
+    void snapshotOnlyBindingDropsTheAddressOnceTheVersionIsNoLongerCurrent() {
+        ModelConfig model = repository.add(model("glm-4.5", Set.of(ModelCapability.WEB_SEARCH)));
+        ModelExecutionHandle handle = registry.acquire(model.id());
+        ModelExecutionHandle.Snapshot stale = handle.snapshot();
+
+        model.update("改名后的模型", ModelDeploymentType.CLOUD, "https://other.example.com/v1", "glm-4.6",
+                "sk-rotated-key", Set.of(ModelCapability.WEB_SEARCH), Duration.ofSeconds(9), Duration.ofSeconds(50), 3,
+                null);
+        registry.acquire(model.id()).close();
+
+        assertThat(registry.bindingFor(stale).baseUrl()).isNull();
+        handle.close();
     }
 
     @Test
@@ -139,8 +201,10 @@ class ModelBindingContractTest {
     }
 
     @Test
-    void bindingIsNullWhenThereIsNoSnapshot() {
-        assertThat(registry.bindingFor(null)).isNull();
+    void bindingIsNullWhenThereIsNoHandleOrSnapshot() {
+        // 两个重载都要显式转型，否则 null 调用有歧义。
+        assertThat(registry.bindingFor((ModelExecutionHandle) null)).isNull();
+        assertThat(registry.bindingFor((ModelExecutionHandle.Snapshot) null)).isNull();
     }
 
     private static ModelConfig model(String modelName, Set<ModelCapability> capabilities) {

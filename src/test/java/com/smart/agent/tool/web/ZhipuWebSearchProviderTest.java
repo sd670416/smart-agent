@@ -6,11 +6,17 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.smart.agent.common.error.AgentException;
+import com.smart.agent.model.ModelCredentialSource;
 import com.smart.agent.model.ModelGatewayProperties;
+import com.smart.agent.model.ModelRunContext;
+import com.smart.agent.model.config.ModelCapability;
+import com.smart.agent.tool.ToolContext;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -99,5 +105,56 @@ class ZhipuWebSearchProviderTest {
                 Duration.ofSeconds(1), Duration.ofSeconds(2));
         return new ZhipuWebSearchProvider(WebClient.builder().build(), MAPPER, model, timeout, CLOCK,
                 ZoneId.of("Asia/Shanghai"));
+    }
+
+    /**
+     * 与 OpenAI 提供方同一条契约：一轮运行内使用句柄持有的凭据，
+     * 配置中途变化后也不回查数据库里的最新版本。
+     */
+    @Test
+    void usesRunScopedCredentialsInsteadOfQueryingTheLatestStoredConfig() throws Exception {
+        AtomicReference<String> authorization = new AtomicReference<>();
+        AtomicReference<String> body = new AtomicReference<>();
+        AtomicInteger sourceQueries = new AtomicInteger();
+        DisposableServer server = HttpServer.create().port(0).handle((request, response) -> {
+            authorization.set(request.requestHeaders().get("Authorization"));
+            return request.receive().aggregate().asString().flatMap(content -> {
+                body.set(content);
+                return response.header("Content-Type", "application/json")
+                        .sendString(Mono.just("{\"choices\":[],\"web_search\":[]}")).then();
+            });
+        }).bindNow();
+        try {
+            String runBaseUrl = "http://127.0.0.1:" + server.port() + "/api/paas/v4";
+            ModelGatewayProperties model = new ModelGatewayProperties("openai-compatible",
+                    "http://127.0.0.1:1/api/paas/v4", "unused-key", "unused-model",
+                    Duration.ofSeconds(1), Duration.ofSeconds(2));
+            ModelCredentialSource latestStored = modelId -> {
+                sourceQueries.incrementAndGet();
+                return new ModelCredentialSource.Credentials(
+                        "https://rotated.bigmodel.cn/api/paas/v4", "sk-rotated", "glm-4.6");
+            };
+            ZhipuWebSearchProvider provider = new ZhipuWebSearchProvider(
+                    WebClient.builder().build(), MAPPER, model, latestStored, Duration.ofSeconds(2), CLOCK,
+                    ZoneId.of("Asia/Shanghai"));
+
+            providerSearchWithinRun(provider, runBaseUrl);
+
+            assertThat(authorization.get()).isEqualTo("Bearer sk-pinned");
+            assertThat(MAPPER.readTree(body.get()).path("model").asText()).isEqualTo("glm-4.5-pinned");
+            assertThat(sourceQueries).hasValue(0);
+        } finally {
+            server.disposeNow();
+        }
+    }
+
+    private static void providerSearchWithinRun(ZhipuWebSearchProvider provider, String runBaseUrl) {
+        ToolContext context = new ToolContext("tenant", "user", "identity", Set.of("role"), Set.of(),
+                Set.of("ai:web-search"))
+                .withModelBinding(new ToolContext.ModelBinding("model-1", "展示名", "glm-4.5-pinned", runBaseUrl,
+                        Set.of(ModelCapability.WEB_SEARCH)));
+        ModelRunContext.with(
+                new ModelCredentialSource.Credentials(runBaseUrl, "sk-pinned", "glm-4.5-pinned"),
+                () -> provider.search(new WebSearchInput("天津天气", 5, null), context));
     }
 }

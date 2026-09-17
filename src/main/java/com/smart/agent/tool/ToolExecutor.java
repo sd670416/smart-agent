@@ -4,6 +4,8 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.smart.agent.common.error.AgentException;
+import com.smart.agent.model.ModelCredentialSource;
+import com.smart.agent.model.ModelRunContext;
 import com.smart.agent.run.AgentRunService;
 import com.smart.agent.security.AgentUserContext;
 import jakarta.annotation.PreDestroy;
@@ -68,6 +70,19 @@ public class ToolExecutor implements AutoCloseable {
      */
     public Object execute(String toolKey, Object input, AgentUserContext userContext,
             ToolContext.ModelBinding modelBinding) {
+        return execute(toolKey, input, userContext, modelBinding, null);
+    }
+
+    /**
+     * 带本轮模型绑定与运行期私有凭据执行工具。
+     *
+     * @param modelBinding 本轮运行固定的模型绑定，见上一个重载
+     * @param credentials  执行句柄持有的模型凭据，与绑定来自同一配置版本。
+     *                     它只在执行工具的工作线程内可见：<b>不写入 ToolContext、不落日志、
+     *                     不进调试事件、不参与序列化</b>；{@code null} 表示本轮无可用凭据
+     */
+    public Object execute(String toolKey, Object input, AgentUserContext userContext,
+            ToolContext.ModelBinding modelBinding, ModelCredentialSource.Credentials credentials) {
         AgentTool<?, ?> tool = toolRegistry.require(toolKey);
         long startedAt = System.nanoTime();
         try {
@@ -76,14 +91,16 @@ public class ToolExecutor implements AutoCloseable {
                 toolContext = toolContext.withModelBinding(modelBinding);
             }
             if (tool.risk() != ToolRisk.L0 && !userContext.permissions().contains(tool.requiredPermission())) {
-                String forbiddenCode = "web.search".equals(tool.key())
-                        ? "AGENT_WEB_SEARCH_FORBIDDEN" : "AGENT_TOOL_FORBIDDEN";
+                String forbiddenCode = tool.key().startsWith("project.")
+                        ? "AGENT_PROJECT_MENU_FORBIDDEN"
+                        : "web.search".equals(tool.key())
+                                ? "AGENT_WEB_SEARCH_FORBIDDEN" : "AGENT_TOOL_FORBIDDEN";
                 throw failure(forbiddenCode, HttpStatus.FORBIDDEN, "Tool permission is required", tool, startedAt,
                         ToolExecutionOutcome.DENIED, 0);
             }
             Object typedInput = deserializeInput(input, tool.inputType());
             validateProjectScope(tool, typedInput, toolContext, startedAt);
-            Object result = executeWithTimeout(tool, typedInput, toolContext);
+            Object result = executeWithTimeout(tool, typedInput, toolContext, credentials);
             int resultSizeBytes = serializeResultSize(result);
             record(tool, ToolExecutionOutcome.SUCCEEDED, startedAt, resultSizeBytes);
             return result;
@@ -131,10 +148,12 @@ public class ToolExecutor implements AutoCloseable {
     }
 
     @SuppressWarnings("unchecked")
-    private Object executeWithTimeout(AgentTool<?, ?> rawTool, Object input, ToolContext context)
-            throws InterruptedException, TimeoutException {
+    private Object executeWithTimeout(AgentTool<?, ?> rawTool, Object input, ToolContext context,
+            ModelCredentialSource.Credentials credentials) throws InterruptedException, TimeoutException {
         AgentTool<Object, Object> tool = (AgentTool<Object, Object>) rawTool;
-        Future<Object> future = executorService.submit(() -> tool.execute(input, context));
+        // 在工作线程内建立运行期私有上下文：线程私有，工具执行完（含异常）立即清理。
+        Future<Object> future = executorService.submit(
+                () -> ModelRunContext.with(credentials, () -> tool.execute(input, context)));
         try {
             Duration executionTimeout = timeoutFor(tool.key());
             return future.get(executionTimeout.toNanos(), TimeUnit.NANOSECONDS);

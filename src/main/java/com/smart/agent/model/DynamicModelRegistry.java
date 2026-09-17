@@ -3,6 +3,7 @@ package com.smart.agent.model;
 import com.smart.agent.model.config.ModelConfig;
 import com.smart.agent.model.config.ModelConfigRepository;
 import com.smart.agent.model.config.ModelSecretCipher;
+import com.smart.agent.tool.ToolContext;
 import jakarta.annotation.PreDestroy;
 import java.util.ArrayList;
 import java.util.Map;
@@ -54,8 +55,11 @@ public class DynamicModelRegistry implements ModelCredentialSource {
     }
 
     /**
-     * 按模型 ID 换取连接信息，供联网搜索等需要直接发起 HTTP 请求的能力使用。
-     * 仅返回必要字段，绝不回传配置版本与能力之外的内部信息。
+     * 按模型 ID 换取连接信息，读取的是数据库里<em>当前最新</em>的配置。
+     *
+     * <p><b>一次运行内不要调用它</b>——配置中途变化会让调用方拿到与运行快照不同的版本。
+     * 运行期请使用 {@link ModelExecutionHandle#credentials()} 并经 {@link ModelRunContext} 传递；
+     * 本方法只服务于没有运行上下文的兜底路径。
      */
     @Override
     public Credentials credentialsFor(String modelId) {
@@ -70,20 +74,44 @@ public class DynamicModelRegistry implements ModelCredentialSource {
     }
 
     /**
-     * 依据执行句柄快照组装工具侧可见的模型绑定。
+     * 依据执行句柄组装工具侧可见的模型绑定。
      *
      * <p>只暴露模型标识、展示名、实际模型名、连接地址与能力集合；
-     * API Key 不进入绑定，需要发请求的能力通过 {@link #credentialsFor(String)} 按需换取。
+     * 连接地址取自句柄持有的<em>同一配置版本</em>，因此一轮运行内聊天与工具的连接信息必然一致。
+     * API Key 不进入绑定，需要发请求的能力经 {@link ModelRunContext} 从运行期私有上下文读取。
      *
-     * @return 组装结果；快照为空或模型已不可用时返回 {@code null}
+     * @return 组装结果；句柄为空时返回 {@code null}
      */
-    public com.smart.agent.tool.ToolContext.ModelBinding bindingFor(ModelExecutionHandle.Snapshot snapshot) {
+    public ToolContext.ModelBinding bindingFor(ModelExecutionHandle handle) {
+        if (handle == null) {
+            return null;
+        }
+        return bindingOf(handle.snapshot(), handle.credentials());
+    }
+
+    /**
+     * 仅凭快照组装绑定，保留给只持有快照的调用方。
+     *
+     * <p>连接地址只在快照版本仍是缓存中的当前版本时给出；版本已推进时返回不含地址的绑定，
+     * 绝不把新版本地址混进正在执行的旧运行。
+     */
+    public ToolContext.ModelBinding bindingFor(ModelExecutionHandle.Snapshot snapshot) {
         if (snapshot == null) {
             return null;
         }
-        Credentials credentials = credentialsFor(snapshot.modelId());
+        return bindingOf(snapshot, credentialsForVersion(snapshot.modelId(), snapshot.configVersion()));
+    }
+
+    /** 按版本取缓存中的凭据：版本不匹配一律视为不可用，避免混用新旧配置。 */
+    private Credentials credentialsForVersion(String modelId, long version) {
+        SharedGateway shared = cache.get(modelId);
+        return shared != null && shared.version == version ? shared.credentials : null;
+    }
+
+    private static ToolContext.ModelBinding bindingOf(
+            ModelExecutionHandle.Snapshot snapshot, Credentials credentials) {
         String baseUrl = credentials == null ? null : credentials.baseUrl();
-        return new com.smart.agent.tool.ToolContext.ModelBinding(snapshot.modelId(), snapshot.displayName(),
+        return new ToolContext.ModelBinding(snapshot.modelId(), snapshot.displayName(),
                 snapshot.modelName(), baseUrl, snapshot.capabilities());
     }
 
@@ -93,8 +121,9 @@ public class DynamicModelRegistry implements ModelCredentialSource {
         ModelExecutionHandle.Snapshot snapshot = new ModelExecutionHandle.Snapshot(
                 config.id(), config.configVersion(), config.name(), config.modelName(), config.deploymentType(),
                 config.capabilities(), config.connectTimeout(), config.readTimeout());
+        Credentials credentials = new Credentials(config.baseUrl(), apiKey, config.modelName());
         SharedGateway replacement = new SharedGateway(
-                config.configVersion(), created.gateway(), snapshot, created.closeAction());
+                config.configVersion(), created.gateway(), snapshot, credentials, created.closeAction());
         if (previous != null) previous.retire();
         return replacement;
     }
@@ -109,16 +138,18 @@ public class DynamicModelRegistry implements ModelCredentialSource {
         private final long version;
         private final ModelGateway gateway;
         private final ModelExecutionHandle.Snapshot snapshot;
+        private final Credentials credentials;
         private final Runnable closeAction;
         private final AtomicInteger references = new AtomicInteger();
         private final AtomicBoolean retired = new AtomicBoolean();
         private final AtomicBoolean closed = new AtomicBoolean();
 
         private SharedGateway(long version, ModelGateway gateway, ModelExecutionHandle.Snapshot snapshot,
-                Runnable closeAction) {
+                Credentials credentials, Runnable closeAction) {
             this.version = version;
             this.gateway = gateway;
             this.snapshot = snapshot;
+            this.credentials = credentials;
             this.closeAction = closeAction;
         }
 
@@ -128,7 +159,7 @@ public class DynamicModelRegistry implements ModelCredentialSource {
                 release();
                 throw new IllegalStateException("模型配置正在更新，请重试");
             }
-            return new ModelExecutionHandle(gateway, snapshot, this::release);
+            return new ModelExecutionHandle(gateway, snapshot, credentials, this::release);
         }
 
         private void retire() {

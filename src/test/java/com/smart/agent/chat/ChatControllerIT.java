@@ -123,6 +123,21 @@ class ChatControllerIT {
     }
 
     @Test
+    void returnsFriendlyPermissionMessageForProjectQueryWithoutProjectMenu() {
+        List<String> events = stream("帮我查询所有项目", Set.of(), Set.of());
+
+        assertThat(events.getLast()).contains("AGENT_PROJECT_MENU_FORBIDDEN")
+                .contains("您当前没有项目报备或项目档案的访问权限，请联系管理员授权");
+        AgentRun run = runRepository.findByTenantIdAndUserIdAndConversationId(
+                "tenant-1", "user-1", conversationId).getFirst();
+        assertThat(run.status()).isEqualTo(AgentRunStatus.PERMISSION_DENIED);
+        assertThat(conversationService.find("tenant-1", "user-1", conversationId).messages())
+                .extracting(com.smart.agent.conversation.Message::content)
+                .contains("您当前没有项目报备或项目档案的访问权限，请联系管理员授权。");
+        assertThat(scenarioModelGateway.requests()).isEmpty();
+    }
+
+    @Test
     void streamsProjectToolAnswerAndPersistsAuditTrail() {
         List<String> events = webTestClient.post().uri("/agent/chat/stream")
                 .header("X-Agent-Context", signedContextToken(

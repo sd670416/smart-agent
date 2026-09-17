@@ -10,6 +10,7 @@ import com.smart.agent.conversation.Message;
 import com.smart.agent.knowledge.KnowledgeCitation;
 import com.smart.agent.knowledge.KnowledgeSearchQuery;
 import com.smart.agent.knowledge.KnowledgeSearchService;
+import com.smart.agent.model.ModelCredentialSource;
 import com.smart.agent.model.ModelEvent;
 import com.smart.agent.model.ModelExecutionHandle;
 import com.smart.agent.model.ModelGateway;
@@ -212,6 +213,7 @@ public class ChatOrchestrator {
                 emit(ChatEvent.messageStart(run.id(), traceId, userMessage.id()));
                 messages.addAll(history);
                 messages.add(new ModelRequest.ConversationMessage("user", modelQuestion(), attachmentParts()));
+                validateProjectMenuPermission(history);
                 validatePageProject();
                 moveTo(AgentRunStatus.ROUTING);
                 emit(ChatEvent.status(run.id(), traceId, status));
@@ -271,7 +273,7 @@ public class ChatOrchestrator {
                 modelGatewayForRun = handle.gateway();
             }
             ModelExecutionHandle.Snapshot snapshot = handle.snapshot();
-            modelBindingForRun = modelRegistry.bindingFor(snapshot);
+            modelBindingForRun = modelRegistry.bindingFor(handle);
             run = withinBudget(() -> runService.start(context.tenantId(), context.userId(),
                     command.conversationId(), traceId, snapshot.modelId(), snapshot.displayName(),
                     snapshot.modelName(), snapshot.configVersion()));
@@ -299,6 +301,19 @@ public class ChatOrchestrator {
             }
         }
 
+        /**
+         * 本轮运行绑定的模型凭据，取自执行句柄，与工具绑定同版本。
+         *
+         * <p>只在工具执行瞬间读取并交给运行期私有上下文，禁止写入日志、调试事件或接口响应。
+         *
+         * @return 本轮凭据；未接入模型配置中心或句柄已释放时为 {@code null}
+         */
+        private ModelCredentialSource.Credentials modelCredentialsForRun() {
+            synchronized (terminalLock) {
+                return modelHandle == null ? null : modelHandle.credentials();
+            }
+        }
+
         private void validatePageProject() {
             ChatCommand.PageContext page = command.pageContext();
             if (page != null && page.projectId() != null && !page.projectId().isBlank()
@@ -306,6 +321,29 @@ public class ChatOrchestrator {
                 throw new AgentException(
                         "AGENT_PROJECT_FORBIDDEN", org.springframework.http.HttpStatus.FORBIDDEN, "Project is not permitted");
             }
+        }
+
+        private void validateProjectMenuPermission(List<ModelRequest.ConversationEntry> history) {
+            if (context.permissions().contains("menu:project")) return;
+            if (isProjectQuestion(command.question()) || isProjectFollowUp(command.question(), history)) {
+                throw new AgentException("AGENT_PROJECT_MENU_FORBIDDEN",
+                        org.springframework.http.HttpStatus.FORBIDDEN, "Project menu permission is required");
+            }
+        }
+
+        private boolean isProjectFollowUp(
+                String question, List<ModelRequest.ConversationEntry> history) {
+            String value = question == null ? "" : question.trim();
+            if (!value.matches(".*(再查|继续|下一页|上一页|更多|详细|再看|重新查).*")) return false;
+            for (int index = history.size() - 1; index >= 0; index--) {
+                if (isProjectQuestion(history.get(index).content())) return true;
+            }
+            return false;
+        }
+
+        private boolean isProjectQuestion(String question) {
+            if (question == null || question.isBlank()) return false;
+            return question.matches(".*(项目|项目报备|项目档案).*");
         }
 
         private String modelQuestion() {
@@ -546,8 +584,12 @@ public class ChatOrchestrator {
                     moveTo(AgentRunStatus.TOOL_EXECUTING);
                     emit(ChatEvent.status(run.id(), traceId, status));
                     if (terminated.get() || sink.isCancelled()) return false;
+                    // 运行期私有凭据：与 modelBindingForRun 同版本，随句柄存活，
+                    // 只在工具执行的工作线程内可见，不落日志、不进响应。
+                    ModelCredentialSource.Credentials runCredentials = modelCredentialsForRun();
                     toolFuture = startToolWithinBudget(
-                            () -> toolExecutor.execute(request.toolKey(), input, context, modelBindingForRun));
+                            () -> toolExecutor.execute(request.toolKey(), input, context, modelBindingForRun,
+                                    runCredentials));
                 }
                 Object result = awaitTool(toolFuture);
                 if (terminated.get() || sink.isCancelled()) return false;

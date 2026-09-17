@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.smart.agent.common.error.AgentException;
 import com.smart.agent.model.ModelCredentialSource;
 import com.smart.agent.model.ModelGatewayProperties;
+import com.smart.agent.model.ModelRunContext;
 import com.smart.agent.tool.ToolContext;
 import java.net.SocketTimeoutException;
 import java.net.URI;
@@ -99,16 +100,23 @@ public final class OpenAiWebSearchProvider implements WebSearchProvider {
     }
 
     /**
-     * 优先使用本轮会话所选模型；未绑定模型时回退到全局配置，
-     * 保证未接入模型配置中心的部署仍可用。
+     * 解析本次请求使用的连接信息。
+     *
+     * <p>优先读取本轮运行的私有上下文：它与聊天使用同一份配置版本，
+     * 因此一轮对话中途改配置不会让联网用上新版本地址或密钥。
+     * 只有在没有运行上下文时（直接调用本提供方、未接入模型配置中心的部署）
+     * 才按模型 ID 兜底换取——那种场景不存在与运行快照的版本差异。
      */
     private ResolvedModel resolve(ToolContext context) {
         ToolContext.ModelBinding binding = context == null ? null : context.modelBinding();
         if (binding == null) {
             return new ResolvedModel(model.baseUrl(), model.apiKey(), model.chatModel());
         }
-        ModelCredentialSource.Credentials resolved = this.credentials.credentialsFor(binding.modelId());
-        if (resolved == null || resolved.apiKey() == null || resolved.apiKey().isBlank()) {
+        ModelCredentialSource.Credentials resolved = ModelRunContext.credentials();
+        if (resolved == null) {
+            resolved = this.credentials.credentialsFor(binding.modelId());
+        }
+        if (resolved == null || !resolved.hasApiKey()) {
             throw new AgentException("AGENT_WEB_SEARCH_PROVIDER_UNSUPPORTED", HttpStatus.BAD_REQUEST,
                     "Selected model has no usable credentials for web search");
         }

@@ -7,6 +7,7 @@ final class AgentErrorMessageCatalog {
     private static final Map<String, String> MESSAGES = Map.ofEntries(
             Map.entry("AGENT_PROJECT_NOT_FOUND", "未找到您有权访问的匹配项目，请检查项目名称或编号。"),
             Map.entry("AGENT_PROJECT_FORBIDDEN", "您暂无权限查看该项目。"),
+            Map.entry("AGENT_PROJECT_MENU_FORBIDDEN", "您当前没有项目报备或项目档案的访问权限，请联系管理员授权。"),
             Map.entry("AGENT_PROJECT_ARCHIVE_TOO_LARGE", "该项目档案数据量较大，请指定要查看的部分。"),
             Map.entry("AGENT_TOOL_PROJECT_FORBIDDEN", "您暂无权限查看该项目。"),
             Map.entry("AGENT_TOOL_FORBIDDEN", "您暂无权限执行本次查询。"),
