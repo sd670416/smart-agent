@@ -9,7 +9,8 @@ public record ModelRequest(
         String systemInstructionVersion,
         List<ConversationEntry> redactedConversationMessages,
         List<AllowedToolSpecification> allowedToolSpecifications,
-        List<RetrievedEvidence> retrievedEvidence) {
+        List<RetrievedEvidence> retrievedEvidence,
+        ToolUseMode toolUseMode) {
 
     public ModelRequest {
         requireText(runId, "runId");
@@ -20,6 +21,20 @@ public record ModelRequest(
         redactedConversationMessages = List.copyOf(redactedConversationMessages);
         allowedToolSpecifications = List.copyOf(allowedToolSpecifications);
         retrievedEvidence = List.copyOf(retrievedEvidence);
+        toolUseMode = Objects.requireNonNull(toolUseMode, "toolUseMode");
+        if (toolUseMode == ToolUseMode.REQUIRED && allowedToolSpecifications.isEmpty()) {
+            throw new IllegalArgumentException("required tool use needs at least one allowed tool");
+        }
+    }
+
+    public ModelRequest(
+            String runId,
+            String systemInstructionVersion,
+            List<ConversationEntry> redactedConversationMessages,
+            List<AllowedToolSpecification> allowedToolSpecifications,
+            List<RetrievedEvidence> retrievedEvidence) {
+        this(runId, systemInstructionVersion, redactedConversationMessages,
+                allowedToolSpecifications, retrievedEvidence, ToolUseMode.AUTO);
     }
 
     public static ModelRequest userQuestion(String runId, String question, List<String> toolKeys) {
@@ -29,8 +44,11 @@ public record ModelRequest(
                 "v1",
                 List.of(new ConversationMessage("user", question)),
                 toolKeys.stream().map(AllowedToolSpecification::forKey).toList(),
-                List.of());
+                List.of(),
+                ToolUseMode.AUTO);
     }
+
+    public enum ToolUseMode { AUTO, REQUIRED }
 
     public sealed interface ConversationEntry permits ConversationMessage, ToolResultMessage {
         String content();

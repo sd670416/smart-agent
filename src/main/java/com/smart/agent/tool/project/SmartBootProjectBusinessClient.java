@@ -98,8 +98,12 @@ public class SmartBootProjectBusinessClient implements ProjectBusinessClient {
     public ProjectContractsResult getContracts(ToolContext context, ProjectContractsInput input) {
         if (!context.canAccessProject(input.projectId())) throw new SecurityException("project access denied");
         String path = "/internal/ai/tools/project-contracts";
-        return client.post().uri(path).headers(headers -> sign(headers, "POST", path, context)).bodyValue(input).retrieve()
-                .bodyToMono(ProjectContractsResult.class).block();
+        ProjectArchiveDetailResult archive = client.post().uri(path)
+                .headers(headers -> sign(headers, "POST", path, context)).bodyValue(input).retrieve()
+                .bodyToMono(ProjectArchiveDetailResult.class).block();
+        if (archive == null) throw new AgentException("AGENT_TOOL_EXECUTION_FAILED", HttpStatus.BAD_GATEWAY,
+                "合同信息响应为空");
+        return new ProjectContractsResult(archive.projectId(), archive.projectName(), archive.sections());
     }
 
     @Override

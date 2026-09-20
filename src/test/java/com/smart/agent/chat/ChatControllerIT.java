@@ -181,6 +181,27 @@ class ChatControllerIT {
     }
 
     @Test
+    void requiresFreshProjectToolResultInsteadOfReusingHistoricalProjectCount() {
+        conversationService.appendMessage("tenant-1", "user-1", conversationId, Message.Role.USER, "查下项目");
+        conversationService.appendMessage("tenant-1", "user-1", conversationId, Message.Role.ASSISTANT,
+                "与之前一致，您可以查看 59 个项目。");
+
+        List<String> events = stream("查下项目", Set.of("menu:project"), Set.of("project-1"));
+
+        assertThat(events).anyMatch(event -> event.contains("tool_start")
+                && event.contains("project.query"));
+        assertThat(events).anyMatch(event -> event.contains("当前可访问 1 个项目"));
+        assertThat(events).noneMatch(event -> event.contains("可以查看 59 个项目"));
+        assertThat(testProjectBusinessClient.queryCalls()).isEqualTo(1);
+        assertThat(scenarioModelGateway.requests().getFirst().toolUseMode())
+                .isEqualTo(ModelRequest.ToolUseMode.REQUIRED);
+        assertThat(scenarioModelGateway.requests().getFirst().allowedToolSpecifications())
+                .allMatch(tool -> tool.key().startsWith("project."));
+        assertThat(scenarioModelGateway.requests().getLast().toolUseMode())
+                .isEqualTo(ModelRequest.ToolUseMode.AUTO);
+    }
+
+    @Test
     void doesNotExposeStreamedToolArgumentsAsChatText() {
         List<ChatEvent> events = chatOrchestrator.stream(
                         new ChatCommand(conversationId, "partial-tool-json", null),
@@ -749,6 +770,7 @@ class ChatControllerIT {
         static final class TestProjectBusinessClient
                 extends com.smart.agent.tool.project.LocalProjectBusinessClient {
             private final AtomicInteger archiveCalls = new AtomicInteger();
+            private final AtomicInteger queryCalls = new AtomicInteger();
 
             @Override
             public com.smart.agent.tool.project.ProjectArchiveDetailResult getArchiveDetail(
@@ -772,8 +794,21 @@ class ChatControllerIT {
                                 "project-1", "示例项目", "A001", "2", "已立项", null, null, null)));
             }
 
+            @Override
+            public com.smart.agent.tool.project.ProjectQueryResult query(
+                    com.smart.agent.tool.ToolContext context,
+                    com.smart.agent.tool.project.ProjectQueryInput input) {
+                queryCalls.incrementAndGet();
+                return new com.smart.agent.tool.project.ProjectQueryResult(
+                        "DETAIL", 1, 20, 1L, false,
+                        List.of(new com.smart.agent.tool.project.ProjectQueryColumn(
+                                "projectName", "项目名称", "TEXT")),
+                        List.of(Map.of("projectName", "示例项目")), List.of());
+            }
+
             int archiveCalls() { return archiveCalls.get(); }
-            void reset() { archiveCalls.set(0); }
+            int queryCalls() { return queryCalls.get(); }
+            void reset() { archiveCalls.set(0); queryCalls.set(0); }
         }
 
         @Bean
@@ -808,6 +843,26 @@ class ChatControllerIT {
                 requests.add(request);
                 modelCalls.incrementAndGet();
                 String question = request.redactedConversationMessages().getFirst().content();
+                String currentQuestion = request.redactedConversationMessages().stream()
+                        .filter(ModelRequest.ConversationMessage.class::isInstance)
+                        .map(ModelRequest.ConversationMessage.class::cast)
+                        .filter(message -> message.role().equals("user"))
+                        .reduce((first, second) -> second)
+                        .map(ModelRequest.ConversationMessage::content)
+                        .orElse(question);
+                if (currentQuestion.equals("查下项目")) {
+                    if (request.redactedConversationMessages().getLast()
+                            instanceof ModelRequest.ToolResultMessage) {
+                        return Flux.just(new ModelEvent.Completed("当前可访问 1 个项目。", 8, 6));
+                    }
+                    if (request.toolUseMode() == ModelRequest.ToolUseMode.REQUIRED) {
+                        return Flux.just(new ModelEvent.ToolRequested(
+                                "fresh-project-query", "project.query", "{}"),
+                                new ModelEvent.Completed("", 6, 3));
+                    }
+                    return Flux.just(new ModelEvent.Completed(
+                            "与之前一致，您可以查看 59 个项目。", 5, 5));
+                }
                 if (question.equals("malformed-tool")) {
                     return Flux.just(new ModelEvent.ToolRequested("bad", "project.getOverview", "not-json"));
                 }

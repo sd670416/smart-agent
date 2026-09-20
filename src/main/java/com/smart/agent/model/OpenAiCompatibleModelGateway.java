@@ -13,6 +13,7 @@ import dev.langchain4j.data.message.ImageContent;
 import dev.langchain4j.data.message.ToolExecutionResultMessage;
 import dev.langchain4j.model.chat.StreamingChatModel;
 import dev.langchain4j.model.chat.request.ChatRequest;
+import dev.langchain4j.model.chat.request.ToolChoice;
 import dev.langchain4j.model.chat.request.json.JsonArraySchema;
 import dev.langchain4j.model.chat.request.json.JsonObjectSchema;
 import dev.langchain4j.model.chat.request.json.JsonRawSchema;
@@ -237,8 +238,13 @@ public class OpenAiCompatibleModelGateway implements ModelGateway {
         for (ModelRequest.RetrievedEvidence evidence : request.retrievedEvidence()) {
             messages.add(UserMessage.from(formatUntrustedEvidence(evidence)));
         }
-        return new PreparedRequest(
-                ChatRequest.builder().messages(messages).toolSpecifications(toolSpecifications).build(), Map.copyOf(schemas));
+        ChatRequest.Builder requestBuilder = ChatRequest.builder()
+                .messages(messages)
+                .toolSpecifications(toolSpecifications);
+        if (request.toolUseMode() == ModelRequest.ToolUseMode.REQUIRED) {
+            requestBuilder.toolChoice(ToolChoice.REQUIRED);
+        }
+        return new PreparedRequest(requestBuilder.build(), Map.copyOf(schemas));
     }
 
     private static String providerToolName(String internalKey) {

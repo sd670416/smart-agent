@@ -19,6 +19,7 @@ import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.data.message.ToolExecutionResultMessage;
 import dev.langchain4j.model.chat.StreamingChatModel;
 import dev.langchain4j.model.chat.request.ChatRequest;
+import dev.langchain4j.model.chat.request.ToolChoice;
 import dev.langchain4j.model.chat.response.ChatResponse;
 import dev.langchain4j.model.chat.response.CompleteToolCall;
 import dev.langchain4j.model.chat.response.StreamingChatResponseHandler;
@@ -255,6 +256,21 @@ class ModelGatewayContractTest {
         assertThat(captured.get().toolSpecifications().getFirst().parameters().properties()).containsKey("projectId");
         assertThat(captured.get().toolSpecifications().getFirst().parameters().required()).containsExactly("projectId");
         assertThat(captured.get().toolSpecifications().getFirst().parameters().additionalProperties()).isFalse();
+    }
+
+    @Test
+    void openAiGatewayRequiresToolCallWhenRequestRequiresFreshBusinessData() {
+        AtomicReference<ChatRequest> captured = new AtomicReference<>();
+        ModelGateway gateway = capturingModel(captured, handler ->
+                handler.onCompleteResponse(response("", 0, 0)));
+        ModelRequest requiredToolRequest = new ModelRequest(
+                "run-required-tool", "v1",
+                List.of(new ModelRequest.ConversationMessage("user", "查下项目")),
+                schemaRequest().allowedToolSpecifications(), List.of(), ModelRequest.ToolUseMode.REQUIRED);
+
+        eventsOf(gateway, requiredToolRequest);
+
+        assertThat(captured.get().toolChoice()).isEqualTo(ToolChoice.REQUIRED);
     }
 
     @Test

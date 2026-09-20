@@ -46,6 +46,7 @@ final class AgentErrorMessageCatalog {
             Map.entry("AGENT_MODEL_WEB_SEARCH_REQUIRED", "所选模型暂不支持联网搜索，请切换到支持联网能力的模型后重试。"),
             Map.entry("AGENT_MODEL_SWITCH_FORBIDDEN", "该模型不可用于当前会话，请刷新后重新选择。"),
             Map.entry("AGENT_MODEL_PROTOCOL_ERROR", "模型响应格式异常，请稍后重试。"),
+            Map.entry("AGENT_PROJECT_DATA_NOT_REFRESHED", "未能获取最新项目数据，请稍后重试。"),
             Map.entry("AGENT_MODEL_EMPTY_RESPONSE", "模型未返回有效内容，请重新提问。"),
             Map.entry("AGENT_MODEL_TURN_LIMIT", "本次查询步骤过多，请缩小查询范围后重试。"),
             Map.entry("AGENT_ANSWER_TOO_LARGE", "回答内容过长，请缩小查询范围后重试。"),

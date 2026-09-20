@@ -109,6 +109,35 @@ class SmartBootProjectBusinessClientTest {
     }
 
     @Test
+    void loadsConstructionAndSubcontractSectionsWithoutDroppingGroupedResponse() {
+        DisposableServer server = HttpServer.create().port(0).handle((request, response) ->
+                response.header("Content-Type", "application/json").sendString(
+                        reactor.core.publisher.Mono.just("{\"projectId\":\"p-1\",\"projectName\":\"项目一\","
+                                + "\"sections\":[{\"key\":\"contract\",\"title\":\"合同信息\",\"status\":\"AVAILABLE\","
+                                + "\"summary\":{\"施工合同名称\":\"施工合同001\",\"最终合同金额\":3000000},\"items\":[],\"message\":null},"
+                                + "{\"key\":\"subcontract\",\"title\":\"分包合同信息\",\"status\":\"EMPTY\","
+                                + "\"summary\":{},\"items\":[],\"message\":null}]}"))).bindNow();
+        try {
+            SmartBootProjectBusinessClient client = new SmartBootProjectBusinessClient(
+                    WebClient.builder().baseUrl("http://127.0.0.1:" + server.port()).build(),
+                    new ObjectMapper(), SECRET);
+
+            ProjectContractsResult result = client.getContracts(
+                    new ToolContext("tenant", "user", "identity", Set.of("p-1")),
+                    new ProjectContractsInput("p-1", null, 1, 20));
+
+            assertThat(result.sections()).extracting(ProjectArchiveDetailResult.Section::key)
+                    .containsExactly("contract", "subcontract");
+            assertThat(result.sections().getFirst().summary())
+                    .containsEntry("施工合同名称", "施工合同001")
+                    .containsEntry("最终合同金额", 3000000);
+            assertThat(result.sections().get(1).status()).isEqualTo("EMPTY");
+        } finally {
+            server.disposeNow();
+        }
+    }
+
+    @Test
     void rejectsArchiveResponseAboveConfiguredSafetyLimit() {
         DisposableServer server = HttpServer.create().port(0).handle((request, response) ->
                 response.header("Content-Type", "application/json").sendString(

@@ -30,6 +30,7 @@ class SystemInstructionCatalogTest {
 
         assertThat(instruction)
                 .contains("project.getArchiveDetail", "项目详情", "完整档案", "不得重复调用")
+                .contains("每个 AVAILABLE 分区", "Markdown 表格", "审批流程", "节点名称", "不得压缩成一行流程描述")
                 .contains("看一下某个项目", "介绍一下某个项目", "单个项目")
                 .contains("只询问状态、预算、进度等明确字段", "project.query")
                 .contains("项目列表、统计、筛选、排序、分组和分页");

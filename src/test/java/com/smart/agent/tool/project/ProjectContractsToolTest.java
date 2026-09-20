@@ -21,7 +21,11 @@ class ProjectContractsToolTest {
         when(client.listAccessible(context, new AccessibleProjectsInput(null, null, 1, 20)))
                 .thenReturn(new AccessibleProjectsResult(1, 20, 1, false, List.of(item)));
         ProjectContractsResult expected = new ProjectContractsResult(
-                "real-id", null, 1, 20, 0, false, null, List.of());
+                "real-id", "联营项目", List.of(
+                        new ProjectArchiveDetailResult.Section("contract", "合同信息", "AVAILABLE",
+                                java.util.Map.of("施工合同名称", "施工合同001"), List.of(), null),
+                        new ProjectArchiveDetailResult.Section("subcontract", "分包合同信息", "EMPTY",
+                                java.util.Map.of(), List.of(), null)));
         when(client.getContracts(context, new ProjectContractsInput("real-id", null, 1, 20)))
                 .thenReturn(expected);
 

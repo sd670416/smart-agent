@@ -178,6 +178,7 @@ public class ChatOrchestrator {
         private AgentRunStatus status;
         private int modelTurns;
         private int toolCalls;
+        private boolean requiresFreshProjectData;
         private List<KnowledgeCitation> citations = List.of();
         private final StringBuilder turnDeltas = new StringBuilder();
         private final List<ModelEvent.ToolRequested> turnTools = new ArrayList<>();
@@ -214,6 +215,8 @@ public class ChatOrchestrator {
                 messages.addAll(history);
                 messages.add(new ModelRequest.ConversationMessage("user", modelQuestion(), attachmentParts()));
                 validateProjectMenuPermission(history);
+                requiresFreshProjectData = isProjectQuestion(command.question())
+                        || isProjectFollowUp(command.question(), history);
                 validatePageProject();
                 moveTo(AgentRunStatus.ROUTING);
                 emit(ChatEvent.status(run.id(), traceId, status));
@@ -426,14 +429,17 @@ public class ChatOrchestrator {
             turnDeltas.setLength(0);
             turnTools.clear();
             turnCompleted = null;
+            boolean requireProjectTool = requiresFreshProjectData && toolCalls == 0;
             List<ModelRequest.AllowedToolSpecification> tools = toolRegistry.allowedReadOnlyTools(context).stream()
                     .filter(this::isRelevantTool)
+                    .filter(tool -> !requireProjectTool || tool.key().startsWith("project."))
                     .map(this::toolSpecification)
                     .toList();
             List<ModelRequest.RetrievedEvidence> evidence = citations.stream()
                     .map(citation -> new ModelRequest.RetrievedEvidence(citation.citationToken(), citation.excerpt()))
                     .toList();
-            ModelRequest request = new ModelRequest(run.id(), "v1", List.copyOf(messages), tools, evidence);
+            ModelRequest request = new ModelRequest(run.id(), "v1", List.copyOf(messages), tools, evidence,
+                    requireProjectTool ? ModelRequest.ToolUseMode.REQUIRED : ModelRequest.ToolUseMode.AUTO);
             try {
                 Disposable subscription = modelGatewayForRun.stream(request)
                         .timeout(remaining())
@@ -543,6 +549,10 @@ public class ChatOrchestrator {
                     if (terminated.get() || !executeTool(requested)) return;
                 }
                 callModel();
+                return;
+            }
+            if (requiresFreshProjectData && toolCalls == 0) {
+                fail("AGENT_PROJECT_DATA_NOT_REFRESHED", AgentRunStatus.FAILED);
                 return;
             }
             completeAnswer();

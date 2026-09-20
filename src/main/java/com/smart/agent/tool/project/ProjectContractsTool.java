@@ -15,7 +15,7 @@ public class ProjectContractsTool implements AgentTool<ProjectContractsInput, Pr
     @Override public Class<ProjectContractsInput> inputType() { return ProjectContractsInput.class; }
     @Override public String requiredPermission() { return "menu:project"; }
     @Override public ToolRisk risk() { return ToolRisk.L1; }
-    @Override public String description() { return "分页查询允许访问项目的五类合同摘要；projectId 可填写项目ID、项目编号或项目名称；contractType 可省略或使用 material、labor、machine、subcontract、other"; }
+    @Override public String description() { return "查询允许访问项目的合同信息，分为独立的施工合同和材料、劳务、机械、专业分包、其他五类分包合同；只返回项目档案中可见的已审批数据；projectId 可填写项目ID、项目编号或项目名称"; }
     @Override public String argumentsSchemaJson() {
         return "{\"type\":\"object\",\"properties\":{\"projectId\":{\"type\":\"string\"},"
                 + "\"contractType\":{\"type\":\"string\"},"
