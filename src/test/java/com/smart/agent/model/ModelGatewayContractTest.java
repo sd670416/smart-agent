@@ -6,6 +6,8 @@ import static org.mockito.Mockito.mock;
 
 import com.smart.agent.tool.project.ProjectBusinessClient;
 import com.smart.agent.tool.project.ProjectContractsTool;
+import com.smart.agent.tool.approval.ApprovalBusinessClient;
+import com.smart.agent.tool.approval.ApprovalQueryTool;
 import com.smart.agent.tool.web.WebSearchPolicy;
 import com.smart.agent.tool.web.WebSearchProperties;
 import com.smart.agent.tool.web.WebSearchResult;
@@ -381,6 +383,25 @@ class ModelGatewayContractTest {
 
         assertThat(eventsOf(gateway, contractsRequest))
                 .containsExactly(new ModelEvent.Completed("合同查询完成", 1, 1));
+        assertThat(captured.get()).isNotNull();
+    }
+
+    @Test
+    void registeredApprovalQuerySchemaCanReachProvider() {
+        AtomicReference<ChatRequest> captured = new AtomicReference<>();
+        ModelGateway gateway = capturingModel(captured, handler ->
+                handler.onCompleteResponse(response("待办查询完成", 1, 1)));
+        ApprovalQueryTool tool = new ApprovalQueryTool(mock(ApprovalBusinessClient.class));
+        ModelRequest approvalRequest = new ModelRequest(
+                "run-approval-schema",
+                "v1",
+                List.of(new ModelRequest.ConversationMessage("user", "查询我的待办")),
+                List.of(new ModelRequest.AllowedToolSpecification(
+                        tool.key(), tool.description(), tool.argumentsSchemaJson())),
+                List.of());
+
+        assertThat(eventsOf(gateway, approvalRequest))
+                .containsExactly(new ModelEvent.Completed("待办查询完成", 1, 1));
         assertThat(captured.get()).isNotNull();
     }
 

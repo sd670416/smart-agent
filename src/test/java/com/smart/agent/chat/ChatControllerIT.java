@@ -93,6 +93,7 @@ class ChatControllerIT {
     @Autowired private InMemoryAgentRunStepRepository stepRepository;
     @Autowired private ChatOrchestrator chatOrchestrator;
     @Autowired private TestBeans.TestProjectBusinessClient testProjectBusinessClient;
+    @Autowired private TestBeans.TestApprovalBusinessClient testApprovalBusinessClient;
 
     private String conversationId;
 
@@ -101,7 +102,59 @@ class ChatControllerIT {
         runRepository.clear();
         scenarioModelGateway.reset();
         testProjectBusinessClient.reset();
+        testApprovalBusinessClient.reset();
         conversationId = conversationService.create("tenant-1", "user-1", "项目问答").id();
+    }
+
+    @Test
+    void approvalFollowUpKeepsApprovalToolsAndRefreshesData() {
+        stream("查询我的待办", Set.of(), Set.of());
+        List<String> events = stream("下一页", Set.of(), Set.of());
+
+        assertThat(events).anyMatch(event -> event.contains("待办查询完成"));
+        assertThat(testApprovalBusinessClient.queryCalls()).isEqualTo(2);
+        assertThat(testApprovalBusinessClient.pages()).containsExactly(1, 2);
+        ModelRequest followUpRequest = scenarioModelGateway.requests().stream()
+                .filter(request -> request.redactedConversationMessages().stream()
+                        .filter(ModelRequest.ConversationMessage.class::isInstance)
+                        .map(ModelRequest.ConversationMessage.class::cast)
+                        .anyMatch(message -> "下一页".equals(message.content())))
+                .findFirst().orElseThrow();
+        assertThat(followUpRequest.toolUseMode()).isEqualTo(ModelRequest.ToolUseMode.REQUIRED);
+        assertThat(followUpRequest.allowedToolSpecifications())
+                .extracting(ModelRequest.AllowedToolSpecification::key)
+                .allMatch(key -> key.startsWith("approval."));
+    }
+
+    @Test
+    void approvalDetailFollowUpIgnoresProjectNameInAssistantAnswer() {
+        stream("查询我的待办", Set.of(), Set.of());
+        conversationService.appendMessage("tenant-1", "user-1", conversationId,
+                Message.Role.ASSISTANT, "项目报备待办详情", null);
+
+        List<String> events = stream("看一下这个待办的详细信息", Set.of(), Set.of());
+
+        assertThat(events).noneMatch(event -> event.contains("AGENT_CHAT_FAILED")
+                || event.contains("AGENT_PROJECT_MENU_FORBIDDEN"));
+        ModelRequest followUp = scenarioModelGateway.requests().getLast();
+        assertThat(followUp.toolUseMode()).isEqualTo(ModelRequest.ToolUseMode.REQUIRED);
+        assertThat(followUp.allowedToolSpecifications())
+                .extracting(ModelRequest.AllowedToolSpecification::key)
+                .isNotEmpty().allMatch(key -> key.startsWith("approval."));
+    }
+
+    @Test
+    void genericDetailFollowUpUsesLatestUserApprovalIntent() {
+        stream("查询我的待办", Set.of(), Set.of());
+        conversationService.appendMessage("tenant-1", "user-1", conversationId,
+                Message.Role.ASSISTANT, "项目报备待办详情", null);
+
+        List<String> events = stream("查看详情", Set.of(), Set.of());
+
+        assertThat(events).noneMatch(event -> event.contains("AGENT_CHAT_FAILED"));
+        assertThat(scenarioModelGateway.requests().getLast().allowedToolSpecifications())
+                .extracting(ModelRequest.AllowedToolSpecification::key)
+                .isNotEmpty().allMatch(key -> key.startsWith("approval."));
     }
 
     @Test
@@ -767,6 +820,40 @@ class ChatControllerIT {
             return new TestProjectBusinessClient();
         }
 
+        @Bean
+        @Primary
+        TestApprovalBusinessClient testApprovalBusinessClient() {
+            return new TestApprovalBusinessClient();
+        }
+
+        static final class TestApprovalBusinessClient
+                implements com.smart.agent.tool.approval.ApprovalBusinessClient {
+            private final AtomicInteger queryCalls = new AtomicInteger();
+            private final List<Integer> pages = new java.util.concurrent.CopyOnWriteArrayList<>();
+
+            @Override
+            public com.smart.agent.tool.approval.ApprovalQueryResult query(
+                    com.smart.agent.tool.ToolContext context,
+                    com.smart.agent.tool.approval.ApprovalQueryInput input) {
+                queryCalls.incrementAndGet();
+                pages.add(input.page());
+                return new com.smart.agent.tool.approval.ApprovalQueryResult(
+                        input.page(), input.pageSize(), 1L,
+                        List.of(Map.of("流程名称", "项目报备00056")), Map.of(), List.of());
+            }
+
+            @Override
+            public com.smart.agent.tool.approval.ApprovalDetailResult detail(
+                    com.smart.agent.tool.ToolContext context,
+                    com.smart.agent.tool.approval.ApprovalDetailInput input) {
+                throw new UnsupportedOperationException();
+            }
+
+            int queryCalls() { return queryCalls.get(); }
+            List<Integer> pages() { return List.copyOf(pages); }
+            void reset() { queryCalls.set(0); pages.clear(); }
+        }
+
         static final class TestProjectBusinessClient
                 extends com.smart.agent.tool.project.LocalProjectBusinessClient {
             private final AtomicInteger archiveCalls = new AtomicInteger();
@@ -850,6 +937,18 @@ class ChatControllerIT {
                         .reduce((first, second) -> second)
                         .map(ModelRequest.ConversationMessage::content)
                         .orElse(question);
+                if (currentQuestion.equals("查询我的待办") || currentQuestion.equals("下一页")) {
+                    if (request.redactedConversationMessages().getLast()
+                            instanceof ModelRequest.ToolResultMessage) {
+                        return Flux.just(new ModelEvent.Completed("待办查询完成。", 8, 6));
+                    }
+                    int page = currentQuestion.equals("下一页") ? 2 : 1;
+                    return Flux.just(new ModelEvent.ToolRequested(
+                            "approval-query-" + page, "approval.query",
+                            "{\"scope\":\"TODO\",\"visibility\":\"SELF\",\"page\":" + page
+                                    + ",\"pageSize\":20,\"recordMode\":\"PROCESS\"}"),
+                            new ModelEvent.Completed("", 6, 3));
+                }
                 if (currentQuestion.equals("查下项目")) {
                     if (request.redactedConversationMessages().getLast()
                             instanceof ModelRequest.ToolResultMessage) {

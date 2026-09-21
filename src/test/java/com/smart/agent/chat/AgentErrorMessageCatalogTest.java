@@ -16,6 +16,10 @@ class AgentErrorMessageCatalogTest {
                 .isEqualTo("暂时无法识别本次查询条件，请换一种说法后重试。");
         assertThat(AgentErrorMessageCatalog.message("AGENT_QUERY_INVALID_REQUEST", false))
                 .contains("项目统计查询", "明确统计方式");
+        assertThat(AgentErrorMessageCatalog.message("AGENT_APPROVAL_QUERY_UNAVAILABLE", false))
+                .contains("审批查询能力", "待办").doesNotContain("项目查询");
+        assertThat(AgentErrorMessageCatalog.message("AGENT_APPROVAL_INVALID_REQUEST", false))
+                .contains("审批查询条件", "待办").doesNotContain("项目统计查询");
         assertThat(AgentErrorMessageCatalog.message("UNEXPECTED_CODE", false))
                 .isEqualTo("抱歉，本次请求暂时未能完成，请稍后重试。");
         assertThat(AgentErrorMessageCatalog.message("UNEXPECTED_CODE", false))

@@ -90,7 +90,11 @@ public class ToolExecutor implements AutoCloseable {
             if (modelBinding != null) {
                 toolContext = toolContext.withModelBinding(modelBinding);
             }
-            if (tool.risk() != ToolRisk.L0 && !userContext.permissions().contains(tool.requiredPermission())) {
+            String requiredPermission = tool.requiredPermission();
+            if (tool.risk() != ToolRisk.L0
+                    && requiredPermission != null
+                    && !requiredPermission.isBlank()
+                    && !userContext.permissions().contains(requiredPermission)) {
                 String forbiddenCode = tool.key().startsWith("project.")
                         ? "AGENT_PROJECT_MENU_FORBIDDEN"
                         : "web.search".equals(tool.key())
@@ -172,7 +176,8 @@ public class ToolExecutor implements AutoCloseable {
     }
 
     Duration timeoutFor(String toolKey) {
-        return "project.getArchiveDetail".equals(toolKey) ? PROJECT_ARCHIVE_TIMEOUT : timeout;
+        return "project.getArchiveDetail".equals(toolKey) || "approval.getDetail".equals(toolKey)
+                ? PROJECT_ARCHIVE_TIMEOUT : timeout;
     }
 
     private int serializeResultSize(Object result) {

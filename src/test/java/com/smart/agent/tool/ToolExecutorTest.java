@@ -91,6 +91,7 @@ class ToolExecutorTest {
     void usesLongerTimeoutOnlyForCompleteProjectArchive() {
         assertThat(executor.timeoutFor("project.getOverview")).isEqualTo(Duration.ofMillis(50));
         assertThat(executor.timeoutFor("project.getArchiveDetail")).isEqualTo(Duration.ofSeconds(30));
+        assertThat(executor.timeoutFor("approval.getDetail")).isEqualTo(Duration.ofSeconds(30));
     }
 
     @Test
@@ -215,6 +216,25 @@ class ToolExecutorTest {
         assertThat(summary.getValue().durationMillis()).isGreaterThanOrEqualTo(0);
         assertThat(summary.getValue().resultSizeBytes()).isPositive();
         assertThat(summary.getValue().toString()).doesNotContain("project-1", "项目名称不应出现在摘要中");
+    }
+
+    @Test
+    void executesReadOnlyToolThatDoesNotRequireAdditionalPermission() {
+        AgentTool<ProjectOverviewInput, String> tool = new AgentTool<>() {
+            @Override public String key() { return "approval.query"; }
+            @Override public Class<ProjectOverviewInput> inputType() { return ProjectOverviewInput.class; }
+            @Override public String requiredPermission() { return ""; }
+            @Override public ToolRisk risk() { return ToolRisk.L1; }
+            @Override public String execute(ProjectOverviewInput input, ToolContext context) { return "ok"; }
+        };
+        ToolExecutor approvalExecutor = new ToolExecutor(
+                new ToolRegistry(Set.of(tool)), agentRunService, Duration.ofMillis(200));
+        try {
+            assertThat(approvalExecutor.execute("approval.query", new ProjectOverviewInput("ignored"),
+                    context(Set.of(), Set.of()))).isEqualTo("ok");
+        } finally {
+            approvalExecutor.close();
+        }
     }
 
     /**

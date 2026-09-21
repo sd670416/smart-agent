@@ -36,6 +36,8 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicReference;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import reactor.core.Disposables;
 import reactor.core.Disposable;
 import reactor.core.publisher.Flux;
@@ -46,6 +48,7 @@ import reactor.core.scheduler.Schedulers;
 import java.util.concurrent.Callable;
 
 public class ChatOrchestrator {
+    private static final Logger log = LoggerFactory.getLogger(ChatOrchestrator.class);
     static final int MAX_MODEL_TURNS = 6;
     static final int MAX_TOOL_CALLS = 5;
     static final int MAX_CITATIONS = 20;
@@ -179,12 +182,14 @@ public class ChatOrchestrator {
         private int modelTurns;
         private int toolCalls;
         private boolean requiresFreshProjectData;
+        private boolean requiresFreshApprovalData;
         private List<KnowledgeCitation> citations = List.of();
         private final StringBuilder turnDeltas = new StringBuilder();
         private final List<ModelEvent.ToolRequested> turnTools = new ArrayList<>();
         private ModelEvent.Completed turnCompleted;
         /** 本轮运行固定的模型执行句柄，运行结束必须释放。 */
         private ModelExecutionHandle modelHandle;
+        private String preparationStage = "resolveModel";
         private ModelGateway modelGatewayForRun;
         private ToolContext.ModelBinding modelBindingForRun;
         private final AtomicBoolean modelHandleReleased = new AtomicBoolean();
@@ -201,11 +206,16 @@ public class ChatOrchestrator {
             sink.onDispose(this::cancel);
             try {
                 String scopedModelId = resolveModelIdForRun();
+                preparationStage = "acquireModel";
                 ModelExecutionHandle handle = acquireModelHandle(scopedModelId);
+                preparationStage = "startRun";
                 bindRunToModel(handle, scopedModelId);
                 status = AgentRunStatus.RECEIVED;
+                preparationStage = "validateAttachments";
                 validateAttachments();
+                preparationStage = "loadHistory";
                 List<ModelRequest.ConversationEntry> history = withinBudget(this::loadConversationHistory);
+                preparationStage = "appendUserMessage";
                 String attachmentUrls = attachmentReferences().stream()
                         .collect(java.util.stream.Collectors.joining("\n"));
                 Message userMessage = withinBudget(() -> conversationService.appendMessage(
@@ -213,18 +223,27 @@ public class ChatOrchestrator {
                         command.question(), attachmentUrls));
                 emit(ChatEvent.messageStart(run.id(), traceId, userMessage.id()));
                 messages.addAll(history);
+                preparationStage = "prepareContext";
                 messages.add(new ModelRequest.ConversationMessage("user", modelQuestion(), attachmentParts()));
                 validateProjectMenuPermission(history);
-                requiresFreshProjectData = isProjectQuestion(command.question())
-                        || isProjectFollowUp(command.question(), history);
+                requiresFreshProjectData = !isApprovalQuestion(command.question())
+                        && (isProjectQuestion(command.question())
+                        || isProjectFollowUp(command.question(), history));
+                requiresFreshApprovalData = isApprovalQuestion(command.question())
+                        || isApprovalFollowUp(command.question(), history);
                 validatePageProject();
+                preparationStage = "routeRun";
                 moveTo(AgentRunStatus.ROUTING);
                 emit(ChatEvent.status(run.id(), traceId, status));
                 moveTo(AgentRunStatus.PLANNING);
                 emit(ChatEvent.status(run.id(), traceId, status));
                 retrieveKnowledgeIfRequired();
+                preparationStage = "callModel";
                 callModel();
             } catch (RuntimeException exception) {
+                log.error("AI会话准备失败: runId={}, traceId={}, stage={}, exception={}",
+                        run == null ? null : run.id(), traceId, preparationStage,
+                        exception.getClass().getName(), exception);
                 if (isTimeout(exception)) {
                     fail("AGENT_RUN_TIMEOUT", AgentRunStatus.TIMEOUT);
                 } else {
@@ -328,7 +347,8 @@ public class ChatOrchestrator {
 
         private void validateProjectMenuPermission(List<ModelRequest.ConversationEntry> history) {
             if (context.permissions().contains("menu:project")) return;
-            if (isProjectQuestion(command.question()) || isProjectFollowUp(command.question(), history)) {
+            if (!isApprovalQuestion(command.question())
+                    && (isProjectQuestion(command.question()) || isProjectFollowUp(command.question(), history))) {
                 throw new AgentException("AGENT_PROJECT_MENU_FORBIDDEN",
                         org.springframework.http.HttpStatus.FORBIDDEN, "Project menu permission is required");
             }
@@ -339,7 +359,10 @@ public class ChatOrchestrator {
             String value = question == null ? "" : question.trim();
             if (!value.matches(".*(再查|继续|下一页|上一页|更多|详细|再看|重新查).*")) return false;
             for (int index = history.size() - 1; index >= 0; index--) {
-                if (isProjectQuestion(history.get(index).content())) return true;
+                if (!(history.get(index) instanceof ModelRequest.ConversationMessage message)
+                        || !"user".equals(message.role())) continue;
+                if (isApprovalQuestion(message.content())) return false;
+                if (isProjectQuestion(message.content())) return true;
             }
             return false;
         }
@@ -430,16 +453,19 @@ public class ChatOrchestrator {
             turnTools.clear();
             turnCompleted = null;
             boolean requireProjectTool = requiresFreshProjectData && toolCalls == 0;
+            boolean requireApprovalTool = requiresFreshApprovalData && toolCalls == 0;
             List<ModelRequest.AllowedToolSpecification> tools = toolRegistry.allowedReadOnlyTools(context).stream()
                     .filter(this::isRelevantTool)
                     .filter(tool -> !requireProjectTool || tool.key().startsWith("project."))
+                    .filter(tool -> !requireApprovalTool || tool.key().startsWith("approval."))
                     .map(this::toolSpecification)
                     .toList();
             List<ModelRequest.RetrievedEvidence> evidence = citations.stream()
                     .map(citation -> new ModelRequest.RetrievedEvidence(citation.citationToken(), citation.excerpt()))
                     .toList();
             ModelRequest request = new ModelRequest(run.id(), "v1", List.copyOf(messages), tools, evidence,
-                    requireProjectTool ? ModelRequest.ToolUseMode.REQUIRED : ModelRequest.ToolUseMode.AUTO);
+                    (requireProjectTool || requireApprovalTool) ? ModelRequest.ToolUseMode.REQUIRED : ModelRequest.ToolUseMode.AUTO);
+            preparationStage = "modelStream";
             try {
                 Disposable subscription = modelGatewayForRun.stream(request)
                         .timeout(remaining())
@@ -452,6 +478,7 @@ public class ChatOrchestrator {
         }
 
         private boolean isRelevantTool(AgentTool<?, ?> tool) {
+            if (tool.key().startsWith("approval.")) return requiresFreshApprovalData;
             if (!tool.key().startsWith("project.")) return true;
             StringBuilder contextText = new StringBuilder(command.question());
             messages.stream().filter(ModelRequest.ConversationMessage.class::isInstance)
@@ -468,6 +495,30 @@ public class ChatOrchestrator {
                     || question.contains("立项") || question.contains("已建") || question.contains("已立")
                     || question.contains("查看更多") || question.contains("下一页")
                     || command.pageContext() != null && command.pageContext().projectId() != null;
+        }
+
+        private boolean isApprovalQuestion(String text) {
+            String question = text == null ? "" : text.toLowerCase(java.util.Locale.ROOT);
+            return question.contains("待办") || question.contains("已办") || question.contains("审批")
+                    || question.contains("办理记录") || question.contains("我发起") || question.contains("流程进度")
+                    || question.contains("谁在审批") || question.contains("审批流") || question.contains("超时审批");
+        }
+
+        private boolean isApprovalFollowUp(
+                String question, List<ModelRequest.ConversationEntry> history) {
+            String value = question == null ? "" : question.trim();
+            if (isProjectQuestion(value) && !isApprovalQuestion(value)) return false;
+            if (!value.matches(".*(继续|下一页|上一页|更多|查看第.{0,6}条|第.{0,6}条|"
+                    + "查看详情|详细信息|刚才那条|刚才那个流程|这个流程|重新查询).*")) {
+                return false;
+            }
+            for (int index = history.size() - 1; index >= 0; index--) {
+                if (!(history.get(index) instanceof ModelRequest.ConversationMessage message)
+                        || !"user".equals(message.role())) continue;
+                if (isApprovalQuestion(message.content())) return true;
+                if (isProjectQuestion(message.content())) return false;
+            }
+            return false;
         }
 
         private ModelRequest.AllowedToolSpecification toolSpecification(AgentTool<?, ?> tool) {
@@ -553,6 +604,10 @@ public class ChatOrchestrator {
             }
             if (requiresFreshProjectData && toolCalls == 0) {
                 fail("AGENT_PROJECT_DATA_NOT_REFRESHED", AgentRunStatus.FAILED);
+                return;
+            }
+            if (requiresFreshApprovalData && toolCalls == 0) {
+                fail("AGENT_APPROVAL_DATA_NOT_REFRESHED", AgentRunStatus.FAILED);
                 return;
             }
             completeAnswer();
@@ -872,8 +927,14 @@ public class ChatOrchestrator {
 
         private String modelFailureCode(String code) {
             if (code != null && code.contains("TIMEOUT")) return "AGENT_MODEL_TIMEOUT";
-            if ("MODEL_TOOL_ARGUMENTS_INVALID".equals(code)) return "AGENT_QUERY_INVALID_REQUEST";
-            if ("MODEL_TOOL_SCHEMA_INVALID".equals(code)) return "AGENT_QUERY_UNAVAILABLE";
+            if ("MODEL_TOOL_ARGUMENTS_INVALID".equals(code)) {
+                return requiresFreshApprovalData
+                        ? "AGENT_APPROVAL_INVALID_REQUEST" : "AGENT_QUERY_INVALID_REQUEST";
+            }
+            if ("MODEL_TOOL_SCHEMA_INVALID".equals(code)) {
+                return requiresFreshApprovalData
+                        ? "AGENT_APPROVAL_QUERY_UNAVAILABLE" : "AGENT_QUERY_UNAVAILABLE";
+            }
             return "AGENT_MODEL_FAILED";
         }
 

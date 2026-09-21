@@ -35,4 +35,16 @@ class SystemInstructionCatalogTest {
                 .contains("只询问状态、预算、进度等明确字段", "project.query")
                 .contains("项目列表、统计、筛选、排序、分组和分页");
     }
+
+    @Test
+    void routesApprovalQueriesAndFollowUpsToReadOnlyApprovalTools() {
+        String instruction = new SystemInstructionCatalog().resolve("v1").orElseThrow();
+
+        assertThat(instruction)
+                .contains("approval.query", "approval.getDetail", "待办", "已办", "我发起")
+                .contains("本人范围", "流程去重", "第1页20条")
+                .contains("下一页", "查看第 N 条", "沿用上一轮")
+                .contains("Markdown 表格", "简体中文")
+                .contains("禁止办理", "退回", "转办", "委托", "拿回", "终止");
+    }
 }

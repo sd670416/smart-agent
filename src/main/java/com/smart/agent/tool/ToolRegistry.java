@@ -34,6 +34,8 @@ public class ToolRegistry {
         return tools.values().stream()
                 .filter(tool -> tool.risk() == ToolRisk.L0 || tool.risk() == ToolRisk.L1)
                 .filter(tool -> tool.risk() == ToolRisk.L0
+                        || tool.requiredPermission() == null
+                        || tool.requiredPermission().isBlank()
                         || context.permissions().contains(tool.requiredPermission()))
                 .toList();
     }
