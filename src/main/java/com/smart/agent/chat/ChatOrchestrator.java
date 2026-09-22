@@ -508,7 +508,7 @@ public class ChatOrchestrator {
                 String question, List<ModelRequest.ConversationEntry> history) {
             String value = question == null ? "" : question.trim();
             if (isProjectQuestion(value) && !isApprovalQuestion(value)) return false;
-            if (!value.matches(".*(继续|下一页|上一页|更多|查看第.{0,6}条|第.{0,6}条|"
+            if (!value.matches(".*(继续|再查|下一页|上一页|更多|查看第.{0,6}条|第.{0,6}条|"
                     + "查看详情|详细信息|刚才那条|刚才那个流程|这个流程|重新查询).*")) {
                 return false;
             }

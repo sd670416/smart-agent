@@ -17,7 +17,7 @@ public class ApprovalDetailTool implements AgentTool<ApprovalDetailInput, Approv
     @Override public Class<ApprovalDetailInput> inputType() { return ApprovalDetailInput.class; }
     @Override public String requiredPermission() { return ""; }
     @Override public ToolRisk risk() { return ToolRisk.L1; }
-    @Override public String description() { return "查看当前用户有权查看的审批详情。processInstanceId 应使用 approval.query 返回的流程实例ID，不要把业务编号或流程名称当作ID；项目待办包含可见档案分区"; }
+    @Override public String description() { return "查看当前用户有权查看的审批详情。processInstanceId 应使用 approval.query 返回的流程实例ID，不要把业务编号或流程名称当作ID；项目报备使用实际提交的业务表单，不是项目档案"; }
     @Override public String argumentsSchemaJson() {
         return "{\"type\":\"object\",\"properties\":{\"processInstanceId\":{\"type\":\"string\"},"
                 + "\"taskId\":{\"type\":\"string\"},\"historyId\":{\"type\":\"string\"},"

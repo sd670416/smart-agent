@@ -127,6 +127,26 @@ class ChatControllerIT {
     }
 
     @Test
+    void recheckApprovalFollowUpCallsApprovalQueryAgain() {
+        stream("有投标的待办嘛", Set.of(), Set.of());
+
+        List<String> events = stream("再查一下", Set.of(), Set.of());
+
+        assertThat(events).anyMatch(event -> event.contains("待办查询完成"));
+        assertThat(testApprovalBusinessClient.queryCalls()).isEqualTo(2);
+        ModelRequest followUp = scenarioModelGateway.requests().stream()
+                .filter(request -> request.redactedConversationMessages().stream()
+                        .filter(ModelRequest.ConversationMessage.class::isInstance)
+                        .map(ModelRequest.ConversationMessage.class::cast)
+                        .anyMatch(message -> "再查一下".equals(message.content())))
+                .findFirst().orElseThrow();
+        assertThat(followUp.toolUseMode()).isEqualTo(ModelRequest.ToolUseMode.REQUIRED);
+        assertThat(followUp.allowedToolSpecifications())
+                .extracting(ModelRequest.AllowedToolSpecification::key)
+                .isNotEmpty().allMatch(key -> key.startsWith("approval."));
+    }
+
+    @Test
     void approvalDetailFollowUpIgnoresProjectNameInAssistantAnswer() {
         stream("查询我的待办", Set.of(), Set.of());
         conversationService.appendMessage("tenant-1", "user-1", conversationId,
@@ -937,7 +957,8 @@ class ChatControllerIT {
                         .reduce((first, second) -> second)
                         .map(ModelRequest.ConversationMessage::content)
                         .orElse(question);
-                if (currentQuestion.equals("查询我的待办") || currentQuestion.equals("下一页")) {
+                if (currentQuestion.equals("查询我的待办") || currentQuestion.equals("下一页")
+                        || currentQuestion.equals("有投标的待办嘛") || currentQuestion.equals("再查一下")) {
                     if (request.redactedConversationMessages().getLast()
                             instanceof ModelRequest.ToolResultMessage) {
                         return Flux.just(new ModelEvent.Completed("待办查询完成。", 8, 6));
