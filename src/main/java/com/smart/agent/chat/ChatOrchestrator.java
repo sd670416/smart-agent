@@ -242,6 +242,7 @@ public class ChatOrchestrator {
                 messages.add(new ModelRequest.ConversationMessage("user", modelQuestion(), attachmentParts()));
                 validateProjectMenuPermission(history);
                 requiresFreshProjectData = !isApprovalQuestion(command.question())
+                        && !isBoardQuestion(command.question())
                         && (isProjectQuestion(command.question())
                         || isProjectFollowUp(command.question(), history));
                 requiresFreshApprovalData = isApprovalQuestion(command.question())
@@ -366,7 +367,8 @@ public class ChatOrchestrator {
 
         private void validateProjectMenuPermission(List<ModelRequest.ConversationEntry> history) {
             if (context.permissions().contains("menu:project")) return;
-            if (!isApprovalQuestion(command.question())
+            if (!isBoardQuestion(command.question())
+                    && !isApprovalQuestion(command.question())
                     && (isProjectQuestion(command.question()) || isProjectFollowUp(command.question(), history))) {
                 throw new AgentException("AGENT_PROJECT_MENU_FORBIDDEN",
                         org.springframework.http.HttpStatus.FORBIDDEN, "Project menu permission is required");
@@ -381,6 +383,7 @@ public class ChatOrchestrator {
                 if (!(history.get(index) instanceof ModelRequest.ConversationMessage message)
                         || !"user".equals(message.role())) continue;
                 if (isApprovalQuestion(message.content())) return false;
+                if (isBoardQuestion(message.content())) return false;
                 if (isProjectQuestion(message.content())) return true;
             }
             return false;
@@ -389,6 +392,11 @@ public class ChatOrchestrator {
         private boolean isProjectQuestion(String question) {
             if (question == null || question.isBlank()) return false;
             return question.matches(".*(项目|项目报备|项目档案).*");
+        }
+
+        private boolean isBoardQuestion(String question) {
+            if (question == null || question.isBlank()) return false;
+            return question.matches(".*(经营看板|预算看板|应收看板|供应商看板|投标看板|库存看板|项目看板|甘特图|看板数据|看板分析|看板指标).*" );
         }
 
         private String modelQuestion() {
@@ -473,17 +481,19 @@ public class ChatOrchestrator {
             turnCompleted = null;
             boolean requireProjectTool = requiresFreshProjectData && toolCalls == 0;
             boolean requireApprovalTool = requiresFreshApprovalData && toolCalls == 0;
+            boolean requireBoardTool = isBoardQuestion(command.question()) && toolCalls == 0;
             List<ModelRequest.AllowedToolSpecification> tools = toolRegistry.allowedReadOnlyTools(context).stream()
                     .filter(this::isRelevantTool)
                     .filter(tool -> !requireProjectTool || tool.key().startsWith("project."))
                     .filter(tool -> !requireApprovalTool || tool.key().startsWith("approval."))
+                    .filter(tool -> !requireBoardTool || tool.key().startsWith("board."))
                     .map(this::toolSpecification)
                     .toList();
             List<ModelRequest.RetrievedEvidence> evidence = citations.stream()
                     .map(citation -> new ModelRequest.RetrievedEvidence(citation.citationToken(), citation.excerpt()))
                     .toList();
             ModelRequest request = new ModelRequest(run.id(), "v1", List.copyOf(messages), tools, evidence,
-                    (requireProjectTool || requireApprovalTool) ? ModelRequest.ToolUseMode.REQUIRED : ModelRequest.ToolUseMode.AUTO);
+                    (requireProjectTool || requireApprovalTool || requireBoardTool) ? ModelRequest.ToolUseMode.REQUIRED : ModelRequest.ToolUseMode.AUTO);
             preparationStage = "modelStream";
             try {
                 Disposable subscription = modelGatewayForRun.stream(request)
