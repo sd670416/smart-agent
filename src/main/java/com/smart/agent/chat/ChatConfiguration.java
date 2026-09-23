@@ -28,18 +28,19 @@ class ChatConfiguration {
             ObjectMapper objectMapper,
             ObjectProvider<KnowledgeSearchService> knowledgeSearchService,
             @Value("${agent.attachment.public-base-url:}") String attachmentPublicBaseUrl,
-            ObjectProvider<com.smart.agent.attachment.AttachmentService> attachmentService) {
+            ObjectProvider<com.smart.agent.attachment.AttachmentService> attachmentService,
+            com.smart.agent.context.ConversationContextService conversationContextService) {
         DynamicModelRegistry registry = modelRegistry.getIfAvailable();
         if (registry == null) {
             return new ChatOrchestrator(
                     conversationService, runService, modelGateway, toolRegistry, toolExecutor, objectMapper,
                     knowledgeSearchService.getIfAvailable(), com.smart.agent.chat.ChatOrchestrator.MAX_RUN_DURATION,
-                    attachmentService.getIfAvailable(), attachmentPublicBaseUrl);
+                    attachmentService.getIfAvailable(), attachmentPublicBaseUrl, conversationContextService);
         }
         return new ChatOrchestrator(
                 conversationService, runService, registry, toolRegistry, toolExecutor, objectMapper,
                 knowledgeSearchService.getIfAvailable(), com.smart.agent.chat.ChatOrchestrator.MAX_RUN_DURATION,
-                attachmentService.getIfAvailable(), attachmentPublicBaseUrl);
+                attachmentService.getIfAvailable(), attachmentPublicBaseUrl, conversationContextService);
     }
 
     @Bean

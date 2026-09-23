@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.smart.agent.common.error.AgentException;
 import com.smart.agent.conversation.ConversationService;
+import com.smart.agent.context.ConversationContextService;
 import com.smart.agent.attachment.AttachmentService;
 import com.smart.agent.attachment.AttachmentStatus;
 import com.smart.agent.conversation.Message;
@@ -67,6 +68,7 @@ public class ChatOrchestrator {
     private final Duration runBudget;
     private final AttachmentService attachmentService;
     private final String attachmentPublicBaseUrl;
+    private final ConversationContextService conversationContextService;
 
     /**
      * 兼容构造：直接使用固定网关，不经过模型注册中心。
@@ -80,7 +82,7 @@ public class ChatOrchestrator {
             ToolExecutor toolExecutor,
             ObjectMapper objectMapper) {
         this(conversationService, runService, modelGateway, null, toolRegistry, toolExecutor, objectMapper,
-                null, null, null, null);
+                null, null, null, null, null);
     }
 
     public ChatOrchestrator(
@@ -92,7 +94,7 @@ public class ChatOrchestrator {
             ObjectMapper objectMapper,
             KnowledgeSearchService knowledgeSearchService) {
         this(conversationService, runService, modelGateway, null, toolRegistry, toolExecutor, objectMapper,
-                knowledgeSearchService, MAX_RUN_DURATION, null, null);
+                knowledgeSearchService, MAX_RUN_DURATION, null, null, null);
     }
 
     /**
@@ -108,9 +110,11 @@ public class ChatOrchestrator {
             KnowledgeSearchService knowledgeSearchService,
             Duration runBudget,
             AttachmentService attachmentService,
-            String attachmentPublicBaseUrl) {
+            String attachmentPublicBaseUrl,
+            ConversationContextService conversationContextService) {
         this(conversationService, runService, null, modelRegistry, toolRegistry, toolExecutor, objectMapper,
-                knowledgeSearchService, runBudget, attachmentService, attachmentPublicBaseUrl);
+                knowledgeSearchService, runBudget, attachmentService, attachmentPublicBaseUrl,
+                conversationContextService);
     }
 
     ChatOrchestrator(
@@ -123,14 +127,14 @@ public class ChatOrchestrator {
             KnowledgeSearchService knowledgeSearchService,
             Duration runBudget) {
         this(conversationService, runService, modelGateway, null, toolRegistry, toolExecutor, objectMapper,
-                knowledgeSearchService, runBudget, null, null);
+                knowledgeSearchService, runBudget, null, null, null);
     }
 
     ChatOrchestrator(ConversationService conversationService, AgentRunService runService, ModelGateway modelGateway,
             ToolRegistry toolRegistry, ToolExecutor toolExecutor, ObjectMapper objectMapper,
             KnowledgeSearchService knowledgeSearchService, Duration runBudget, AttachmentService attachmentService) {
         this(conversationService, runService, modelGateway, null, toolRegistry, toolExecutor, objectMapper,
-                knowledgeSearchService, runBudget, attachmentService, null);
+                knowledgeSearchService, runBudget, attachmentService, null, null);
     }
 
     ChatOrchestrator(ConversationService conversationService, AgentRunService runService, ModelGateway modelGateway,
@@ -138,13 +142,23 @@ public class ChatOrchestrator {
             KnowledgeSearchService knowledgeSearchService, Duration runBudget, AttachmentService attachmentService,
             String attachmentPublicBaseUrl) {
         this(conversationService, runService, modelGateway, null, toolRegistry, toolExecutor, objectMapper,
-                knowledgeSearchService, runBudget, attachmentService, attachmentPublicBaseUrl);
+                knowledgeSearchService, runBudget, attachmentService, attachmentPublicBaseUrl, null);
+    }
+
+    ChatOrchestrator(ConversationService conversationService, AgentRunService runService, ModelGateway modelGateway,
+            ToolRegistry toolRegistry, ToolExecutor toolExecutor, ObjectMapper objectMapper,
+            KnowledgeSearchService knowledgeSearchService, Duration runBudget, AttachmentService attachmentService,
+            String attachmentPublicBaseUrl, ConversationContextService conversationContextService) {
+        this(conversationService, runService, modelGateway, null, toolRegistry, toolExecutor, objectMapper,
+                knowledgeSearchService, runBudget, attachmentService, attachmentPublicBaseUrl,
+                conversationContextService);
     }
 
     ChatOrchestrator(ConversationService conversationService, AgentRunService runService, ModelGateway modelGateway,
             DynamicModelRegistry modelRegistry, ToolRegistry toolRegistry, ToolExecutor toolExecutor,
             ObjectMapper objectMapper, KnowledgeSearchService knowledgeSearchService, Duration runBudget,
-            AttachmentService attachmentService, String attachmentPublicBaseUrl) {
+            AttachmentService attachmentService, String attachmentPublicBaseUrl,
+            ConversationContextService conversationContextService) {
         this.conversationService = conversationService;
         this.runService = runService;
         this.modelGateway = modelGateway;
@@ -156,6 +170,7 @@ public class ChatOrchestrator {
         this.runBudget = runBudget;
         this.attachmentService = attachmentService;
         this.attachmentPublicBaseUrl = attachmentPublicBaseUrl == null ? "" : attachmentPublicBaseUrl.trim();
+        this.conversationContextService = conversationContextService;
     }
 
     public Flux<ChatEvent> stream(ChatCommand command, AgentUserContext context, String traceId) {
@@ -239,6 +254,10 @@ public class ChatOrchestrator {
                 emit(ChatEvent.status(run.id(), traceId, status));
                 retrieveKnowledgeIfRequired();
                 preparationStage = "callModel";
+                if (resolveApprovalOrdinalFollowUp()) {
+                    callModel();
+                    return;
+                }
                 callModel();
             } catch (RuntimeException exception) {
                 log.error("AI会话准备失败: runId={}, traceId={}, stage={}, exception={}",
@@ -521,6 +540,103 @@ public class ChatOrchestrator {
             return false;
         }
 
+        private boolean resolveApprovalOrdinalFollowUp() {
+            if (!requiresFreshApprovalData) return false;
+            Integer ordinal = parseOrdinal(command.question());
+            if (ordinal == null) return false;
+            if (conversationContextService == null) {
+                throw approvalSelectionFailure("AGENT_APPROVAL_CONTEXT_MISSING");
+            }
+            String payload = withinBudget(() -> conversationContextService.find(
+                            context.tenantId(), context.userId(), command.conversationId(),
+                            ConversationContextService.APPROVAL_QUERY))
+                    .map(com.smart.agent.context.ConversationContext::payloadJson)
+                    .orElseThrow(() -> approvalSelectionFailure("AGENT_APPROVAL_CONTEXT_MISSING"));
+            try {
+                JsonNode snapshot = objectMapper.readTree(payload);
+                JsonNode items = snapshot.path("result").path("items");
+                if (!items.isArray() || ordinal > items.size()) {
+                    throw approvalSelectionFailure("AGENT_APPROVAL_ORDINAL_OUT_OF_RANGE");
+                }
+                JsonNode selected = items.get(ordinal - 1);
+                String processInstanceId = textOrNull(selected, "processInstanceId");
+                if (processInstanceId == null) {
+                    throw approvalSelectionFailure("AGENT_APPROVAL_CONTEXT_INVALID");
+                }
+                JsonNode arguments = snapshot.path("arguments");
+                com.fasterxml.jackson.databind.node.ObjectNode detail = objectMapper.createObjectNode();
+                detail.put("processInstanceId", processInstanceId);
+                putIfText(detail, "taskId", textOrNull(selected, "taskId"));
+                putIfText(detail, "historyId", textOrNull(selected, "historyId"));
+                putIfText(detail, "scope", textOrNull(arguments, "scope"));
+                putIfText(detail, "visibility", textOrNull(arguments, "visibility"));
+                putIfText(detail, "personKeyword", textOrNull(arguments, "personKeyword"));
+                ModelEvent.ToolRequested request = new ModelEvent.ToolRequested(
+                        "approval-detail-" + UUID.randomUUID(), "approval.getDetail",
+                        objectMapper.writeValueAsString(detail));
+                persistDebug("TOOL_REQUEST", request.toolKey(), request.argumentsJson());
+                emit(ChatEvent.debug(run.id(), traceId, "TOOL_REQUEST", Map.of(
+                        "toolKey", request.toolKey(), "arguments", request.argumentsJson(),
+                        "resolvedOrdinal", ordinal)));
+                return executeTool(request);
+            } catch (AgentException exception) {
+                throw exception;
+            } catch (com.fasterxml.jackson.core.JsonProcessingException exception) {
+                throw approvalSelectionFailure("AGENT_APPROVAL_CONTEXT_INVALID");
+            }
+        }
+
+        private Integer parseOrdinal(String question) {
+            if (question == null) return null;
+            java.util.regex.Matcher matcher = java.util.regex.Pattern
+                    .compile("(?:查看|看一下|看|打开)?\\s*第\\s*([0-9一二两三四五六七八九十百]+)"
+                            + "\\s*(?:条|个|项)(?:\\s*(?:待办|已办|流程|审批))?")
+                    .matcher(question.trim());
+            if (!matcher.find()) return null;
+            String value = matcher.group(1);
+            try {
+                if (value.matches("[0-9]+")) {
+                    int parsed = Integer.parseInt(value);
+                    return parsed > 0 ? parsed : null;
+                }
+                return chineseOrdinal(value);
+            } catch (NumberFormatException ignored) {
+                return null;
+            }
+        }
+
+        private Integer chineseOrdinal(String value) {
+            Map<Character, Integer> digits = Map.of(
+                    '一', 1, '二', 2, '两', 2, '三', 3, '四', 4,
+                    '五', 5, '六', 6, '七', 7, '八', 8, '九', 9);
+            if ("十".equals(value)) return 10;
+            int hundred = value.indexOf('百');
+            int ten = value.indexOf('十');
+            int result = 0;
+            if (hundred >= 0) result += digits.getOrDefault(value.charAt(0), 0) * 100;
+            if (ten >= 0) {
+                result += ten == 0 || hundred >= 0 && ten == hundred + 1
+                        ? 10 : digits.getOrDefault(value.charAt(ten - 1), 0) * 10;
+            }
+            char last = value.charAt(value.length() - 1);
+            if (last != '百' && last != '十') result += digits.getOrDefault(last, 0);
+            return result > 0 ? result : null;
+        }
+
+        private String textOrNull(JsonNode node, String field) {
+            JsonNode value = node == null ? null : node.get(field);
+            return value == null || value.isNull() || !value.isValueNode() || value.asText().isBlank()
+                    ? null : value.asText();
+        }
+
+        private void putIfText(com.fasterxml.jackson.databind.node.ObjectNode target, String field, String value) {
+            if (value != null) target.put(field, value);
+        }
+
+        private AgentException approvalSelectionFailure(String code) {
+            return new AgentException(code, org.springframework.http.HttpStatus.BAD_REQUEST, code);
+        }
+
         private ModelRequest.AllowedToolSpecification toolSpecification(AgentTool<?, ?> tool) {
             return new ModelRequest.AllowedToolSpecification(
                     tool.key(), tool.description(), tool.argumentsSchemaJson());
@@ -659,6 +775,13 @@ public class ChatOrchestrator {
                 Object result = awaitTool(toolFuture);
                 if (terminated.get() || sink.isCancelled()) return false;
                 String serializedResult = objectMapper.writeValueAsString(result);
+                if ("approval.query".equals(request.toolKey()) && conversationContextService != null) {
+                    String snapshot = objectMapper.writeValueAsString(Map.of(
+                            "arguments", input, "result", result));
+                    withinBudget(() -> conversationContextService.upsert(
+                            context.tenantId(), context.userId(), command.conversationId(),
+                            ConversationContextService.APPROVAL_QUERY, snapshot, run.id()));
+                }
                 long durationMillis = Duration.ofNanos(System.nanoTime() - toolStarted).toMillis();
                 String debugResult = safeDebugToolResult(request.toolKey(), result, serializedResult, durationMillis);
                 persistDebug("TOOL_RESULT", request.toolKey(), debugResult);

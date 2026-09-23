@@ -147,6 +147,58 @@ class ChatControllerIT {
     }
 
     @Test
+    void ordinalApprovalFollowUpUsesPersistedIdsForDetail() {
+        stream("查询我的待办", Set.of(), Set.of());
+
+        List<String> events = stream("第一条", Set.of(), Set.of());
+
+        assertThat(events).anyMatch(event -> event.contains("审批详情查询完成"));
+        assertThat(testApprovalBusinessClient.detailCalls()).isEqualTo(1);
+        assertThat(testApprovalBusinessClient.lastDetailInput()).isEqualTo(
+                new com.smart.agent.tool.approval.ApprovalDetailInput(
+                        "11111111-1111-1111-1111-111111111111", "task-1", "history-1",
+                        "TODO", "SELF", null));
+        assertThat(testApprovalBusinessClient.queryCalls()).isEqualTo(1);
+    }
+
+    @Test
+    void ordinalApprovalFollowUpAcceptsChineseItemClassifier() {
+        stream("查询我的已办", Set.of(), Set.of());
+
+        List<String> events = stream("看一下第1个已办的信息", Set.of(), Set.of());
+
+        assertThat(events).anyMatch(event -> event.contains("审批详情查询完成"));
+        assertThat(testApprovalBusinessClient.detailCalls()).isEqualTo(1);
+        assertThat(testApprovalBusinessClient.lastDetailInput().processInstanceId())
+                .isEqualTo("11111111-1111-1111-1111-111111111111");
+    }
+
+    @Test
+    void ordinalApprovalFollowUpExplainsWhenOrdinalIsOutOfRange() {
+        stream("查询我的待办", Set.of(), Set.of());
+
+        List<String> events = stream("第2条", Set.of(), Set.of());
+
+        assertThat(events.getLast()).contains("AGENT_APPROVAL_ORDINAL_OUT_OF_RANGE")
+                .contains("指定的序号不在最新审批列表中");
+        assertThat(testApprovalBusinessClient.detailCalls()).isZero();
+    }
+
+    @Test
+    void ordinalApprovalFollowUpExplainsWhenUpgradedConversationHasNoSnapshot() {
+        conversationService.appendMessage("tenant-1", "user-1", conversationId,
+                Message.Role.USER, "查询我的待办");
+        conversationService.appendMessage("tenant-1", "user-1", conversationId,
+                Message.Role.ASSISTANT, "共查询到 1 条待办。");
+
+        List<String> events = stream("第一条", Set.of(), Set.of());
+
+        assertThat(events.getLast()).contains("AGENT_APPROVAL_CONTEXT_MISSING")
+                .contains("请先查询待办、已办或我发起的流程");
+        assertThat(testApprovalBusinessClient.detailCalls()).isZero();
+    }
+
+    @Test
     void approvalDetailFollowUpIgnoresProjectNameInAssistantAnswer() {
         stream("查询我的待办", Set.of(), Set.of());
         conversationService.appendMessage("tenant-1", "user-1", conversationId,
@@ -795,6 +847,17 @@ class ChatControllerIT {
         }
 
         @Bean
+        InMemoryConversationContextRepository conversationContextRepository() {
+            return new InMemoryConversationContextRepository();
+        }
+
+        @Bean
+        com.smart.agent.context.ConversationContextService conversationContextService(
+                InMemoryConversationContextRepository repository) {
+            return new com.smart.agent.context.ConversationContextService(repository);
+        }
+
+        @Bean
         InMemoryAgentRunRepository agentRunRepository() {
             return new InMemoryAgentRunRepository();
         }
@@ -823,9 +886,11 @@ class ChatControllerIT {
                 ModelGateway modelGateway,
                 ToolRegistry registry,
                 ToolExecutor executor,
-                ObjectMapper objectMapper, KnowledgeSearchService knowledgeSearchService) {
+                ObjectMapper objectMapper, KnowledgeSearchService knowledgeSearchService,
+                com.smart.agent.context.ConversationContextService conversationContextService) {
             return new ChatOrchestrator(conversations, runs, modelGateway, registry, executor, objectMapper,
-                    knowledgeSearchService);
+                    knowledgeSearchService, ChatOrchestrator.MAX_RUN_DURATION, null, null,
+                    conversationContextService);
         }
 
         @Bean
@@ -849,7 +914,10 @@ class ChatControllerIT {
         static final class TestApprovalBusinessClient
                 implements com.smart.agent.tool.approval.ApprovalBusinessClient {
             private final AtomicInteger queryCalls = new AtomicInteger();
+            private final AtomicInteger detailCalls = new AtomicInteger();
             private final List<Integer> pages = new java.util.concurrent.CopyOnWriteArrayList<>();
+            private final AtomicReference<com.smart.agent.tool.approval.ApprovalDetailInput> lastDetailInput =
+                    new AtomicReference<>();
 
             @Override
             public com.smart.agent.tool.approval.ApprovalQueryResult query(
@@ -859,19 +927,29 @@ class ChatControllerIT {
                 pages.add(input.page());
                 return new com.smart.agent.tool.approval.ApprovalQueryResult(
                         input.page(), input.pageSize(), 1L,
-                        List.of(Map.of("流程名称", "项目报备00056")), Map.of(), List.of());
+                        List.of(Map.of(
+                                "processInstanceId", "11111111-1111-1111-1111-111111111111",
+                                "taskId", "task-1", "historyId", "history-1",
+                                "fields", Map.of("流程名称", "项目报备00056"))),
+                        Map.of(), List.of());
             }
 
             @Override
             public com.smart.agent.tool.approval.ApprovalDetailResult detail(
                     com.smart.agent.tool.ToolContext context,
                     com.smart.agent.tool.approval.ApprovalDetailInput input) {
-                throw new UnsupportedOperationException();
+                detailCalls.incrementAndGet();
+                lastDetailInput.set(input);
+                return new com.smart.agent.tool.approval.ApprovalDetailResult(
+                        input.processInstanceId(), Map.of("流程名称", "项目报备00056"),
+                        Map.of("项目名称", "示例项目"), List.of(), List.of(), Map.of());
             }
 
             int queryCalls() { return queryCalls.get(); }
+            int detailCalls() { return detailCalls.get(); }
+            com.smart.agent.tool.approval.ApprovalDetailInput lastDetailInput() { return lastDetailInput.get(); }
             List<Integer> pages() { return List.copyOf(pages); }
-            void reset() { queryCalls.set(0); pages.clear(); }
+            void reset() { queryCalls.set(0); detailCalls.set(0); lastDetailInput.set(null); pages.clear(); }
         }
 
         static final class TestProjectBusinessClient
@@ -957,7 +1035,8 @@ class ChatControllerIT {
                         .reduce((first, second) -> second)
                         .map(ModelRequest.ConversationMessage::content)
                         .orElse(question);
-                if (currentQuestion.equals("查询我的待办") || currentQuestion.equals("下一页")
+                if (currentQuestion.equals("查询我的待办") || currentQuestion.equals("查询我的已办")
+                        || currentQuestion.equals("下一页")
                         || currentQuestion.equals("有投标的待办嘛") || currentQuestion.equals("再查一下")) {
                     if (request.redactedConversationMessages().getLast()
                             instanceof ModelRequest.ToolResultMessage) {
@@ -969,6 +1048,12 @@ class ChatControllerIT {
                             "{\"scope\":\"TODO\",\"visibility\":\"SELF\",\"page\":" + page
                                     + ",\"pageSize\":20,\"recordMode\":\"PROCESS\"}"),
                             new ModelEvent.Completed("", 6, 3));
+                }
+                if ((currentQuestion.equals("第一条") || currentQuestion.equals("看一下第1个已办的信息"))
+                        && request.redactedConversationMessages().getLast()
+                        instanceof ModelRequest.ToolResultMessage toolResult
+                        && toolResult.toolKey().equals("approval.getDetail")) {
+                    return Flux.just(new ModelEvent.Completed("审批详情查询完成。", 8, 6));
                 }
                 if (currentQuestion.equals("查下项目")) {
                     if (request.redactedConversationMessages().getLast()
@@ -1127,6 +1212,29 @@ class ChatControllerIT {
             return Optional.ofNullable(conversations.get(id))
                     .filter(conversation -> conversation.tenantId().equals(tenantId))
                     .filter(conversation -> conversation.userId().equals(userId));
+        }
+    }
+
+    static final class InMemoryConversationContextRepository
+            implements com.smart.agent.context.ConversationContextRepository {
+        private final Map<String, com.smart.agent.context.ConversationContext> contexts = new ConcurrentHashMap<>();
+
+        @Override
+        public com.smart.agent.context.ConversationContext save(
+                com.smart.agent.context.ConversationContext context) {
+            contexts.put(key(context.tenantId(), context.userId(), context.conversationId(), context.contextType()),
+                    context);
+            return context;
+        }
+
+        @Override
+        public Optional<com.smart.agent.context.ConversationContext> find(
+                String tenantId, String userId, String conversationId, String contextType) {
+            return Optional.ofNullable(contexts.get(key(tenantId, userId, conversationId, contextType)));
+        }
+
+        private static String key(String tenantId, String userId, String conversationId, String contextType) {
+            return String.join("/", tenantId, userId, conversationId, contextType);
         }
     }
 
