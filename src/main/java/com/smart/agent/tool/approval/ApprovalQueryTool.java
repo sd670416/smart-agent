@@ -23,8 +23,8 @@ public class ApprovalQueryTool implements AgentTool<ApprovalQueryInput, Approval
                 + "\"processType\":{\"type\":\"string\"},\"filter\":{\"type\":\"object\"},"
                 + "\"select\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},"
                 + "\"groupBy\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},"
-                + "\"aggregations\":{\"type\":\"array\",\"items\":{\"type\":\"object\"}},"
-                + "\"orderBy\":{\"type\":\"array\",\"items\":{\"type\":\"object\"}},"
+                + "\"aggregations\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"function\":{\"type\":\"string\"},\"field\":{\"type\":\"string\"},\"alias\":{\"type\":\"string\"}},\"additionalProperties\":false}},"
+                + "\"orderBy\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"field\":{\"type\":\"string\"},\"direction\":{\"type\":\"string\"}},\"additionalProperties\":false}},"
                 + "\"recordMode\":{\"type\":\"string\",\"description\":\"PROCESS流程去重或OPERATION操作记录；默认PROCESS\"}},"
                 + "\"additionalProperties\":false}";
     }

@@ -196,8 +196,15 @@ public class ChatOrchestrator {
         private AgentRunStatus status;
         private int modelTurns;
         private int toolCalls;
+        private int projectToolCalls;
+        private int approvalToolCalls;
+        private int boardToolCalls;
         private boolean requiresFreshProjectData;
         private boolean requiresFreshApprovalData;
+        private boolean requiresFreshBoardData;
+        private boolean requiresRelativeTimeForProject;
+        private boolean timeToolCompleted;
+        private String activeBusinessDomain;
         private List<KnowledgeCitation> citations = List.of();
         private final StringBuilder turnDeltas = new StringBuilder();
         private final List<ModelEvent.ToolRequested> turnTools = new ArrayList<>();
@@ -239,14 +246,23 @@ public class ChatOrchestrator {
                 emit(ChatEvent.messageStart(run.id(), traceId, userMessage.id()));
                 messages.addAll(history);
                 preparationStage = "prepareContext";
-                messages.add(new ModelRequest.ConversationMessage("user", modelQuestion(), attachmentParts()));
                 validateProjectMenuPermission(history);
-                requiresFreshProjectData = !isApprovalQuestion(command.question())
+                activeBusinessDomain = loadActiveBusinessDomain();
+                boolean projectContextFollowUp = isProjectContextFollowUp(
+                        command.question(), history, activeBusinessDomain);
+                requiresFreshProjectData = (!isApprovalQuestion(command.question()) || projectContextFollowUp)
                         && !isBoardQuestion(command.question())
                         && (isProjectQuestion(command.question())
-                        || isProjectFollowUp(command.question(), history));
-                requiresFreshApprovalData = isApprovalQuestion(command.question())
-                        || isApprovalFollowUp(command.question(), history);
+                        || isProjectFollowUp(command.question(), history)
+                        || projectContextFollowUp);
+                requiresRelativeTimeForProject = requiresFreshProjectData
+                        && isRelativeTimeQuestion(command.question());
+                requiresFreshApprovalData = !projectContextFollowUp && (isApprovalQuestion(command.question())
+                        || isApprovalFollowUp(command.question(), history));
+                requiresFreshBoardData = isBoardQuestion(command.question());
+                // 先完成业务域判定，再生成带可信路由提示的本轮消息。
+                // 否则 modelQuestion 无法使用本轮上下文判定结果。
+                messages.add(new ModelRequest.ConversationMessage("user", modelQuestion(), attachmentParts()));
                 validatePageProject();
                 preparationStage = "routeRun";
                 moveTo(AgentRunStatus.ROUTING);
@@ -255,6 +271,10 @@ public class ChatOrchestrator {
                 emit(ChatEvent.status(run.id(), traceId, status));
                 retrieveKnowledgeIfRequired();
                 preparationStage = "callModel";
+                if (resolveProjectOrdinalFollowUp()) {
+                    callModel();
+                    return;
+                }
                 if (resolveApprovalOrdinalFollowUp()) {
                     callModel();
                     return;
@@ -366,9 +386,10 @@ public class ChatOrchestrator {
         }
 
         private void validateProjectMenuPermission(List<ModelRequest.ConversationEntry> history) {
+            // 看板查询不依赖项目报备/项目档案菜单，必须在项目权限校验前直接放行。
+            if (containsBoardKeyword(command.question())) return;
             if (context.permissions().contains("menu:project")) return;
-            if (!isBoardQuestion(command.question())
-                    && !isApprovalQuestion(command.question())
+            if (!isApprovalQuestion(command.question())
                     && (isProjectQuestion(command.question()) || isProjectFollowUp(command.question(), history))) {
                 throw new AgentException("AGENT_PROJECT_MENU_FORBIDDEN",
                         org.springframework.http.HttpStatus.FORBIDDEN, "Project menu permission is required");
@@ -389,20 +410,89 @@ public class ChatOrchestrator {
             return false;
         }
 
+        /**
+         * 追问不应只按关键词路由。若上一轮明确建立了项目查询上下文，
+         * 当前轮只提供字段、状态或统计口径时，继续沿用项目工具；审批流
+         * 只有在当前轮明确指向待办、已办、流程、办理人等审批对象时才接管。
+         */
+        private boolean isProjectContextFollowUp(String question,
+                                                  List<ModelRequest.ConversationEntry> history,
+                                                  String domain) {
+            if (question == null || question.isBlank() || history == null) return false;
+            if (isBoardQuestion(question) || isProjectQuestion(question)) return false;
+            String value = question.trim();
+            if (!value.matches(".*(多少|数量|统计|筛选|状态|审批完成|审批通过|审批中|驳回|草稿|项目|"
+                    + "第.{0,6}条|第一条|第二条|详情|档案|这个|刚才).*")) return false;
+            // “审批状态”既可以是项目字段，也可以是流程语义。已有成功工具形成的
+            // 业务域快照优先于聊天文本，且失败工具不会覆盖它。
+            if ("PROJECT".equals(domain)) return true;
+            if ("APPROVAL".equals(domain) || "BOARD".equals(domain)) return false;
+            for (int index = history.size() - 1; index >= 0; index--) {
+                ModelRequest.ConversationEntry entry = history.get(index);
+                if (!(entry instanceof ModelRequest.ConversationMessage message)
+                        || !"user".equals(message.role())) continue;
+                if (isProjectQuestion(message.content())) return true;
+                // 单独的“审批完成/审批状态”可能只是项目字段追问，不能作为
+                // 审批流业务域锚点。只有明确的流程对象才切换到审批域。
+                if (isExplicitApprovalWorkflowQuestion(message.content())
+                        || isBoardQuestion(message.content())) return false;
+            }
+            return false;
+        }
+
+        private boolean isExplicitApprovalWorkflowQuestion(String text) {
+            if (text == null || text.isBlank()) return false;
+            return text.matches(".*(待办|已办|我发起|审批流|流程|办理记录|审批节点|办理人|处理人|谁在审批|超时审批).*" );
+        }
+
+        private String loadActiveBusinessDomain() {
+            if (conversationContextService == null) return null;
+            return withinBudget(() -> conversationContextService.find(
+                            context.tenantId(), context.userId(), command.conversationId(),
+                            ConversationContextService.ACTIVE_BUSINESS_DOMAIN))
+                    .map(com.smart.agent.context.ConversationContext::payloadJson)
+                    .map(value -> {
+                        try { return objectMapper.readTree(value).path("domain").asText(null); }
+                        catch (Exception ignored) { return null; }
+                    }).orElse(null);
+        }
+
         private boolean isProjectQuestion(String question) {
             if (question == null || question.isBlank()) return false;
             return question.matches(".*(项目|项目报备|项目档案).*");
         }
 
-        private boolean isBoardQuestion(String question) {
+        private boolean isRelativeTimeQuestion(String question) {
             if (question == null || question.isBlank()) return false;
-            return question.matches(".*(经营看板|预算看板|应收看板|供应商看板|投标看板|库存看板|项目看板|甘特图|看板数据|看板分析|看板指标).*" );
+            return question.matches(".*(今天|昨日|昨天|明天|本周|上周|下周|本月|上月|下月|今年|去年|明年|最近[0-9一二三四五六七八九十]+[天日周月年]).*");
+        }
+
+        private boolean isBoardQuestion(String question) {
+            return containsBoardKeyword(question);
+        }
+
+        private boolean containsBoardKeyword(String question) {
+            if (question == null || question.isBlank()) return false;
+            return question.contains("经营看板") || question.contains("预算看板")
+                    || question.contains("应收看板") || question.contains("供应商看板")
+                    || question.contains("投标看板") || question.contains("库存看板")
+                    || question.contains("项目看板") || question.contains("甘特图")
+                    || question.contains("看板数据") || question.contains("看板分析")
+                    || question.contains("看板指标");
         }
 
         private String modelQuestion() {
             ChatCommand.PageContext page = command.pageContext();
-            if (page == null) return command.question();
-            StringBuilder safe = new StringBuilder(command.question()).append("\n[trusted-page-context");
+            StringBuilder safe = new StringBuilder(command.question());
+            if (isBoardQuestion(command.question())) {
+                safe.append("\n[trusted-routing: 本轮是看板查询，只能调用 board.query、board.compare 或 board.detail；不得调用 project.query，也不要返回项目菜单权限提示]");
+            } else if (requiresFreshApprovalData) {
+                safe.append("\n[trusted-routing: 本轮是审批查询，只能调用 approval.query 或 approval.getDetail；不得调用 project.* 或 board.*]");
+            } else if (requiresFreshProjectData) {
+                safe.append("\n[trusted-routing: 本轮是项目查询，只能调用 project.query 或 project.getArchiveDetail；不得调用 approval.* 或 board.*。历史中的审批内容不改变本轮路由]");
+            }
+            if (page == null) return safe.toString();
+            safe.append("\n[trusted-page-context");
             appendContext(safe, "pageCode", page.pageCode());
             appendContext(safe, "projectId", page.projectId());
             appendContext(safe, "businessType", page.businessType());
@@ -479,12 +569,24 @@ public class ChatOrchestrator {
             turnDeltas.setLength(0);
             turnTools.clear();
             turnCompleted = null;
-            boolean requireProjectTool = requiresFreshProjectData && toolCalls == 0;
+            boolean requireProjectTool = requiresFreshProjectData
+                    && (!requiresRelativeTimeForProject || timeToolCompleted);
             boolean requireApprovalTool = requiresFreshApprovalData && toolCalls == 0;
             boolean requireBoardTool = isBoardQuestion(command.question()) && toolCalls == 0;
+            boolean requireTimeTool = requiresRelativeTimeForProject && !timeToolCompleted;
+            boolean allowTimeTool = requireTimeTool;
             List<ModelRequest.AllowedToolSpecification> tools = toolRegistry.allowedReadOnlyTools(context).stream()
                     .filter(this::isRelevantTool)
-                    .filter(tool -> !requireProjectTool || tool.key().startsWith("project."))
+                    .filter(tool -> {
+                        boolean currentProject = requiresFreshProjectData;
+                        boolean currentApproval = requiresFreshApprovalData;
+                        if (currentProject && !currentApproval && tool.key().startsWith("approval.")) return false;
+                        if (currentApproval && !currentProject && tool.key().startsWith("project.")) return false;
+                        if (isBoardQuestion(command.question()) && !tool.key().startsWith("board.")) return false;
+                        return true;
+                    })
+                    .filter(tool -> requireTimeTool ? "system.current_time".equals(tool.key())
+                            : !requireProjectTool || tool.key().startsWith("project."))
                     .filter(tool -> !requireApprovalTool || tool.key().startsWith("approval."))
                     .filter(tool -> !requireBoardTool || tool.key().startsWith("board."))
                     .map(this::toolSpecification)
@@ -493,7 +595,8 @@ public class ChatOrchestrator {
                     .map(citation -> new ModelRequest.RetrievedEvidence(citation.citationToken(), citation.excerpt()))
                     .toList();
             ModelRequest request = new ModelRequest(run.id(), "v1", List.copyOf(messages), tools, evidence,
-                    (requireProjectTool || requireApprovalTool || requireBoardTool) ? ModelRequest.ToolUseMode.REQUIRED : ModelRequest.ToolUseMode.AUTO);
+                    (requireProjectTool || requireApprovalTool || requireBoardTool || requireTimeTool)
+                            ? ModelRequest.ToolUseMode.REQUIRED : ModelRequest.ToolUseMode.AUTO);
             preparationStage = "modelStream";
             try {
                 Disposable subscription = modelGatewayForRun.stream(request)
@@ -593,6 +696,38 @@ public class ChatOrchestrator {
                 throw exception;
             } catch (com.fasterxml.jackson.core.JsonProcessingException exception) {
                 throw approvalSelectionFailure("AGENT_APPROVAL_CONTEXT_INVALID");
+            }
+        }
+
+        private boolean resolveProjectOrdinalFollowUp() {
+            if (!requiresFreshProjectData || !"PROJECT".equals(activeBusinessDomain)) return false;
+            Integer ordinal = parseOrdinal(command.question());
+            if (ordinal == null) return false;
+            if (conversationContextService == null) return false;
+            String payload = withinBudget(() -> conversationContextService.find(
+                            context.tenantId(), context.userId(), command.conversationId(),
+                            ConversationContextService.PROJECT_QUERY))
+                    .map(com.smart.agent.context.ConversationContext::payloadJson).orElse(null);
+            if (payload == null) return false;
+            try {
+                JsonNode snapshot = objectMapper.readTree(payload);
+                JsonNode rows = snapshot.path("result").path("rows");
+                if (!rows.isArray() || ordinal < 1 || ordinal > rows.size()) return false;
+                JsonNode selected = rows.get(ordinal - 1);
+                String projectId = selected.path("projectId").asText(null);
+                if (projectId == null || projectId.isBlank()) return false;
+                com.fasterxml.jackson.databind.node.ObjectNode detail = objectMapper.createObjectNode();
+                detail.put("projectId", projectId);
+                ModelEvent.ToolRequested request = new ModelEvent.ToolRequested(
+                        "project-archive-detail-" + UUID.randomUUID(), "project.getArchiveDetail",
+                        objectMapper.writeValueAsString(detail));
+                persistDebug("TOOL_REQUEST", request.toolKey(), request.argumentsJson());
+                emit(ChatEvent.debug(run.id(), traceId, "TOOL_REQUEST", Map.of(
+                        "toolKey", request.toolKey(), "arguments", request.argumentsJson(),
+                        "resolvedOrdinal", ordinal)));
+                return executeTool(request);
+            } catch (Exception exception) {
+                return false;
             }
         }
 
@@ -728,12 +863,29 @@ public class ChatOrchestrator {
                 callModel();
                 return;
             }
-            if (requiresFreshProjectData && toolCalls == 0) {
-                fail("AGENT_PROJECT_DATA_NOT_REFRESHED", AgentRunStatus.FAILED);
+            if (requiresFreshProjectData && projectToolCalls == 0) {
+                // 当前轮只要涉及项目数据，就不能使用历史回答直接结束。
+                // 某些模型会先复述上一轮内容而不发起工具调用，这里追加一次
+                // 强制提醒，让模型重新选择 project.* 工具；达到模型轮次上限后
+                // 由统一超限错误结束，避免向用户展示过期数据。
+                messages.add(new ModelRequest.ConversationMessage("user",
+                        "[trusted-refresh-required: 本轮必须重新调用 project.query 或 project.getArchiveDetail 获取实时数据，"
+                                + "不得复用历史回答或声称已经查询。请立即调用项目工具。]"));
+                callModel();
                 return;
             }
-            if (requiresFreshApprovalData && toolCalls == 0) {
-                fail("AGENT_APPROVAL_DATA_NOT_REFRESHED", AgentRunStatus.FAILED);
+            if (requiresFreshApprovalData && approvalToolCalls == 0) {
+                messages.add(new ModelRequest.ConversationMessage("user",
+                        "[trusted-refresh-required: 本轮必须重新调用 approval.query 或 approval.getDetail 获取实时审批数据，"
+                                + "不得复用历史回答。请立即调用审批工具。]"));
+                callModel();
+                return;
+            }
+            if (requiresFreshBoardData && boardToolCalls == 0) {
+                messages.add(new ModelRequest.ConversationMessage("user",
+                        "[trusted-refresh-required: 本轮必须重新调用 board.query、board.compare 或 board.detail 获取实时看板数据，"
+                                + "不得复用历史回答。请立即调用看板工具。]"));
+                callModel();
                 return;
             }
             completeAnswer();
@@ -784,13 +936,43 @@ public class ChatOrchestrator {
                 }
                 Object result = awaitTool(toolFuture);
                 if (terminated.get() || sink.isCancelled()) return false;
+                if (request.toolKey().startsWith("project.")) projectToolCalls++;
+                if (request.toolKey().startsWith("approval.")) approvalToolCalls++;
+                if (request.toolKey().startsWith("board.")) boardToolCalls++;
                 String serializedResult = objectMapper.writeValueAsString(result);
+                if ("system.current_time".equals(request.toolKey()) && requiresRelativeTimeForProject) {
+                    timeToolCompleted = true;
+                    messages.add(new ModelRequest.ConversationMessage("user",
+                            "[trusted-time-reference: system.current_time 返回结果如下，请据此把相对时间转换为明确日期范围，并立即调用 project.query 查询项目。结果："
+                                    + serializedResult + "]"));
+                }
                 if ("approval.query".equals(request.toolKey()) && conversationContextService != null) {
                     String snapshot = objectMapper.writeValueAsString(Map.of(
                             "arguments", input, "result", result));
                     withinBudget(() -> conversationContextService.upsert(
                             context.tenantId(), context.userId(), command.conversationId(),
                             ConversationContextService.APPROVAL_QUERY, snapshot, run.id()));
+                }
+                if ("project.query".equals(request.toolKey()) && conversationContextService != null) {
+                    String snapshot = objectMapper.writeValueAsString(Map.of(
+                            "arguments", input, "result", result));
+                    withinBudget(() -> conversationContextService.upsert(
+                            context.tenantId(), context.userId(), command.conversationId(),
+                            ConversationContextService.PROJECT_QUERY, snapshot, run.id()));
+                }
+                persistActiveBusinessDomain(request.toolKey());
+                // 工具结果返回后明确要求模型生成最终答复，避免模型只完成工具调用
+                // 却不输出文字，最终被前端误报为“查询能力不可用”。
+                if (request.toolKey().startsWith("approval.")
+                        || request.toolKey().startsWith("project.")
+                        || request.toolKey().startsWith("board.")) {
+                    String renderingRequirement = request.toolKey().startsWith("project.")
+                            ? "项目明细表格必须完整展示工具 columns 中的全部列，尤其不得省略审批状态列。"
+                            : "必须完整展示工具返回的业务字段。";
+                    messages.add(new ModelRequest.ConversationMessage("user",
+                            "[trusted-tool-result: 业务工具已经返回本轮最新数据。请立即依据刚返回的结果用中文回答用户，"
+                                    + renderingRequirement
+                                    + "不得再次声称能力不可用，也不得复用历史结果。若结果为空，请明确说明没有符合条件的数据。]"));
                 }
                 long durationMillis = Duration.ofNanos(System.nanoTime() - toolStarted).toMillis();
                 String debugResult = safeDebugToolResult(request.toolKey(), result, serializedResult, durationMillis);
@@ -856,6 +1038,25 @@ public class ChatOrchestrator {
                 fail("AGENT_TOOL_INVALID_INPUT", AgentRunStatus.FAILED);
                 return false;
             }
+        }
+
+        private void persistActiveBusinessDomain(String toolKey) {
+            if (conversationContextService == null || toolKey == null) return;
+            String domain = toolKey.startsWith("project.") ? "PROJECT"
+                    : toolKey.startsWith("approval.") ? "APPROVAL"
+                    : toolKey.startsWith("board.") ? "BOARD" : null;
+            if (domain == null) return;
+            String payload;
+            try {
+                payload = objectMapper.writeValueAsString(Map.of(
+                        "domain", domain, "toolKey", toolKey));
+            } catch (Exception exception) {
+                throw new IllegalStateException("Unable to serialize business domain context", exception);
+            }
+            withinBudget(() -> conversationContextService.upsert(
+                    context.tenantId(), context.userId(), command.conversationId(),
+                    ConversationContextService.ACTIVE_BUSINESS_DOMAIN, payload, run.id()));
+            activeBusinessDomain = domain;
         }
 
         private boolean recordFailedTool(String toolKey, String outcome, long started) {
