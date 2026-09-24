@@ -21,6 +21,8 @@ import com.smart.agent.run.AgentRun;
 import com.smart.agent.run.AgentRunService;
 import com.smart.agent.run.AgentRunStatus;
 import com.smart.agent.security.AgentUserContext;
+import com.smart.agent.routing.QueryIntentResolver;
+import com.smart.agent.routing.IntentResolution;
 import com.smart.agent.tool.AgentTool;
 import com.smart.agent.tool.ToolContext;
 import com.smart.agent.tool.ToolExecutor;
@@ -69,6 +71,8 @@ public class ChatOrchestrator {
     private final AttachmentService attachmentService;
     private final String attachmentPublicBaseUrl;
     private final ConversationContextService conversationContextService;
+    /** Optional during compatibility construction; Spring production wiring supplies it. */
+    private QueryIntentResolver queryIntentResolver;
 
     /**
      * 兼容构造：直接使用固定网关，不经过模型注册中心。
@@ -115,6 +119,44 @@ public class ChatOrchestrator {
         this(conversationService, runService, null, modelRegistry, toolRegistry, toolExecutor, objectMapper,
                 knowledgeSearchService, runBudget, attachmentService, attachmentPublicBaseUrl,
                 conversationContextService);
+    }
+
+    public ChatOrchestrator(
+            ConversationService conversationService,
+            AgentRunService runService,
+            DynamicModelRegistry modelRegistry,
+            ToolRegistry toolRegistry,
+            ToolExecutor toolExecutor,
+            ObjectMapper objectMapper,
+            KnowledgeSearchService knowledgeSearchService,
+            Duration runBudget,
+            AttachmentService attachmentService,
+            String attachmentPublicBaseUrl,
+            ConversationContextService conversationContextService,
+            QueryIntentResolver queryIntentResolver) {
+        this(conversationService, runService, modelRegistry, toolRegistry, toolExecutor, objectMapper,
+                knowledgeSearchService, runBudget, attachmentService, attachmentPublicBaseUrl,
+                conversationContextService);
+        this.queryIntentResolver = queryIntentResolver;
+    }
+
+    public ChatOrchestrator(
+            ConversationService conversationService,
+            AgentRunService runService,
+            ModelGateway modelGateway,
+            ToolRegistry toolRegistry,
+            ToolExecutor toolExecutor,
+            ObjectMapper objectMapper,
+            KnowledgeSearchService knowledgeSearchService,
+            Duration runBudget,
+            AttachmentService attachmentService,
+            String attachmentPublicBaseUrl,
+            ConversationContextService conversationContextService,
+            QueryIntentResolver queryIntentResolver) {
+        this(conversationService, runService, modelGateway, toolRegistry, toolExecutor, objectMapper,
+                knowledgeSearchService, runBudget, attachmentService, attachmentPublicBaseUrl,
+                conversationContextService);
+        this.queryIntentResolver = queryIntentResolver;
     }
 
     ChatOrchestrator(
@@ -248,6 +290,7 @@ public class ChatOrchestrator {
                 preparationStage = "prepareContext";
                 validateProjectMenuPermission(history);
                 activeBusinessDomain = loadActiveBusinessDomain();
+                recordIntentResolution();
                 boolean projectContextFollowUp = isProjectContextFollowUp(
                         command.question(), history, activeBusinessDomain);
                 requiresFreshProjectData = (!isApprovalQuestion(command.question()) || projectContextFollowUp)
@@ -291,6 +334,34 @@ public class ChatOrchestrator {
                             && agentException.status().value() == 403
                                     ? AgentRunStatus.PERMISSION_DENIED : AgentRunStatus.FAILED);
                 }
+            }
+        }
+
+        /**
+         * 旁路记录通用意图裁决结果。明确查询仍由旧路由执行，避免新规则改变现网行为；
+         * 该信息用于后续澄清持久化和诊断，并且不包含权限以外的用户敏感数据。
+         */
+        private void recordIntentResolution() {
+            if (queryIntentResolver == null) return;
+            Map<String, Object> page = new HashMap<>();
+            ChatCommand.PageContext pageContext = command.pageContext();
+            if (pageContext != null) {
+                page.put("pageCode", pageContext.pageCode());
+                page.put("businessType", pageContext.businessType());
+                page.put("businessId", pageContext.businessId());
+            }
+            IntentResolution resolution = queryIntentResolver.resolve(
+                    command.question(), page, activeBusinessDomain, context);
+            if (run != null) {
+                persistDebug("INTENT_RESOLUTION", "routing", intentResolutionJson(resolution));
+            }
+        }
+
+        private String intentResolutionJson(IntentResolution resolution) {
+            try {
+                return objectMapper.writeValueAsString(resolution);
+            } catch (Exception exception) {
+                return "{\"status\":\"SERIALIZATION_FAILED\"}";
             }
         }
 
@@ -1042,9 +1113,13 @@ public class ChatOrchestrator {
 
         private void persistActiveBusinessDomain(String toolKey) {
             if (conversationContextService == null || toolKey == null) return;
-            String domain = toolKey.startsWith("project.") ? "PROJECT"
-                    : toolKey.startsWith("approval.") ? "APPROVAL"
-                    : toolKey.startsWith("board.") ? "BOARD" : null;
+            String domain = queryIntentResolver == null ? null : queryIntentResolver.domainCodeForTool(toolKey);
+            // Compatibility fallback for tests or embedded callers that do not provide Spring routing beans.
+            if (domain == null) {
+                domain = toolKey.startsWith("project.") ? "PROJECT"
+                        : toolKey.startsWith("approval.") ? "APPROVAL"
+                        : toolKey.startsWith("board.") ? "BOARD" : null;
+            }
             if (domain == null) return;
             String payload;
             try {

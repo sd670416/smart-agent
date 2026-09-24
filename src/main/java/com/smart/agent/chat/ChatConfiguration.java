@@ -8,6 +8,7 @@ import com.smart.agent.model.ModelGateway;
 import com.smart.agent.run.AgentRunService;
 import com.smart.agent.tool.ToolExecutor;
 import com.smart.agent.tool.ToolRegistry;
+import com.smart.agent.routing.QueryIntentResolver;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.beans.factory.ObjectProvider;
@@ -29,18 +30,21 @@ class ChatConfiguration {
             ObjectProvider<KnowledgeSearchService> knowledgeSearchService,
             @Value("${agent.attachment.public-base-url:}") String attachmentPublicBaseUrl,
             ObjectProvider<com.smart.agent.attachment.AttachmentService> attachmentService,
-            com.smart.agent.context.ConversationContextService conversationContextService) {
+            com.smart.agent.context.ConversationContextService conversationContextService,
+            QueryIntentResolver queryIntentResolver) {
         DynamicModelRegistry registry = modelRegistry.getIfAvailable();
         if (registry == null) {
             return new ChatOrchestrator(
                     conversationService, runService, modelGateway, toolRegistry, toolExecutor, objectMapper,
                     knowledgeSearchService.getIfAvailable(), com.smart.agent.chat.ChatOrchestrator.MAX_RUN_DURATION,
-                    attachmentService.getIfAvailable(), attachmentPublicBaseUrl, conversationContextService);
+                    attachmentService.getIfAvailable(), attachmentPublicBaseUrl, conversationContextService,
+                    queryIntentResolver);
         }
         return new ChatOrchestrator(
                 conversationService, runService, registry, toolRegistry, toolExecutor, objectMapper,
                 knowledgeSearchService.getIfAvailable(), com.smart.agent.chat.ChatOrchestrator.MAX_RUN_DURATION,
-                attachmentService.getIfAvailable(), attachmentPublicBaseUrl, conversationContextService);
+                attachmentService.getIfAvailable(), attachmentPublicBaseUrl, conversationContextService,
+                queryIntentResolver);
     }
 
     @Bean

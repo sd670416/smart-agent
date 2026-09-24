@@ -47,4 +47,13 @@ class SystemInstructionCatalogTest {
                 .contains("Markdown 表格", "简体中文")
                 .contains("禁止办理", "退回", "转办", "委托", "拿回", "终止");
     }
+
+    @Test
+    void includesStructuredIntentClarificationRules() {
+        String instruction = new SystemInstructionCatalog().resolve("v1").orElseThrow();
+
+        assertThat(instruction)
+                .contains("domainCode", "domainName", "reason", "score")
+                .contains("不得猜测工具", "确认前不得调用业务工具");
+    }
 }
