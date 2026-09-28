@@ -94,6 +94,7 @@ class ChatControllerIT {
     @Autowired private ChatOrchestrator chatOrchestrator;
     @Autowired private TestBeans.TestProjectBusinessClient testProjectBusinessClient;
     @Autowired private TestBeans.TestApprovalBusinessClient testApprovalBusinessClient;
+    @Autowired private InMemoryPendingClarificationRepository pendingClarificationRepository;
 
     private String conversationId;
 
@@ -104,6 +105,42 @@ class ChatControllerIT {
         testProjectBusinessClient.reset();
         testApprovalBusinessClient.reset();
         conversationId = conversationService.create("tenant-1", "user-1", "项目问答").id();
+    }
+
+    @Test
+    void ambiguousBusinessDomainReturnsClarificationWithoutCallingModelOrBusinessTools() {
+        List<String> events = stream("统计项目审批", Set.of("menu:project"), Set.of());
+
+        assertThat(events).anyMatch(event -> event.contains("\"type\":\"clarification\""));
+        assertThat(events).anyMatch(event -> event.contains("domain:PROJECT") && event.contains("domain:APPROVAL"));
+        assertThat(events.getLast()).contains("\"type\":\"message_end\"");
+        assertThat(scenarioModelGateway.modelCalls()).isZero();
+        assertThat(testProjectBusinessClient.queryCalls()).isZero();
+        assertThat(testApprovalBusinessClient.queryCalls()).isZero();
+    }
+
+    @Test
+    void clarificationSelectionRestoresOriginalQuestionAndExecutesSelectedDomain() {
+        stream("统计项目审批", Set.of("menu:project"), Set.of());
+        com.smart.agent.clarification.PendingClarification pending = pendingClarificationRepository
+                .findActive("tenant-1", "user-1", conversationId).orElseThrow();
+
+        List<String> events = webTestClient.post().uri("/agent/chat/stream")
+                .header("X-Agent-Context", signedContextToken(Set.of("menu:project"), Set.of(), Set.of()))
+                .bodyValue(Map.of(
+                        "conversationId", conversationId,
+                        "content", "审批",
+                        "clarification", Map.of(
+                                "clarificationId", pending.id(),
+                                "optionId", "domain:APPROVAL")))
+                .exchange().expectStatus().isOk().returnResult(String.class)
+                .getResponseBody().collectList().block(Duration.ofSeconds(5));
+
+        assertThat(events).anyMatch(event -> event.contains("approval.query"));
+        assertThat(testApprovalBusinessClient.queryCalls()).isEqualTo(1);
+        assertThat(testProjectBusinessClient.queryCalls()).isZero();
+        assertThat(pending.status()).isEqualTo(
+                com.smart.agent.clarification.PendingClarification.Status.RESOLVED);
     }
 
     @Test
@@ -124,6 +161,19 @@ class ChatControllerIT {
         assertThat(followUpRequest.allowedToolSpecifications())
                 .extracting(ModelRequest.AllowedToolSpecification::key)
                 .allMatch(key -> key.startsWith("approval."));
+    }
+
+    @Test
+    void approvalResultGenerationKeepsOnlyApprovalToolsOnTheSecondModelTurn() {
+        List<String> events = stream("我要看一下我的待办列表", Set.of(), Set.of());
+
+        assertThat(events).anyMatch(event -> event.contains("待办查询完成"));
+        assertThat(scenarioModelGateway.requests()).hasSize(2);
+        ModelRequest resultTurn = scenarioModelGateway.requests().getLast();
+        assertThat(resultTurn.toolUseMode()).isEqualTo(ModelRequest.ToolUseMode.AUTO);
+        assertThat(resultTurn.allowedToolSpecifications())
+                .extracting(ModelRequest.AllowedToolSpecification::key)
+                .isNotEmpty().allMatch(key -> key.startsWith("approval."));
     }
 
     @Test
@@ -227,6 +277,21 @@ class ChatControllerIT {
         assertThat(scenarioModelGateway.requests().getLast().allowedToolSpecifications())
                 .extracting(ModelRequest.AllowedToolSpecification::key)
                 .isNotEmpty().allMatch(key -> key.startsWith("approval."));
+    }
+
+    @Test
+    void genericApprovalDetailFollowUpResolvesTheOnlyListedTask() {
+        stream("查询我的待办", Set.of(), Set.of());
+
+        List<String> events = stream("查看一下详情", Set.of(), Set.of());
+
+        assertThat(events).anyMatch(event -> event.contains("approval.getDetail"));
+        assertThat(testApprovalBusinessClient.detailCalls()).isEqualTo(1);
+        assertThat(testApprovalBusinessClient.lastDetailInput()).isEqualTo(
+                new com.smart.agent.tool.approval.ApprovalDetailInput(
+                        "11111111-1111-1111-1111-111111111111", "task-1", "history-1",
+                        "TODO", "SELF", null));
+        assertThat(testProjectBusinessClient.queryCalls()).isZero();
     }
 
     @Test
@@ -858,6 +923,31 @@ class ChatControllerIT {
         }
 
         @Bean
+        InMemoryPendingClarificationRepository pendingClarificationRepository() {
+            return new InMemoryPendingClarificationRepository();
+        }
+
+        @Bean
+        com.smart.agent.clarification.PendingClarificationService pendingClarificationService(
+                InMemoryPendingClarificationRepository repository, ObjectMapper objectMapper) {
+            return new com.smart.agent.clarification.PendingClarificationService(repository, objectMapper);
+        }
+
+        @Bean
+        com.smart.agent.routing.BusinessDomainRegistry businessDomainRegistry() {
+            return new com.smart.agent.routing.BusinessDomainRegistry(List.of(
+                    new com.smart.agent.routing.ProjectDomainContributor(),
+                    new com.smart.agent.routing.ApprovalDomainContributor(),
+                    new com.smart.agent.routing.BoardDomainContributor()));
+        }
+
+        @Bean
+        com.smart.agent.routing.QueryIntentResolver queryIntentResolver(
+                com.smart.agent.routing.BusinessDomainRegistry registry) {
+            return new com.smart.agent.routing.QueryIntentResolver(registry);
+        }
+
+        @Bean
         InMemoryAgentRunRepository agentRunRepository() {
             return new InMemoryAgentRunRepository();
         }
@@ -887,10 +977,12 @@ class ChatControllerIT {
                 ToolRegistry registry,
                 ToolExecutor executor,
                 ObjectMapper objectMapper, KnowledgeSearchService knowledgeSearchService,
-                com.smart.agent.context.ConversationContextService conversationContextService) {
+                com.smart.agent.context.ConversationContextService conversationContextService,
+                com.smart.agent.routing.QueryIntentResolver queryIntentResolver,
+                com.smart.agent.clarification.PendingClarificationService pendingClarificationService) {
             return new ChatOrchestrator(conversations, runs, modelGateway, registry, executor, objectMapper,
                     knowledgeSearchService, ChatOrchestrator.MAX_RUN_DURATION, null, null,
-                    conversationContextService);
+                    conversationContextService, queryIntentResolver, pendingClarificationService);
         }
 
         @Bean
@@ -1035,6 +1127,17 @@ class ChatControllerIT {
                         .reduce((first, second) -> second)
                         .map(ModelRequest.ConversationMessage::content)
                         .orElse(question);
+                if (currentQuestion.startsWith("统计项目审批")) {
+                    if (request.redactedConversationMessages().getLast()
+                            instanceof ModelRequest.ToolResultMessage) {
+                        return Flux.just(new ModelEvent.Completed("审批查询完成。", 8, 6));
+                    }
+                    return Flux.just(new ModelEvent.ToolRequested(
+                            "clarified-approval-query", "approval.query",
+                            "{\"scope\":\"TODO\",\"visibility\":\"SELF\",\"page\":1,"
+                                    + "\"pageSize\":20,\"recordMode\":\"PROCESS\"}"),
+                            new ModelEvent.Completed("", 6, 3));
+                }
                 if (currentQuestion.equals("查询我的待办") || currentQuestion.equals("查询我的已办")
                         || currentQuestion.equals("下一页")
                         || currentQuestion.equals("有投标的待办嘛") || currentQuestion.equals("再查一下")) {
@@ -1235,6 +1338,36 @@ class ChatControllerIT {
 
         private static String key(String tenantId, String userId, String conversationId, String contextType) {
             return String.join("/", tenantId, userId, conversationId, contextType);
+        }
+    }
+
+    static final class InMemoryPendingClarificationRepository
+            implements com.smart.agent.clarification.PendingClarificationRepository {
+        private final Map<String, com.smart.agent.clarification.PendingClarification> values =
+                new ConcurrentHashMap<>();
+
+        @Override
+        public com.smart.agent.clarification.PendingClarification save(
+                com.smart.agent.clarification.PendingClarification value) {
+            values.put(value.id(), value);
+            return value;
+        }
+
+        @Override
+        public Optional<com.smart.agent.clarification.PendingClarification> findByIdAndScope(
+                String id, String tenantId, String userId, String conversationId) {
+            return Optional.ofNullable(values.get(id))
+                    .filter(value -> value.belongsTo(tenantId, userId, conversationId));
+        }
+
+        @Override
+        public Optional<com.smart.agent.clarification.PendingClarification> findActive(
+                String tenantId, String userId, String conversationId) {
+            return values.values().stream()
+                    .filter(value -> value.belongsTo(tenantId, userId, conversationId))
+                    .filter(value -> value.status()
+                            == com.smart.agent.clarification.PendingClarification.Status.PENDING)
+                    .findFirst();
         }
     }
 

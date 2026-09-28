@@ -137,6 +137,31 @@ public class AgentRunService {
     }
 
     @Transactional
+    public Completion completeWithClarification(String tenantId, String userId, String conversationId, String runId,
+            AgentRunStatus expected, String content, String safeClarificationSummary) {
+        Conversation conversation = conversationRepository.findByIdAndTenantIdAndUserId(
+                        tenantId, userId, conversationId)
+                .orElseThrow(() -> new IllegalArgumentException("Conversation not found: " + conversationId));
+        AgentRun run = agentRunRepository.findByIdAndTenantIdAndUserId(tenantId, userId, runId)
+                .orElseThrow(() -> new IllegalArgumentException("Agent run not found: " + runId));
+        if (run.status() != expected) throw new IllegalStateException("Unexpected run status");
+        Message message = conversation.append(Message.Role.ASSISTANT, content);
+        run.transition(AgentRunStatus.COMPLETED);
+        conversationRepository.save(conversation);
+        agentRunRepository.save(run);
+        if (stepRepository != null) {
+            List<AgentRunStep> existing = stepRepository.findByTenantIdAndUserIdAndRunIdOrderBySequence(
+                    tenantId, userId, runId);
+            long sequence = existing.size() + 1L;
+            stepRepository.save(AgentRunStep.completed(tenantId, userId, runId, sequence,
+                    "CLARIFICATION", null, safeClarificationSummary));
+            stepRepository.save(AgentRunStep.completed(tenantId, userId, runId, sequence + 1L,
+                    "TERMINAL", null, "{\"status\":\"COMPLETED\"}"));
+        }
+        return new Completion(run, message);
+    }
+
+    @Transactional
     public AgentRun finishTerminal(String tenantId, String userId, String runId, AgentRunStatus expected,
             AgentRunStatus terminal, String safeErrorCode) {
         AgentRun run = agentRunRepository.findByIdAndTenantIdAndUserId(tenantId, userId, runId)

@@ -39,6 +39,16 @@ public class QueryIntentResolver {
         return registry.findByTool(toolKey).map(BusinessDomainDescriptor::code).orElse(null);
     }
 
+    public IntentResolution resolveSelectedDomain(
+            String domainCode, String originalQuestion, AgentUserContext userContext) {
+        return registry.availableDomains(userContext).stream()
+                .filter(domain -> domain.code().equals(domainCode))
+                .findFirst()
+                .map(domain -> IntentResolution.resolved(new QueryIntentCandidate(
+                        domain, "用户确认业务域", Integer.MAX_VALUE)))
+                .orElseThrow(() -> new IllegalArgumentException("Selected business domain is unavailable"));
+    }
+
     private int score(BusinessDomainDescriptor domain, String question,
             Map<String, ?> pageContext, String activeDomain) {
         int score = 0;

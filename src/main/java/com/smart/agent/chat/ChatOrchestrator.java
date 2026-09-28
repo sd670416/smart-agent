@@ -23,6 +23,9 @@ import com.smart.agent.run.AgentRunStatus;
 import com.smart.agent.security.AgentUserContext;
 import com.smart.agent.routing.QueryIntentResolver;
 import com.smart.agent.routing.IntentResolution;
+import com.smart.agent.clarification.ClarificationPrompt;
+import com.smart.agent.clarification.PendingClarification;
+import com.smart.agent.clarification.PendingClarificationService;
 import com.smart.agent.tool.AgentTool;
 import com.smart.agent.tool.ToolContext;
 import com.smart.agent.tool.ToolExecutor;
@@ -73,6 +76,7 @@ public class ChatOrchestrator {
     private final ConversationContextService conversationContextService;
     /** Optional during compatibility construction; Spring production wiring supplies it. */
     private QueryIntentResolver queryIntentResolver;
+    private PendingClarificationService pendingClarificationService;
 
     /**
      * 兼容构造：直接使用固定网关，不经过模型注册中心。
@@ -133,11 +137,13 @@ public class ChatOrchestrator {
             AttachmentService attachmentService,
             String attachmentPublicBaseUrl,
             ConversationContextService conversationContextService,
-            QueryIntentResolver queryIntentResolver) {
+            QueryIntentResolver queryIntentResolver,
+            PendingClarificationService pendingClarificationService) {
         this(conversationService, runService, modelRegistry, toolRegistry, toolExecutor, objectMapper,
                 knowledgeSearchService, runBudget, attachmentService, attachmentPublicBaseUrl,
                 conversationContextService);
         this.queryIntentResolver = queryIntentResolver;
+        this.pendingClarificationService = pendingClarificationService;
     }
 
     public ChatOrchestrator(
@@ -152,11 +158,13 @@ public class ChatOrchestrator {
             AttachmentService attachmentService,
             String attachmentPublicBaseUrl,
             ConversationContextService conversationContextService,
-            QueryIntentResolver queryIntentResolver) {
+            QueryIntentResolver queryIntentResolver,
+            PendingClarificationService pendingClarificationService) {
         this(conversationService, runService, modelGateway, toolRegistry, toolExecutor, objectMapper,
                 knowledgeSearchService, runBudget, attachmentService, attachmentPublicBaseUrl,
                 conversationContextService);
         this.queryIntentResolver = queryIntentResolver;
+        this.pendingClarificationService = pendingClarificationService;
     }
 
     ChatOrchestrator(
@@ -247,6 +255,7 @@ public class ChatOrchestrator {
         private boolean requiresRelativeTimeForProject;
         private boolean timeToolCompleted;
         private String activeBusinessDomain;
+        private String effectiveQuestion;
         private List<KnowledgeCitation> citations = List.of();
         private final StringBuilder turnDeltas = new StringBuilder();
         private final List<ModelEvent.ToolRequested> turnTools = new ArrayList<>();
@@ -263,6 +272,7 @@ public class ChatOrchestrator {
             this.context = context;
             this.traceId = traceId;
             this.sink = sink;
+            this.effectiveQuestion = command.question();
         }
 
         void start() {
@@ -288,21 +298,33 @@ public class ChatOrchestrator {
                 emit(ChatEvent.messageStart(run.id(), traceId, userMessage.id()));
                 messages.addAll(history);
                 preparationStage = "prepareContext";
+                IntentResolution confirmedResolution = resolveClarificationSelection();
+                activeBusinessDomain = confirmedResolution == null
+                        ? loadActiveBusinessDomain()
+                        : confirmedResolution.candidate().orElseThrow().domain().code();
                 validateProjectMenuPermission(history);
-                activeBusinessDomain = loadActiveBusinessDomain();
-                recordIntentResolution();
+                IntentResolution intentResolution = confirmedResolution == null
+                        ? recordIntentResolution()
+                        : confirmedResolution;
+                boolean domainConfirmed = confirmedResolution != null;
                 boolean projectContextFollowUp = isProjectContextFollowUp(
-                        command.question(), history, activeBusinessDomain);
-                requiresFreshProjectData = (!isApprovalQuestion(command.question()) || projectContextFollowUp)
-                        && !isBoardQuestion(command.question())
-                        && (isProjectQuestion(command.question())
-                        || isProjectFollowUp(command.question(), history)
-                        || projectContextFollowUp);
+                        effectiveQuestion, history, activeBusinessDomain);
+                requiresFreshProjectData = domainConfirmed
+                        ? "PROJECT".equals(activeBusinessDomain)
+                        : ((!isApprovalQuestion(effectiveQuestion) || projectContextFollowUp)
+                        && !isBoardQuestion(effectiveQuestion)
+                        && (isProjectQuestion(effectiveQuestion)
+                        || isProjectFollowUp(effectiveQuestion, history)
+                        || projectContextFollowUp));
                 requiresRelativeTimeForProject = requiresFreshProjectData
-                        && isRelativeTimeQuestion(command.question());
-                requiresFreshApprovalData = !projectContextFollowUp && (isApprovalQuestion(command.question())
-                        || isApprovalFollowUp(command.question(), history));
-                requiresFreshBoardData = isBoardQuestion(command.question());
+                        && isRelativeTimeQuestion(effectiveQuestion);
+                requiresFreshApprovalData = domainConfirmed
+                        ? "APPROVAL".equals(activeBusinessDomain)
+                        : !projectContextFollowUp && (isApprovalQuestion(effectiveQuestion)
+                        || isApprovalFollowUp(effectiveQuestion, history));
+                requiresFreshBoardData = domainConfirmed
+                        ? "BOARD".equals(activeBusinessDomain)
+                        : isBoardQuestion(effectiveQuestion);
                 // 先完成业务域判定，再生成带可信路由提示的本轮消息。
                 // 否则 modelQuestion 无法使用本轮上下文判定结果。
                 messages.add(new ModelRequest.ConversationMessage("user", modelQuestion(), attachmentParts()));
@@ -312,6 +334,7 @@ public class ChatOrchestrator {
                 emit(ChatEvent.status(run.id(), traceId, status));
                 moveTo(AgentRunStatus.PLANNING);
                 emit(ChatEvent.status(run.id(), traceId, status));
+                if (completeClarification(intentResolution)) return;
                 retrieveKnowledgeIfRequired();
                 preparationStage = "callModel";
                 if (resolveProjectOrdinalFollowUp()) {
@@ -341,8 +364,8 @@ public class ChatOrchestrator {
          * 旁路记录通用意图裁决结果。明确查询仍由旧路由执行，避免新规则改变现网行为；
          * 该信息用于后续澄清持久化和诊断，并且不包含权限以外的用户敏感数据。
          */
-        private void recordIntentResolution() {
-            if (queryIntentResolver == null) return;
+        private IntentResolution recordIntentResolution() {
+            if (queryIntentResolver == null) return null;
             Map<String, Object> page = new HashMap<>();
             ChatCommand.PageContext pageContext = command.pageContext();
             if (pageContext != null) {
@@ -351,9 +374,105 @@ public class ChatOrchestrator {
                 page.put("businessId", pageContext.businessId());
             }
             IntentResolution resolution = queryIntentResolver.resolve(
-                    command.question(), page, activeBusinessDomain, context);
+                    effectiveQuestion, page, activeBusinessDomain, context);
             if (run != null) {
                 persistDebug("INTENT_RESOLUTION", "routing", intentResolutionJson(resolution));
+            }
+            return resolution;
+        }
+
+        private IntentResolution resolveClarificationSelection() {
+            ChatCommand.ClarificationSelection selection = command.clarification();
+            if (selection == null) return null;
+            if (pendingClarificationService == null || queryIntentResolver == null) {
+                throw clarificationFailure();
+            }
+            try {
+                PendingClarification pending = withinBudget(() -> pendingClarificationService.resolve(
+                        context.tenantId(), context.userId(), command.conversationId(),
+                        selection.clarificationId(), selection.optionId()));
+                JsonNode intent = objectMapper.readTree(pending.intentJson());
+                JsonNode options = objectMapper.readTree(pending.optionsJson());
+                String domainCode = null;
+                for (JsonNode option : options) {
+                    if (selection.optionId().equals(option.path("id").asText())) {
+                        domainCode = option.path("domainCode").asText(null);
+                        break;
+                    }
+                }
+                String originalQuestion = intent.path("originalQuestion").asText(null);
+                if (domainCode == null || originalQuestion == null || originalQuestion.isBlank()) {
+                    throw clarificationFailure();
+                }
+                effectiveQuestion = originalQuestion;
+                IntentResolution resolution = queryIntentResolver.resolveSelectedDomain(
+                        domainCode, originalQuestion, context);
+                persistDebug("CLARIFICATION_RESOLVED", "routing", objectMapper.writeValueAsString(Map.of(
+                        "clarificationId", pending.id(), "optionId", selection.optionId(),
+                        "domainCode", domainCode)));
+                return resolution;
+            } catch (com.smart.agent.clarification.PendingClarificationException exception) {
+                throw clarificationFailure();
+            } catch (AgentException exception) {
+                throw exception;
+            } catch (Exception exception) {
+                throw clarificationFailure();
+            }
+        }
+
+        private AgentException clarificationFailure() {
+            return new AgentException("AGENT_CLARIFICATION_INVALID",
+                    org.springframework.http.HttpStatus.BAD_REQUEST, "Clarification selection is invalid");
+        }
+
+        private boolean completeClarification(IntentResolution resolution) {
+            if (resolution == null || resolution.status() != IntentResolution.Status.NEEDS_CLARIFICATION
+                    || pendingClarificationService == null) return false;
+            ClarificationPrompt prompt = ClarificationPrompt.from(resolution);
+            try {
+                Map<String, Object> storedIntent = new java.util.LinkedHashMap<>();
+                storedIntent.put("originalQuestion", effectiveQuestion);
+                storedIntent.put("activeBusinessDomain", activeBusinessDomain);
+                storedIntent.put("ambiguityType", prompt.ambiguityType());
+                storedIntent.put("options", prompt.options());
+                String intentJson = objectMapper.writeValueAsString(storedIntent);
+                String optionsJson = objectMapper.writeValueAsString(prompt.options());
+                PendingClarification clarification = withinBudget(() -> pendingClarificationService.create(
+                        context.tenantId(), context.userId(), command.conversationId(), activeBusinessDomain,
+                        intentJson, optionsJson, Duration.ofMinutes(10)));
+                moveTo(AgentRunStatus.GENERATING);
+                emit(ChatEvent.status(run.id(), traceId, status));
+                String answer = prompt.displayText();
+                emit(ChatEvent.delta(run.id(), traceId, answer));
+                Map<String, Object> data = new java.util.LinkedHashMap<>();
+                data.put("clarificationId", clarification.id());
+                data.put("question", prompt.question());
+                data.put("ambiguityType", prompt.ambiguityType());
+                if (clarification.sourceDomain() != null) {
+                    data.put("sourceDomain", clarification.sourceDomain());
+                }
+                data.put("options", prompt.options());
+                data.put("expiresAt", clarification.expiresAt().toString());
+                emit(ChatEvent.clarification(run.id(), traceId, data));
+                String clarificationSummary = objectMapper.writeValueAsString(data);
+                synchronized (terminalLock) {
+                    if (terminated.get() || sink.isCancelled()) return true;
+                    AgentRunService.Completion completion = withinBudget(() -> runService.completeWithClarification(
+                            context.tenantId(), context.userId(), command.conversationId(), run.id(), status,
+                            answer, clarificationSummary));
+                    run = completion.run();
+                    status = AgentRunStatus.COMPLETED;
+                    terminated.set(true);
+                    sink.next(ChatEvent.messageEnd(run.id(), traceId, completion.message().id()));
+                    sink.complete();
+                }
+                return true;
+            } catch (RuntimeException exception) {
+                throw exception;
+            } catch (Exception exception) {
+                throw new IllegalStateException("Unable to persist clarification", exception);
+            } finally {
+                if (terminated.get()) releaseModelHandle();
             }
         }
 
@@ -458,10 +577,11 @@ public class ChatOrchestrator {
 
         private void validateProjectMenuPermission(List<ModelRequest.ConversationEntry> history) {
             // 看板查询不依赖项目报备/项目档案菜单，必须在项目权限校验前直接放行。
-            if (containsBoardKeyword(command.question())) return;
+            if (containsBoardKeyword(effectiveQuestion)) return;
             if (context.permissions().contains("menu:project")) return;
-            if (!isApprovalQuestion(command.question())
-                    && (isProjectQuestion(command.question()) || isProjectFollowUp(command.question(), history))) {
+            if ("PROJECT".equals(activeBusinessDomain)
+                    || (!isApprovalQuestion(effectiveQuestion)
+                    && (isProjectQuestion(effectiveQuestion) || isProjectFollowUp(effectiveQuestion, history)))) {
                 throw new AgentException("AGENT_PROJECT_MENU_FORBIDDEN",
                         org.springframework.http.HttpStatus.FORBIDDEN, "Project menu permission is required");
             }
@@ -554,8 +674,8 @@ public class ChatOrchestrator {
 
         private String modelQuestion() {
             ChatCommand.PageContext page = command.pageContext();
-            StringBuilder safe = new StringBuilder(command.question());
-            if (isBoardQuestion(command.question())) {
+            StringBuilder safe = new StringBuilder(effectiveQuestion);
+            if (isBoardQuestion(effectiveQuestion) || requiresFreshBoardData) {
                 safe.append("\n[trusted-routing: 本轮是看板查询，只能调用 board.query、board.compare 或 board.detail；不得调用 project.query，也不要返回项目菜单权限提示]");
             } else if (requiresFreshApprovalData) {
                 safe.append("\n[trusted-routing: 本轮是审批查询，只能调用 approval.query 或 approval.getDetail；不得调用 project.* 或 board.*]");
@@ -594,12 +714,12 @@ public class ChatOrchestrator {
         private void retrieveKnowledgeIfRequired() {
             if (knowledgeSearchService == null || !context.permissions().contains("knowledge:read")
                     || context.knowledgeSpaceIds().isEmpty() || command.pageContext() == null
-                    || command.pageContext().projectId() == null || !requiresKnowledge(command.question())) {
+                    || command.pageContext().projectId() == null || !requiresKnowledge(effectiveQuestion)) {
                 return;
             }
             moveTo(AgentRunStatus.RETRIEVING);
             emit(ChatEvent.status(run.id(), traceId, status));
-            citations = withinBudget(() -> knowledgeSearchService.search(new KnowledgeSearchQuery(command.question(),
+            citations = withinBudget(() -> knowledgeSearchService.search(new KnowledgeSearchQuery(effectiveQuestion,
                     context.knowledgeSpaceIds(), command.pageContext().projectId(), MAX_CITATIONS), context))
                     .stream().limit(MAX_CITATIONS).toList();
             if (terminated.get() || sink.isCancelled()) return;
@@ -643,17 +763,18 @@ public class ChatOrchestrator {
             boolean requireProjectTool = requiresFreshProjectData
                     && (!requiresRelativeTimeForProject || timeToolCompleted);
             boolean requireApprovalTool = requiresFreshApprovalData && toolCalls == 0;
-            boolean requireBoardTool = isBoardQuestion(command.question()) && toolCalls == 0;
+            boolean requireBoardTool = requiresFreshBoardData && toolCalls == 0;
             boolean requireTimeTool = requiresRelativeTimeForProject && !timeToolCompleted;
-            boolean allowTimeTool = requireTimeTool;
             List<ModelRequest.AllowedToolSpecification> tools = toolRegistry.allowedReadOnlyTools(context).stream()
                     .filter(this::isRelevantTool)
                     .filter(tool -> {
-                        boolean currentProject = requiresFreshProjectData;
-                        boolean currentApproval = requiresFreshApprovalData;
-                        if (currentProject && !currentApproval && tool.key().startsWith("approval.")) return false;
-                        if (currentApproval && !currentProject && tool.key().startsWith("project.")) return false;
-                        if (isBoardQuestion(command.question()) && !tool.key().startsWith("board.")) return false;
+                        if (requiresFreshApprovalData) return tool.key().startsWith("approval.");
+                        if (requiresFreshBoardData) return tool.key().startsWith("board.");
+                        if (requiresFreshProjectData) {
+                            return requireTimeTool
+                                    ? "system.current_time".equals(tool.key())
+                                    : tool.key().startsWith("project.");
+                        }
                         return true;
                     })
                     .filter(tool -> requireTimeTool ? "system.current_time".equals(tool.key())
@@ -668,6 +789,15 @@ public class ChatOrchestrator {
             ModelRequest request = new ModelRequest(run.id(), "v1", List.copyOf(messages), tools, evidence,
                     (requireProjectTool || requireApprovalTool || requireBoardTool || requireTimeTool)
                             ? ModelRequest.ToolUseMode.REQUIRED : ModelRequest.ToolUseMode.AUTO);
+            Map<String, Object> modelRequestDebug = new java.util.LinkedHashMap<>();
+            modelRequestDebug.put("turn", modelTurns);
+            modelRequestDebug.put("stage", "MODEL_REQUEST");
+            modelRequestDebug.put("toolUseMode", request.toolUseMode().name());
+            modelRequestDebug.put("allowedTools", tools.stream().map(ModelRequest.AllowedToolSpecification::key).toList());
+            modelRequestDebug.put("messageCount", messages.size());
+            modelRequestDebug.put("evidenceCount", evidence.size());
+            persistDebug("MODEL_REQUEST", null, modelRequestDebug);
+            emit(ChatEvent.debug(run.id(), traceId, "MODEL_REQUEST", modelRequestDebug));
             preparationStage = "modelStream";
             try {
                 Disposable subscription = modelGatewayForRun.stream(request)
@@ -676,6 +806,10 @@ public class ChatOrchestrator {
                         .subscribe(this::handleModelEventSafely, this::handleModelError, this::finishModelTurnSafely);
                 modelSubscription.update(subscription);
             } catch (RuntimeException exception) {
+                Map<String, Object> modelErrorDebug = Map.of(
+                        "turn", modelTurns, "stage", "MODEL_ERROR", "code", "AGENT_MODEL_FAILED");
+                persistDebug("MODEL_ERROR", null, modelErrorDebug);
+                emit(ChatEvent.debug(run.id(), traceId, "MODEL_ERROR", modelErrorDebug));
                 fail("AGENT_MODEL_FAILED", AgentRunStatus.FAILED);
             }
         }
@@ -683,7 +817,7 @@ public class ChatOrchestrator {
         private boolean isRelevantTool(AgentTool<?, ?> tool) {
             if (tool.key().startsWith("approval.")) return requiresFreshApprovalData;
             if (!tool.key().startsWith("project.")) return true;
-            StringBuilder contextText = new StringBuilder(command.question());
+            StringBuilder contextText = new StringBuilder(effectiveQuestion);
             messages.stream().filter(ModelRequest.ConversationMessage.class::isInstance)
                     .map(ModelRequest.ConversationMessage.class::cast)
                     .forEach(message -> contextText.append('\n').append(message.content()));
@@ -712,7 +846,8 @@ public class ChatOrchestrator {
             String value = question == null ? "" : question.trim();
             if (isProjectQuestion(value) && !isApprovalQuestion(value)) return false;
             if (!value.matches(".*(继续|再查|下一页|上一页|更多|查看第.{0,6}条|第.{0,6}条|"
-                    + "查看详情|详细信息|刚才那条|刚才那个流程|这个流程|重新查询).*")) {
+                    + "查看详情|详细信息|刚才那条|刚才那个流程|这个流程|重新查询).*")
+                    && !isGenericApprovalDetailFollowUp(value)) {
                 return false;
             }
             for (int index = history.size() - 1; index >= 0; index--) {
@@ -724,10 +859,18 @@ public class ChatOrchestrator {
             return false;
         }
 
+        private boolean isGenericApprovalDetailFollowUp(String question) {
+            return question != null && question.trim().matches(
+                    "^(?:请)?(?:查看|看|打开)?(?:一下|下)?(?:这个|这条|该条)?"
+                            + "(?:待办|已办|流程)?(?:的)?(?:详情|详细信息)[吗吧呢。？?]*$");
+        }
+
         private boolean resolveApprovalOrdinalFollowUp() {
             if (!requiresFreshApprovalData) return false;
-            Integer ordinal = parseOrdinal(command.question());
-            if (ordinal == null) return false;
+            Integer ordinal = parseOrdinal(effectiveQuestion);
+            boolean genericDetail = ordinal == null && "APPROVAL".equals(activeBusinessDomain)
+                    && isGenericApprovalDetailFollowUp(effectiveQuestion);
+            if (ordinal == null && !genericDetail) return false;
             if (conversationContextService == null) {
                 throw approvalSelectionFailure("AGENT_APPROVAL_CONTEXT_MISSING");
             }
@@ -739,6 +882,15 @@ public class ChatOrchestrator {
             try {
                 JsonNode snapshot = objectMapper.readTree(payload);
                 JsonNode items = snapshot.path("result").path("items");
+                if (genericDetail) {
+                    if (!items.isArray() || items.isEmpty()) {
+                        throw approvalSelectionFailure("AGENT_APPROVAL_CONTEXT_MISSING");
+                    }
+                    if (items.size() != 1) {
+                        throw approvalSelectionFailure("AGENT_APPROVAL_DETAIL_AMBIGUOUS");
+                    }
+                    ordinal = 1;
+                }
                 if (!items.isArray() || ordinal > items.size()) {
                     throw approvalSelectionFailure("AGENT_APPROVAL_ORDINAL_OUT_OF_RANGE");
                 }
@@ -758,10 +910,12 @@ public class ChatOrchestrator {
                 ModelEvent.ToolRequested request = new ModelEvent.ToolRequested(
                         "approval-detail-" + UUID.randomUUID(), "approval.getDetail",
                         objectMapper.writeValueAsString(detail));
-                persistDebug("TOOL_REQUEST", request.toolKey(), request.argumentsJson());
-                emit(ChatEvent.debug(run.id(), traceId, "TOOL_REQUEST", Map.of(
+                Map<String, Object> toolRequestDebug = Map.of(
+                        "turn", Math.max(1, modelTurns), "stage", "TOOL_REQUEST", "toolCallIndex", 1,
                         "toolKey", request.toolKey(), "arguments", request.argumentsJson(),
-                        "resolvedOrdinal", ordinal)));
+                        "resolvedOrdinal", ordinal);
+                persistDebug("TOOL_REQUEST", request.toolKey(), toolRequestDebug);
+                emit(ChatEvent.debug(run.id(), traceId, "TOOL_REQUEST", toolRequestDebug));
                 return executeTool(request);
             } catch (AgentException exception) {
                 throw exception;
@@ -772,7 +926,7 @@ public class ChatOrchestrator {
 
         private boolean resolveProjectOrdinalFollowUp() {
             if (!requiresFreshProjectData || !"PROJECT".equals(activeBusinessDomain)) return false;
-            Integer ordinal = parseOrdinal(command.question());
+            Integer ordinal = parseOrdinal(effectiveQuestion);
             if (ordinal == null) return false;
             if (conversationContextService == null) return false;
             String payload = withinBudget(() -> conversationContextService.find(
@@ -792,10 +946,12 @@ public class ChatOrchestrator {
                 ModelEvent.ToolRequested request = new ModelEvent.ToolRequested(
                         "project-archive-detail-" + UUID.randomUUID(), "project.getArchiveDetail",
                         objectMapper.writeValueAsString(detail));
-                persistDebug("TOOL_REQUEST", request.toolKey(), request.argumentsJson());
-                emit(ChatEvent.debug(run.id(), traceId, "TOOL_REQUEST", Map.of(
+                Map<String, Object> toolRequestDebug = Map.of(
+                        "turn", Math.max(1, modelTurns), "stage", "TOOL_REQUEST", "toolCallIndex", 1,
                         "toolKey", request.toolKey(), "arguments", request.argumentsJson(),
-                        "resolvedOrdinal", ordinal)));
+                        "resolvedOrdinal", ordinal);
+                persistDebug("TOOL_REQUEST", request.toolKey(), toolRequestDebug);
+                emit(ChatEvent.debug(run.id(), traceId, "TOOL_REQUEST", toolRequestDebug));
                 return executeTool(request);
             } catch (Exception exception) {
                 return false;
@@ -881,17 +1037,26 @@ public class ChatOrchestrator {
             } else if (event instanceof ModelEvent.ToolRequested requested) {
                 turnTools.add(requested);
                 String debugArguments = safeDebugToolRequest(requested.toolKey(), requested.argumentsJson());
-                persistDebug("TOOL_REQUEST", requested.toolKey(), debugArguments);
-                emit(ChatEvent.debug(run.id(), traceId, "TOOL_REQUEST", Map.of(
-                        "toolKey", requested.toolKey(), "arguments", debugArguments)));
+                Map<String, Object> toolRequestDebug = Map.of(
+                        "turn", modelTurns, "stage", "TOOL_REQUEST",
+                        "toolCallIndex", turnTools.size(),
+                        "toolKey", requested.toolKey(), "arguments", debugArguments);
+                persistDebug("TOOL_REQUEST", requested.toolKey(), toolRequestDebug);
+                emit(ChatEvent.debug(run.id(), traceId, "TOOL_REQUEST", toolRequestDebug));
             } else if (event instanceof ModelEvent.Completed completed) {
                 turnCompleted = completed;
-                persistDebug("MODEL_RESPONSE", null, completed.text());
-                emit(ChatEvent.debug(run.id(), traceId, "MODEL_RESPONSE", Map.of(
+                Map<String, Object> modelResponseDebug = Map.of(
+                        "turn", modelTurns, "stage", "MODEL_RESPONSE",
                         "text", completed.text() == null ? "" : completed.text(),
-                        "inputTokens", completed.inputTokens(), "outputTokens", completed.outputTokens())));
+                        "inputTokens", completed.inputTokens(), "outputTokens", completed.outputTokens());
+                persistDebug("MODEL_RESPONSE", null, modelResponseDebug);
+                emit(ChatEvent.debug(run.id(), traceId, "MODEL_RESPONSE", modelResponseDebug));
             } else if (event instanceof ModelEvent.Failed failed) {
                 String safeModelCode = modelFailureCode(failed.code());
+                Map<String, Object> modelErrorDebug = Map.of(
+                        "turn", modelTurns, "stage", "MODEL_ERROR", "code", safeModelCode);
+                persistDebug("MODEL_ERROR", null, modelErrorDebug);
+                emit(ChatEvent.debug(run.id(), traceId, "MODEL_ERROR", modelErrorDebug));
                 runService.recordStep(context.tenantId(), context.userId(), run.id(), "MODEL",
                         "{\"turn\":" + modelTurns + "}", "{\"outcome\":\"FAILED\",\"code\":\""
                                 + safeModelCode + "\"}");
@@ -901,6 +1066,11 @@ public class ChatOrchestrator {
         }
 
         private void handleModelError(Throwable error) {
+            String code = isTimeout(error) ? "AGENT_RUN_TIMEOUT" : "AGENT_MODEL_FAILED";
+            Map<String, Object> modelErrorDebug = Map.of(
+                    "turn", modelTurns, "stage", "MODEL_ERROR", "code", code);
+            persistDebug("MODEL_ERROR", null, modelErrorDebug);
+            emit(ChatEvent.debug(run.id(), traceId, "MODEL_ERROR", modelErrorDebug));
             if (isTimeout(error)) {
                 fail("AGENT_RUN_TIMEOUT", AgentRunStatus.TIMEOUT);
             } else {
@@ -979,9 +1149,11 @@ public class ChatOrchestrator {
                     emit(ChatEvent.status(run.id(), traceId, status));
                     messages.add(new ModelRequest.ToolResultMessage(
                             request.callId(), request.toolKey(), normalizedArguments, cached.serializedResult()));
-                    persistDebug("TOOL_RESULT", request.toolKey(), cached.debugResult());
-                    emit(ChatEvent.debug(run.id(), traceId, "TOOL_RESULT", Map.of(
-                            "toolKey", request.toolKey(), "result", cached.debugResult(), "cached", true)));
+                    Map<String, Object> cachedToolDebug = Map.of(
+                            "turn", Math.max(1, modelTurns), "stage", "TOOL_RESULT",
+                            "toolKey", request.toolKey(), "result", cached.debugResult(), "cached", true);
+                    persistDebug("TOOL_RESULT", request.toolKey(), cachedToolDebug);
+                    emit(ChatEvent.debug(run.id(), traceId, "TOOL_RESULT", cachedToolDebug));
                     emit(ChatEvent.toolResult(run.id(), traceId, request.toolKey()));
                     return true;
                 }
@@ -1047,9 +1219,11 @@ public class ChatOrchestrator {
                 }
                 long durationMillis = Duration.ofNanos(System.nanoTime() - toolStarted).toMillis();
                 String debugResult = safeDebugToolResult(request.toolKey(), result, serializedResult, durationMillis);
-                persistDebug("TOOL_RESULT", request.toolKey(), debugResult);
-                emit(ChatEvent.debug(run.id(), traceId, "TOOL_RESULT", Map.of(
-                        "toolKey", request.toolKey(), "result", debugResult)));
+                Map<String, Object> toolResultDebug = Map.of(
+                        "turn", Math.max(1, modelTurns), "stage", "TOOL_RESULT",
+                        "toolKey", request.toolKey(), "result", debugResult);
+                persistDebug("TOOL_RESULT", request.toolKey(), toolResultDebug);
+                emit(ChatEvent.debug(run.id(), traceId, "TOOL_RESULT", toolResultDebug));
                 String risk = toolRegistry.require(request.toolKey()).risk().name();
                 int resultSize = serializedResult.getBytes(java.nio.charset.StandardCharsets.UTF_8).length;
                 synchronized (terminalLock) {
@@ -1077,9 +1251,12 @@ public class ChatOrchestrator {
                 return true;
             } catch (AgentException exception) {
                 if (terminated.get()) return false;
-                persistDebug("TOOL_ERROR", request.toolKey(), exception.code() + ": " + exception.getMessage());
-                emit(ChatEvent.debug(run.id(), traceId, "TOOL_ERROR", Map.of(
-                        "toolKey", request.toolKey(), "error", exception.code(), "message", exception.getMessage())));
+                Map<String, Object> toolErrorDebug = Map.of(
+                        "turn", Math.max(1, modelTurns), "stage", "TOOL_ERROR",
+                        "toolKey", request.toolKey(), "error", exception.code(),
+                        "message", exception.getMessage() == null ? "" : exception.getMessage());
+                persistDebug("TOOL_ERROR", request.toolKey(), toolErrorDebug);
+                emit(ChatEvent.debug(run.id(), traceId, "TOOL_ERROR", toolErrorDebug));
                 if (!recordFailedTool(request.toolKey(), safeToolOutcome(exception), toolStarted)) return false;
                     fail(exception.code(), exception.status().value() == 403
                             ? AgentRunStatus.PERMISSION_DENIED : AgentRunStatus.FAILED,
@@ -1092,10 +1269,12 @@ public class ChatOrchestrator {
                 return false;
             } catch (RuntimeException exception) {
                 if (terminated.get()) return false;
-                persistDebug("TOOL_ERROR", request.toolKey(), "RUNTIME_ERROR: "
-                        + (exception.getMessage() == null ? "" : exception.getMessage()));
-                emit(ChatEvent.debug(run.id(), traceId, "TOOL_ERROR", Map.of(
-                        "toolKey", request.toolKey(), "error", "RUNTIME_ERROR", "message", exception.getMessage() == null ? "" : exception.getMessage())));
+                Map<String, Object> toolErrorDebug = Map.of(
+                        "turn", Math.max(1, modelTurns), "stage", "TOOL_ERROR",
+                        "toolKey", request.toolKey(), "error", "RUNTIME_ERROR",
+                        "message", exception.getMessage() == null ? "" : exception.getMessage());
+                persistDebug("TOOL_ERROR", request.toolKey(), toolErrorDebug);
+                emit(ChatEvent.debug(run.id(), traceId, "TOOL_ERROR", toolErrorDebug));
                 if (!recordFailedTool(request.toolKey(),
                         isTimeout(exception) ? "TIMED_OUT" : "INVALID_INPUT", toolStarted)) return false;
                 fail(isTimeout(exception) ? "AGENT_RUN_TIMEOUT" : "AGENT_TOOL_INVALID_INPUT",
@@ -1103,8 +1282,12 @@ public class ChatOrchestrator {
                 return false;
             } catch (Exception exception) {
                 if (terminated.get()) return false;
-                persistDebug("TOOL_ERROR", request.toolKey(), "INVALID_INPUT: "
-                        + (exception.getMessage() == null ? "" : exception.getMessage()));
+                Map<String, Object> toolErrorDebug = Map.of(
+                        "turn", Math.max(1, modelTurns), "stage", "TOOL_ERROR",
+                        "toolKey", request.toolKey(), "error", "INVALID_INPUT",
+                        "message", exception.getMessage() == null ? "" : exception.getMessage());
+                persistDebug("TOOL_ERROR", request.toolKey(), toolErrorDebug);
+                emit(ChatEvent.debug(run.id(), traceId, "TOOL_ERROR", toolErrorDebug));
                 if (!recordFailedTool(request.toolKey(), "INVALID_INPUT", toolStarted)) return false;
                 fail("AGENT_TOOL_INVALID_INPUT", AgentRunStatus.FAILED);
                 return false;
@@ -1294,6 +1477,36 @@ public class ChatOrchestrator {
                 if (value.length() > 20000) value = value.substring(0, 20000);
                 runService.recordStep(context.tenantId(), context.userId(), run.id(), "AI_DEBUG_" + type,
                         toolKey, value);
+            } catch (RuntimeException ignored) {
+                // Debug persistence must not affect the chat response.
+            }
+        }
+
+        private void persistDebug(String type, String toolKey, Map<String, Object> data) {
+            try {
+                Map<String, Object> persisted = new java.util.LinkedHashMap<>();
+                persisted.put("debugVersion", 2);
+                persisted.putAll(data);
+                String value = objectMapper.writeValueAsString(persisted);
+                if (value.length() > 20000) {
+                    for (String field : List.of("result", "text", "arguments", "message")) {
+                        Object content = persisted.get(field);
+                        if (content instanceof String text && text.length() > 12000) {
+                            persisted.put(field, text.substring(0, 12000));
+                            persisted.put("truncated", true);
+                        }
+                    }
+                    value = objectMapper.writeValueAsString(persisted);
+                }
+                if (value.length() > 20000) {
+                    persisted.keySet().removeAll(List.of("result", "text", "arguments", "message"));
+                    persisted.put("truncated", true);
+                    value = objectMapper.writeValueAsString(persisted);
+                }
+                runService.recordStep(context.tenantId(), context.userId(), run.id(), "AI_DEBUG_" + type,
+                        toolKey, value);
+            } catch (com.fasterxml.jackson.core.JsonProcessingException ignored) {
+                // Debug persistence must not affect the chat response.
             } catch (RuntimeException ignored) {
                 // Debug persistence must not affect the chat response.
             }

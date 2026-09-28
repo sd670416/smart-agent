@@ -70,6 +70,7 @@ final class AgentErrorMessageCatalog {
             Map.entry("AGENT_ATTACHMENTS_TOO_MANY", "本次上传的附件数量过多，请减少附件后重试。"),
             Map.entry("AGENT_PERSISTENCE_FAILED", "消息保存失败，请稍后重试。"),
             Map.entry("AGENT_UNAUTHORIZED", "登录状态已失效，请重新登录后再试。"),
+            Map.entry("AGENT_CLARIFICATION_INVALID", "待确认问题不存在、已经处理或已失效，请重新提问。"),
             Map.entry("AGENT_CHAT_FAILED", FALLBACK));
 
     private AgentErrorMessageCatalog() {

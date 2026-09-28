@@ -41,4 +41,12 @@ class QueryIntentResolverTest {
         assertEquals(IntentResolution.Status.NEEDS_CLARIFICATION, result.status());
         assertTrue(result.ambiguity().isPresent());
     }
+
+    @Test
+    void resolvesASelectedDomainOnlyWhenItIsCurrentlyAvailable() {
+        IntentResolution result = resolver.resolveSelectedDomain("APPROVAL", "统计项目审批", user);
+
+        assertEquals(IntentResolution.Status.RESOLVED, result.status());
+        assertEquals("APPROVAL", result.candidate().orElseThrow().domain().code());
+    }
 }

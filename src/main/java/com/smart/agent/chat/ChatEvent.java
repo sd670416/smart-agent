@@ -47,6 +47,11 @@ public record ChatEvent(
         return new ChatEvent("message_delta", runId, traceId, null, null, text, null, Map.of());
     }
 
+    static ChatEvent clarification(String runId, String traceId, Map<String, Object> data) {
+        return new ChatEvent("clarification", runId, traceId, null, "NEEDS_CLARIFICATION",
+                null, null, Map.copyOf(data));
+    }
+
     static ChatEvent messageEnd(String runId, String traceId, String messageId) {
         return new ChatEvent("message_end", runId, traceId, messageId, null, null, null, Map.of());
     }

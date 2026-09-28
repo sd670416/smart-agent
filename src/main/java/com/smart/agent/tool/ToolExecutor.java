@@ -26,7 +26,7 @@ import org.springframework.stereotype.Component;
 public class ToolExecutor implements AutoCloseable {
     static final int MAX_RESULT_BYTES = 64 * 1024;
     private static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(5);
-    private static final Duration PROJECT_ARCHIVE_TIMEOUT = Duration.ofSeconds(30);
+    private static final Duration SLOW_BUSINESS_TOOL_TIMEOUT = Duration.ofSeconds(30);
 
     private final ToolRegistry toolRegistry;
     private final AgentRunService agentRunService;
@@ -176,8 +176,10 @@ public class ToolExecutor implements AutoCloseable {
     }
 
     Duration timeoutFor(String toolKey) {
-        return "project.getArchiveDetail".equals(toolKey) || "approval.getDetail".equals(toolKey)
-                ? PROJECT_ARCHIVE_TIMEOUT : timeout;
+        return "project.getArchiveDetail".equals(toolKey)
+                || "approval.query".equals(toolKey)
+                || "approval.getDetail".equals(toolKey)
+                ? SLOW_BUSINESS_TOOL_TIMEOUT : timeout;
     }
 
     private int serializeResultSize(Object result) {

@@ -88,9 +88,10 @@ class ToolExecutorTest {
     }
 
     @Test
-    void usesLongerTimeoutOnlyForCompleteProjectArchive() {
+    void usesLongerTimeoutForArchiveAndApprovalQueries() {
         assertThat(executor.timeoutFor("project.getOverview")).isEqualTo(Duration.ofMillis(50));
         assertThat(executor.timeoutFor("project.getArchiveDetail")).isEqualTo(Duration.ofSeconds(30));
+        assertThat(executor.timeoutFor("approval.query")).isEqualTo(Duration.ofSeconds(30));
         assertThat(executor.timeoutFor("approval.getDetail")).isEqualTo(Duration.ofSeconds(30));
     }
 
