@@ -34,7 +34,9 @@ class BusinessDomainRegistryTest {
     void exposesOnlyContributorsAvailableToTheContext() {
         BusinessDomainContributor available = () -> descriptor("A", "tool.one");
         BusinessDomainContributor unavailable = new BusinessDomainContributor() {
-            @Override public BusinessDomainDescriptor descriptor() { return descriptor("B", "tool.two"); }
+            @Override public BusinessDomainDescriptor descriptor() {
+                return BusinessDomainRegistryTest.descriptor("B", "tool.two");
+            }
             @Override public boolean availableTo(com.smart.agent.security.AgentUserContext context) { return false; }
         };
         BusinessDomainRegistry registry = new BusinessDomainRegistry(List.of(available, unavailable));
