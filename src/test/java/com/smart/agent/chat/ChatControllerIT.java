@@ -94,6 +94,7 @@ class ChatControllerIT {
     @Autowired private ChatOrchestrator chatOrchestrator;
     @Autowired private TestBeans.TestProjectBusinessClient testProjectBusinessClient;
     @Autowired private TestBeans.TestApprovalBusinessClient testApprovalBusinessClient;
+    @Autowired private com.smart.agent.context.ConversationContextService conversationContextService;
     @Autowired private InMemoryPendingClarificationRepository pendingClarificationRepository;
 
     private String conversationId;
@@ -155,12 +156,40 @@ class ChatControllerIT {
                 .filter(request -> request.redactedConversationMessages().stream()
                         .filter(ModelRequest.ConversationMessage.class::isInstance)
                         .map(ModelRequest.ConversationMessage.class::cast)
-                        .anyMatch(message -> "下一页".equals(message.content())))
+                        .anyMatch(message -> message.content().startsWith("下一页")))
                 .findFirst().orElseThrow();
-        assertThat(followUpRequest.toolUseMode()).isEqualTo(ModelRequest.ToolUseMode.REQUIRED);
+        assertThat(followUpRequest.toolUseMode()).isEqualTo(ModelRequest.ToolUseMode.AUTO);
         assertThat(followUpRequest.allowedToolSpecifications())
                 .extracting(ModelRequest.AllowedToolSpecification::key)
-                .allMatch(key -> key.startsWith("approval."));
+                .isNotEmpty().allMatch(key -> key.startsWith("approval."));
+    }
+
+    @Test
+    void approvalNextPageRetainsPersistedScopeAndProcessType() {
+        stream("查询我的待办", Set.of(), Set.of());
+        conversationContextService.upsert("tenant-1", "user-1", conversationId,
+                com.smart.agent.context.ConversationContextService.APPROVAL_QUERY,
+                "{\"arguments\":{\"scope\":\"PROCESSED\",\"visibility\":\"SELF\","
+                        + "\"processType\":\"投标报名\",\"page\":1,\"pageSize\":20,"
+                        + "\"recordMode\":\"PROCESS\"},\"result\":{\"items\":[]}}", "previous-run");
+
+        stream("下一页", Set.of(), Set.of());
+
+        assertThat(testApprovalBusinessClient.queryCalls()).isEqualTo(2);
+        assertThat(testApprovalBusinessClient.lastQueryInput().scope()).isEqualTo("PROCESSED");
+        assertThat(testApprovalBusinessClient.lastQueryInput().processType()).isEqualTo("投标报名");
+        assertThat(testApprovalBusinessClient.lastQueryInput().page()).isEqualTo(2);
+    }
+
+    @Test
+    void approvalPreviousPageReturnsToTheFirstPage() {
+        stream("查询我的待办", Set.of(), Set.of());
+        stream("下一页", Set.of(), Set.of());
+
+        stream("上一页", Set.of(), Set.of());
+
+        assertThat(testApprovalBusinessClient.pages()).containsExactly(1, 2, 1);
+        assertThat(testApprovalBusinessClient.lastQueryInput().scope()).isEqualTo("TODO");
     }
 
     @Test
@@ -188,7 +217,7 @@ class ChatControllerIT {
                 .filter(request -> request.redactedConversationMessages().stream()
                         .filter(ModelRequest.ConversationMessage.class::isInstance)
                         .map(ModelRequest.ConversationMessage.class::cast)
-                        .anyMatch(message -> "再查一下".equals(message.content())))
+                        .anyMatch(message -> message.content().startsWith("再查一下")))
                 .findFirst().orElseThrow();
         assertThat(followUp.toolUseMode()).isEqualTo(ModelRequest.ToolUseMode.REQUIRED);
         assertThat(followUp.allowedToolSpecifications())
@@ -232,6 +261,26 @@ class ChatControllerIT {
         assertThat(events.getLast()).contains("AGENT_APPROVAL_ORDINAL_OUT_OF_RANGE")
                 .contains("指定的序号不在最新审批列表中");
         assertThat(testApprovalBusinessClient.detailCalls()).isZero();
+    }
+
+    @Test
+    void approvalDetailAcceptsAbsoluteOrdinalOnTheSecondPage() {
+        stream("查询我的待办", Set.of(), Set.of());
+        conversationContextService.upsert("tenant-1", "user-1", conversationId,
+                com.smart.agent.context.ConversationContextService.APPROVAL_QUERY,
+                "{\"arguments\":{\"scope\":\"TODO\",\"visibility\":\"SELF\","
+                        + "\"page\":2,\"pageSize\":20},\"result\":{\"page\":2,"
+                        + "\"pageSize\":20,\"items\":[{\"processInstanceId\":"
+                        + "\"22222222-2222-2222-2222-222222222222\",\"taskId\":\"task-21\"}]}}",
+                "page-two-run");
+
+        List<String> events = stream("第21条", Set.of(), Set.of());
+
+        assertThat(events).anyMatch(event -> event.contains("approval.getDetail"));
+        assertThat(testApprovalBusinessClient.detailCalls()).isEqualTo(1);
+        assertThat(testApprovalBusinessClient.lastDetailInput().processInstanceId())
+                .isEqualTo("22222222-2222-2222-2222-222222222222");
+        assertThat(testApprovalBusinessClient.lastDetailInput().taskId()).isEqualTo("task-21");
     }
 
     @Test
@@ -1010,12 +1059,15 @@ class ChatControllerIT {
             private final List<Integer> pages = new java.util.concurrent.CopyOnWriteArrayList<>();
             private final AtomicReference<com.smart.agent.tool.approval.ApprovalDetailInput> lastDetailInput =
                     new AtomicReference<>();
+            private final AtomicReference<com.smart.agent.tool.approval.ApprovalQueryInput> lastQueryInput =
+                    new AtomicReference<>();
 
             @Override
             public com.smart.agent.tool.approval.ApprovalQueryResult query(
                     com.smart.agent.tool.ToolContext context,
                     com.smart.agent.tool.approval.ApprovalQueryInput input) {
                 queryCalls.incrementAndGet();
+                lastQueryInput.set(input);
                 pages.add(input.page());
                 return new com.smart.agent.tool.approval.ApprovalQueryResult(
                         input.page(), input.pageSize(), 1L,
@@ -1040,8 +1092,9 @@ class ChatControllerIT {
             int queryCalls() { return queryCalls.get(); }
             int detailCalls() { return detailCalls.get(); }
             com.smart.agent.tool.approval.ApprovalDetailInput lastDetailInput() { return lastDetailInput.get(); }
+            com.smart.agent.tool.approval.ApprovalQueryInput lastQueryInput() { return lastQueryInput.get(); }
             List<Integer> pages() { return List.copyOf(pages); }
-            void reset() { queryCalls.set(0); detailCalls.set(0); lastDetailInput.set(null); pages.clear(); }
+            void reset() { queryCalls.set(0); detailCalls.set(0); lastDetailInput.set(null); lastQueryInput.set(null); pages.clear(); }
         }
 
         static final class TestProjectBusinessClient
@@ -1124,8 +1177,9 @@ class ChatControllerIT {
                         .filter(ModelRequest.ConversationMessage.class::isInstance)
                         .map(ModelRequest.ConversationMessage.class::cast)
                         .filter(message -> message.role().equals("user"))
+                        .filter(message -> !message.content().startsWith("[trusted-"))
                         .reduce((first, second) -> second)
-                        .map(ModelRequest.ConversationMessage::content)
+                        .map(message -> message.content().split("\\n\\[trusted-", 2)[0])
                         .orElse(question);
                 if (currentQuestion.startsWith("统计项目审批")) {
                     if (request.redactedConversationMessages().getLast()

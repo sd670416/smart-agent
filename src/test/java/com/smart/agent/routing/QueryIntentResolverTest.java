@@ -16,7 +16,8 @@ class QueryIntentResolverTest {
             () -> new BusinessDomainDescriptor("APPROVAL", "审批", List.of("approval.query"), List.of(), "REALTIME",
                     List.of("待办", "审批"))));
     private final QueryIntentResolver resolver = new QueryIntentResolver(registry);
-    private final AgentUserContext user = new AgentUserContext("tenant", "user", "identity", Set.of());
+    private final AgentUserContext user = new AgentUserContext("tenant", "user", "identity",
+            Set.of("menu:project", "menu:board:manage"), Set.of());
 
     @Test
     void resolvesUniqueDomain() {
@@ -48,5 +49,52 @@ class QueryIntentResolverTest {
 
         assertEquals(IntentResolution.Status.RESOLVED, result.status());
         assertEquals("APPROVAL", result.candidate().orElseThrow().domain().code());
+    }
+
+    @Test
+    void projectRegionDistributionUsesBoardDomainButOrdinaryProjectQueryDoesNot() {
+        QueryIntentResolver withBoard = new QueryIntentResolver(new BusinessDomainRegistry(List.of(
+                new ProjectDomainContributor(), new BoardDomainContributor())));
+
+        IntentResolution chart = withBoard.resolve("我说的是项目区域分布", Map.of(), "PROJECT", user);
+        IntentResolution project = withBoard.resolve("查询项目名称", Map.of(), null, user);
+
+        assertEquals("BOARD", chart.candidate().orElseThrow().domain().code());
+        assertEquals("PROJECT", project.candidate().orElseThrow().domain().code());
+    }
+
+    @Test
+    void genericProjectQueryRequiresDomainClarification() {
+        QueryIntentResolver withBoard = new QueryIntentResolver(new BusinessDomainRegistry(List.of(
+                new ProjectDomainContributor(), new BoardDomainContributor())));
+
+        IntentResolution result = withBoard.resolve("查项目", Map.of(), null, user);
+
+        assertEquals(IntentResolution.Status.NEEDS_CLARIFICATION, result.status());
+        assertEquals(2, result.ambiguity().orElseThrow().candidates().size());
+    }
+
+    @Test
+    void manageMetricWithoutBoardWordResolvesBoard() {
+        QueryIntentResolver withBoard = new QueryIntentResolver(new BusinessDomainRegistry(List.of(
+                new ProjectDomainContributor(), new BoardDomainContributor())));
+
+        IntentResolution result = withBoard.resolve("各省有多少项目", Map.of(), null, user);
+
+        assertEquals(IntentResolution.Status.RESOLVED, result.status());
+        assertEquals("BOARD", result.candidate().orElseThrow().domain().code());
+    }
+
+    @Test
+    void genericProjectQuestionDoesNotOfferUnavailableBoardOption() {
+        QueryIntentResolver withBoard = new QueryIntentResolver(new BusinessDomainRegistry(List.of(
+                new ProjectDomainContributor(), new BoardDomainContributor())));
+        AgentUserContext projectOnly = new AgentUserContext("tenant", "user", "identity",
+                Set.of("menu:project"), Set.of());
+
+        IntentResolution result = withBoard.resolve("查项目", Map.of(), null, projectOnly);
+
+        assertEquals(IntentResolution.Status.RESOLVED, result.status());
+        assertEquals("PROJECT", result.candidate().orElseThrow().domain().code());
     }
 }

@@ -60,7 +60,7 @@ public class ChatOrchestrator {
     static final int MAX_CITATIONS = 20;
     static final int MAX_HISTORY_MESSAGES = 20;
     static final int MAX_HISTORY_BYTES = 32 * 1024;
-    static final Duration MAX_RUN_DURATION = Duration.ofSeconds(90);
+    static final Duration MAX_RUN_DURATION = Duration.ofSeconds(300);
 
     private final ConversationService conversationService;
     private final AgentRunService runService;
@@ -302,29 +302,38 @@ public class ChatOrchestrator {
                 activeBusinessDomain = confirmedResolution == null
                         ? loadActiveBusinessDomain()
                         : confirmedResolution.candidate().orElseThrow().domain().code();
-                validateProjectMenuPermission(history);
                 IntentResolution intentResolution = confirmedResolution == null
                         ? recordIntentResolution()
                         : confirmedResolution;
-                boolean domainConfirmed = confirmedResolution != null;
+                String resolvedDomain = intentResolution == null ? null
+                        : intentResolution.candidate().map(candidate -> candidate.domain().code()).orElse(null);
                 boolean projectContextFollowUp = isProjectContextFollowUp(
                         effectiveQuestion, history, activeBusinessDomain);
-                requiresFreshProjectData = domainConfirmed
-                        ? "PROJECT".equals(activeBusinessDomain)
+                requiresFreshProjectData = intentResolution != null
+                        ? "PROJECT".equals(resolvedDomain)
                         : ((!isApprovalQuestion(effectiveQuestion) || projectContextFollowUp)
                         && !isBoardQuestion(effectiveQuestion)
                         && (isProjectQuestion(effectiveQuestion)
                         || isProjectFollowUp(effectiveQuestion, history)
                         || projectContextFollowUp));
+                if (projectContextFollowUp && !isExplicitApprovalWorkflowQuestion(effectiveQuestion)
+                        && !isBoardQuestion(effectiveQuestion)
+                        && intentResolution != null
+                        && intentResolution.status() == IntentResolution.Status.RESOLVED) {
+                    requiresFreshProjectData = true;
+                }
                 requiresRelativeTimeForProject = requiresFreshProjectData
                         && isRelativeTimeQuestion(effectiveQuestion);
-                requiresFreshApprovalData = domainConfirmed
-                        ? "APPROVAL".equals(activeBusinessDomain)
+                requiresFreshApprovalData = intentResolution != null
+                        ? "APPROVAL".equals(resolvedDomain) && !requiresFreshProjectData
                         : !projectContextFollowUp && (isApprovalQuestion(effectiveQuestion)
                         || isApprovalFollowUp(effectiveQuestion, history));
-                requiresFreshBoardData = domainConfirmed
-                        ? "BOARD".equals(activeBusinessDomain)
+                requiresFreshBoardData = intentResolution != null
+                        ? "BOARD".equals(resolvedDomain) && !requiresFreshProjectData
                         : isBoardQuestion(effectiveQuestion);
+                if (intentResolution == null || intentResolution.status() != IntentResolution.Status.NEEDS_CLARIFICATION) {
+                    validateProjectMenuPermission(history);
+                }
                 // 先完成业务域判定，再生成带可信路由提示的本轮消息。
                 // 否则 modelQuestion 无法使用本轮上下文判定结果。
                 messages.add(new ModelRequest.ConversationMessage("user", modelQuestion(), attachmentParts()));
@@ -338,6 +347,10 @@ public class ChatOrchestrator {
                 retrieveKnowledgeIfRequired();
                 preparationStage = "callModel";
                 if (resolveProjectOrdinalFollowUp()) {
+                    callModel();
+                    return;
+                }
+                if (resolveApprovalPageFollowUp()) {
                     callModel();
                     return;
                 }
@@ -360,10 +373,7 @@ public class ChatOrchestrator {
             }
         }
 
-        /**
-         * 旁路记录通用意图裁决结果。明确查询仍由旧路由执行，避免新规则改变现网行为；
-         * 该信息用于后续澄清持久化和诊断，并且不包含权限以外的用户敏感数据。
-         */
+        /** Records the domain decision used by this turn and the clarification flow. */
         private IntentResolution recordIntentResolution() {
             if (queryIntentResolver == null) return null;
             Map<String, Object> page = new HashMap<>();
@@ -577,7 +587,7 @@ public class ChatOrchestrator {
 
         private void validateProjectMenuPermission(List<ModelRequest.ConversationEntry> history) {
             // 看板查询不依赖项目报备/项目档案菜单，必须在项目权限校验前直接放行。
-            if (containsBoardKeyword(effectiveQuestion)) return;
+            if (requiresFreshBoardData) return;
             if (context.permissions().contains("menu:project")) return;
             if ("PROJECT".equals(activeBusinessDomain)
                     || (!isApprovalQuestion(effectiveQuestion)
@@ -665,6 +675,7 @@ public class ChatOrchestrator {
         private boolean containsBoardKeyword(String question) {
             if (question == null || question.isBlank()) return false;
             return question.contains("经营看板") || question.contains("预算看板")
+                    || question.contains("项目区域分布")
                     || question.contains("应收看板") || question.contains("供应商看板")
                     || question.contains("投标看板") || question.contains("库存看板")
                     || question.contains("项目看板") || question.contains("甘特图")
@@ -675,7 +686,7 @@ public class ChatOrchestrator {
         private String modelQuestion() {
             ChatCommand.PageContext page = command.pageContext();
             StringBuilder safe = new StringBuilder(effectiveQuestion);
-            if (isBoardQuestion(effectiveQuestion) || requiresFreshBoardData) {
+            if (requiresFreshBoardData) {
                 safe.append("\n[trusted-routing: 本轮是看板查询，只能调用 board.query、board.compare 或 board.detail；不得调用 project.query，也不要返回项目菜单权限提示]");
             } else if (requiresFreshApprovalData) {
                 safe.append("\n[trusted-routing: 本轮是审批查询，只能调用 approval.query 或 approval.getDetail；不得调用 project.* 或 board.*]");
@@ -865,6 +876,46 @@ public class ChatOrchestrator {
                             + "(?:待办|已办|流程)?(?:的)?(?:详情|详细信息)[吗吧呢。？?]*$");
         }
 
+        private boolean resolveApprovalPageFollowUp() {
+            if (!requiresFreshApprovalData || !"APPROVAL".equals(activeBusinessDomain)
+                    || effectiveQuestion == null) return false;
+            String question = effectiveQuestion.trim();
+            boolean next = question.matches("^(?:请)?(?:看|查|查询)?(?:一下|下)?(?:下一页|更多)(?:吧|。|？)?$");
+            boolean previous = question.matches("^(?:请)?(?:看|查|查询)?(?:一下|下)?上一页(?:吧|。|？)?$");
+            if (!next && !previous) return false;
+            if (conversationContextService == null) {
+                throw approvalSelectionFailure("AGENT_APPROVAL_CONTEXT_MISSING");
+            }
+            String payload = withinBudget(() -> conversationContextService.find(
+                            context.tenantId(), context.userId(), command.conversationId(),
+                            ConversationContextService.APPROVAL_QUERY))
+                    .map(com.smart.agent.context.ConversationContext::payloadJson)
+                    .orElseThrow(() -> approvalSelectionFailure("AGENT_APPROVAL_CONTEXT_MISSING"));
+            try {
+                JsonNode arguments = objectMapper.readTree(payload).path("arguments");
+                if (!arguments.isObject()) {
+                    throw approvalSelectionFailure("AGENT_APPROVAL_CONTEXT_INVALID");
+                }
+                com.fasterxml.jackson.databind.node.ObjectNode query =
+                        (com.fasterxml.jackson.databind.node.ObjectNode) arguments.deepCopy();
+                int page = Math.max(1, query.path("page").asInt(1));
+                query.put("page", next ? Math.addExact(page, 1) : Math.max(1, page - 1));
+                ModelEvent.ToolRequested request = new ModelEvent.ToolRequested(
+                        "approval-page-" + UUID.randomUUID(), "approval.query",
+                        objectMapper.writeValueAsString(query));
+                Map<String, Object> toolRequestDebug = Map.of(
+                        "turn", Math.max(1, modelTurns), "stage", "TOOL_REQUEST", "toolCallIndex", 1,
+                        "toolKey", request.toolKey(), "arguments", request.argumentsJson());
+                persistDebug("TOOL_REQUEST", request.toolKey(), toolRequestDebug);
+                emit(ChatEvent.debug(run.id(), traceId, "TOOL_REQUEST", toolRequestDebug));
+                return executeTool(request);
+            } catch (AgentException exception) {
+                throw exception;
+            } catch (com.fasterxml.jackson.core.JsonProcessingException | ArithmeticException exception) {
+                throw approvalSelectionFailure("AGENT_APPROVAL_CONTEXT_INVALID");
+            }
+        }
+
         private boolean resolveApprovalOrdinalFollowUp() {
             if (!requiresFreshApprovalData) return false;
             Integer ordinal = parseOrdinal(effectiveQuestion);
@@ -891,15 +942,25 @@ public class ChatOrchestrator {
                     }
                     ordinal = 1;
                 }
-                if (!items.isArray() || ordinal > items.size()) {
+                JsonNode arguments = snapshot.path("arguments");
+                JsonNode result = snapshot.path("result");
+                int page = Math.max(1, result.path("page").asInt(arguments.path("page").asInt(1)));
+                int pageSize = Math.max(1, result.path("pageSize").asInt(arguments.path("pageSize").asInt(20)));
+                int itemIndex = ordinal - 1;
+                if (items.isArray() && ordinal > items.size() && page > 1) {
+                    long firstOrdinal = (long) (page - 1) * pageSize + 1;
+                    if (ordinal >= firstOrdinal && ordinal < firstOrdinal + items.size()) {
+                        itemIndex = (int) (ordinal - firstOrdinal);
+                    }
+                }
+                if (!items.isArray() || itemIndex < 0 || itemIndex >= items.size()) {
                     throw approvalSelectionFailure("AGENT_APPROVAL_ORDINAL_OUT_OF_RANGE");
                 }
-                JsonNode selected = items.get(ordinal - 1);
+                JsonNode selected = items.get(itemIndex);
                 String processInstanceId = textOrNull(selected, "processInstanceId");
                 if (processInstanceId == null) {
                     throw approvalSelectionFailure("AGENT_APPROVAL_CONTEXT_INVALID");
                 }
-                JsonNode arguments = snapshot.path("arguments");
                 com.fasterxml.jackson.databind.node.ObjectNode detail = objectMapper.createObjectNode();
                 detail.put("processInstanceId", processInstanceId);
                 putIfText(detail, "taskId", textOrNull(selected, "taskId"));
@@ -1555,7 +1616,8 @@ public class ChatOrchestrator {
             }
             if ("MODEL_TOOL_SCHEMA_INVALID".equals(code)) {
                 return requiresFreshApprovalData
-                        ? "AGENT_APPROVAL_QUERY_UNAVAILABLE" : "AGENT_QUERY_UNAVAILABLE";
+                        ? "AGENT_APPROVAL_QUERY_UNAVAILABLE"
+                        : requiresFreshBoardData ? "AGENT_BOARD_QUERY_UNAVAILABLE" : "AGENT_QUERY_UNAVAILABLE";
             }
             return "AGENT_MODEL_FAILED";
         }

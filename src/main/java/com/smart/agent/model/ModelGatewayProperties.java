@@ -18,7 +18,7 @@ public record ModelGatewayProperties(
         apiKey = defaultValue(apiKey, "local-development-key");
         chatModel = defaultValue(chatModel, "local-test-model");
         connectTimeout = connectTimeout == null ? Duration.ofSeconds(5) : connectTimeout;
-        readTimeout = readTimeout == null ? Duration.ofSeconds(30) : readTimeout;
+        readTimeout = readTimeout == null ? Duration.ofSeconds(120) : readTimeout;
     }
 
     private static String defaultValue(String value, String fallback) {

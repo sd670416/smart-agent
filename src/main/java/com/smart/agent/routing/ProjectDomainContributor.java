@@ -1,5 +1,6 @@
 package com.smart.agent.routing;
 
+import com.smart.agent.security.AgentUserContext;
 import java.util.List;
 import org.springframework.stereotype.Component;
 
@@ -13,4 +14,9 @@ public class ProjectDomainContributor implements BusinessDomainContributor {
 
     @Override
     public BusinessDomainDescriptor descriptor() { return DESCRIPTOR; }
+
+    @Override
+    public boolean availableTo(AgentUserContext context) {
+        return context != null && context.permissions().contains("menu:project");
+    }
 }

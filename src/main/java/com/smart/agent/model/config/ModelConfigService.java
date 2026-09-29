@@ -35,7 +35,7 @@ public class ModelConfigService {
     public static final String PERMISSION_TEST = "aiModel:test";
 
     private static final Duration DEFAULT_CONNECT_TIMEOUT = Duration.ofSeconds(5);
-    private static final Duration DEFAULT_READ_TIMEOUT = Duration.ofSeconds(30);
+    private static final Duration DEFAULT_READ_TIMEOUT = Duration.ofSeconds(120);
 
     /** 引导导入记录的操作人标识，与真实登录用户区分。 */
     private static final String BOOTSTRAP_OPERATOR = "system:model-config-bootstrap";

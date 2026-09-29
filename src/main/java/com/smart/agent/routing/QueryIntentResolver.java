@@ -28,6 +28,15 @@ public class QueryIntentResolver {
         }
         candidates.sort(Comparator.comparingInt(QueryIntentCandidate::score).reversed());
         if (candidates.isEmpty()) return IntentResolution.unknown(question);
+        if (isGenericProjectRequest(normalized) && activeDomain == null
+                && userContext.permissions().contains("menu:board:manage")) {
+            registry.availableDomains(userContext).stream()
+                    .filter(domain -> "BOARD".equals(domain.code()))
+                    .findFirst()
+                    .ifPresent(domain -> candidates.add(new QueryIntentCandidate(
+                            domain, "项目列表或经营看板统计均可能", candidates.get(0).score())));
+            if (candidates.size() > 1) return IntentResolution.needsClarification(question, candidates);
+        }
         if (candidates.size() == 1 || candidates.get(0).score() > candidates.get(1).score()) {
             return IntentResolution.resolved(candidates.get(0));
         }
@@ -55,7 +64,12 @@ public class QueryIntentResolver {
         for (String term : domain.triggerTerms()) {
             if (term != null && !term.isBlank() && question.contains(term.toLowerCase(Locale.ROOT))) score += 10;
         }
-        if (domain.code().equalsIgnoreCase(activeDomain)) score += 3;
+        if ("BOARD".equals(domain.code()) && domain.triggerTerms().stream()
+                .anyMatch(term -> term != null && !"看板".equals(term)
+                        && term.length() >= 2 && question.contains(term.toLowerCase(Locale.ROOT)))) {
+            score += 15;
+        }
+        if (domain.code().equalsIgnoreCase(activeDomain) && isContextualFollowUp(question)) score += 3;
         if (pageContext != null) {
             String page = String.valueOf(pageContext.get("routeName")) + " "
                     + String.valueOf(pageContext.get("routePath"));
@@ -65,6 +79,15 @@ public class QueryIntentResolver {
             }
         }
         return score;
+    }
+
+    private boolean isGenericProjectRequest(String question) {
+        return question.matches("^(?:请)?(?:查|查询|看|查看|统计)?(?:一下|下)?项目(?:信息|数据|情况|数量|有多少|多少)?[？?。]?$"
+                + "|^(?:请)?项目(?:有多少|多少|数量)[？?。]?$");
+    }
+
+    private boolean isContextualFollowUp(String question) {
+        return question.matches(".*(查|看|多少|数量|统计|第|上一页|下一页|明细|详情|筛选|状态|比较|对比|继续|项目|审批|看板).*" );
     }
 
     private String reason(BusinessDomainDescriptor domain, int score) {

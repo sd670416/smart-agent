@@ -24,6 +24,7 @@ final class AgentErrorMessageCatalog {
             Map.entry("AGENT_QUERY_TOO_COMPLEX", "查询条件过于复杂，请减少筛选、分组或统计条件。"),
             Map.entry("AGENT_QUERY_INVALID_REQUEST", "我已识别到这是项目统计查询，但查询条件格式不完整。请明确统计方式，例如“按项目状态分组统计数量”，或补充具体时间范围。"),
             Map.entry("AGENT_QUERY_UNAVAILABLE", "当前项目查询能力暂时不可用。你可以先说明项目名称、状态、类型或时间范围，我会按支持的条件重新查询。"),
+            Map.entry("AGENT_BOARD_QUERY_UNAVAILABLE", "当前看板查询工具暂时不可用，请稍后重试。"),
             Map.entry("AGENT_TIMEZONE_INVALID", "无法识别指定时区，请使用例如 Asia/Shanghai 的标准时区名称。"),
             Map.entry("AGENT_WEB_SEARCH_DISABLED", "当前未启用联网搜索，请联系管理员配置。"),
             Map.entry("AGENT_WEB_SEARCH_FORBIDDEN", "您暂无使用联网搜索的权限。"),

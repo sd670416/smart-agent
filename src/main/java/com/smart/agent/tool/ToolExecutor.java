@@ -179,6 +179,7 @@ public class ToolExecutor implements AutoCloseable {
         return "project.getArchiveDetail".equals(toolKey)
                 || "approval.query".equals(toolKey)
                 || "approval.getDetail".equals(toolKey)
+                || toolKey.startsWith("board.")
                 ? SLOW_BUSINESS_TOOL_TIMEOUT : timeout;
     }
 
