@@ -62,7 +62,7 @@ class AttachmentControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"objectKey\":\"" + objectKey + "\",\"size\":12,"
                                 + "\"etag\":\"etag-1\",\"detectedMediaType\":\"image/png\"}"))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("UPLOADED"));
+                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("READY"));
         mvc.perform(get("/agent/attachments/{id}", id)
                         .requestAttr(CONTEXT_ATTRIBUTE, context("tenant-1", "user-1")))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.etag").value("etag-1"));

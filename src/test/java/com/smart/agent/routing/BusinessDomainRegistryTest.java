@@ -41,8 +41,10 @@ class BusinessDomainRegistryTest {
         };
         BusinessDomainRegistry registry = new BusinessDomainRegistry(List.of(available, unavailable));
 
-        assertEquals(1, registry.availableDomains(null).size());
-        assertTrue(registry.availableDomains(null).get(0).code().equals("A"));
+        com.smart.agent.security.AgentUserContext context = new com.smart.agent.security.AgentUserContext(
+                "tenant", "user", "identity", java.util.Set.of());
+        assertEquals(1, registry.availableDomains(context).size());
+        assertTrue(registry.availableDomains(context).get(0).code().equals("A"));
     }
 
     private static BusinessDomainDescriptor descriptor(String code, String tool) {
