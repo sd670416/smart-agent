@@ -17,7 +17,7 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 @Component
-@Profile({"local", "test"})
+@Profile({"local", "dev", "test"})
 public class LocalContextTokenVerifier implements ContextTokenVerifier {
     private final ObjectMapper objectMapper;
     private final byte[] secret;
