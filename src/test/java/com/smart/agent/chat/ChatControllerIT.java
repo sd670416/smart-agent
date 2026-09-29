@@ -165,6 +165,23 @@ class ChatControllerIT {
     }
 
     @Test
+    void pendingForThreeDaysUsesCurrentTimeThenTaskCreationTime() {
+        List<String> events = stream("查一下3天没处理的待办", Set.of(), Set.of());
+
+        assertThat(events).anyMatch(event -> event.contains("待办查询完成"));
+        assertThat(testApprovalBusinessClient.queryCalls()).isEqualTo(1);
+        assertThat(testApprovalBusinessClient.lastQueryInput().filter()).containsEntry("logic", "and");
+        assertThat(testApprovalBusinessClient.lastQueryInput().filter().get("conditions"))
+                .asString().contains("taskCreateTime").contains("lte");
+        assertThat(scenarioModelGateway.requests().get(0).allowedToolSpecifications())
+                .extracting(ModelRequest.AllowedToolSpecification::key)
+                .containsExactly("system.current_time");
+        assertThat(scenarioModelGateway.requests().get(1).allowedToolSpecifications())
+                .extracting(ModelRequest.AllowedToolSpecification::key)
+                .containsExactlyInAnyOrder("approval.query", "approval.getDetail");
+    }
+
+    @Test
     void approvalNextPageRetainsPersistedScopeAndProcessType() {
         stream("查询我的待办", Set.of(), Set.of());
         conversationContextService.upsert("tenant-1", "user-1", conversationId,
@@ -1191,6 +1208,26 @@ class ChatControllerIT {
                             "{\"scope\":\"TODO\",\"visibility\":\"SELF\",\"page\":1,"
                                     + "\"pageSize\":20,\"recordMode\":\"PROCESS\"}"),
                             new ModelEvent.Completed("", 6, 3));
+                }
+                if (currentQuestion.equals("查一下3天没处理的待办")) {
+                    boolean hasTime = request.redactedConversationMessages().stream()
+                            .filter(ModelRequest.ToolResultMessage.class::isInstance)
+                            .map(ModelRequest.ToolResultMessage.class::cast)
+                            .anyMatch(message -> message.toolKey().equals("system.current_time"));
+                    boolean hasApproval = request.redactedConversationMessages().stream()
+                            .filter(ModelRequest.ToolResultMessage.class::isInstance)
+                            .map(ModelRequest.ToolResultMessage.class::cast)
+                            .anyMatch(message -> message.toolKey().equals("approval.query"));
+                    if (!hasTime) return Flux.just(new ModelEvent.ToolRequested(
+                            "pending-age-time", "system.current_time", "{}"),
+                            new ModelEvent.Completed("", 6, 3));
+                    if (!hasApproval) return Flux.just(new ModelEvent.ToolRequested(
+                            "pending-age-query", "approval.query",
+                            "{\"scope\":\"TODO\",\"visibility\":\"SELF\",\"filter\":{\"logic\":\"and\","
+                                    + "\"conditions\":[{\"field\":\"taskCreateTime\",\"operator\":\"lte\","
+                                    + "\"value\":\"2026-09-26 10:00:00\"}]}}"),
+                            new ModelEvent.Completed("", 6, 3));
+                    return Flux.just(new ModelEvent.Completed("待办查询完成。", 8, 6));
                 }
                 if (currentQuestion.equals("查询我的待办") || currentQuestion.equals("查询我的已办")
                         || currentQuestion.equals("下一页")

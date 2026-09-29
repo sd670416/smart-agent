@@ -253,6 +253,7 @@ public class ChatOrchestrator {
         private boolean requiresFreshApprovalData;
         private boolean requiresFreshBoardData;
         private boolean requiresRelativeTimeForProject;
+        private boolean requiresRelativeTimeForApproval;
         private boolean timeToolCompleted;
         private String activeBusinessDomain;
         private String effectiveQuestion;
@@ -328,6 +329,8 @@ public class ChatOrchestrator {
                         ? "APPROVAL".equals(resolvedDomain) && !requiresFreshProjectData
                         : !projectContextFollowUp && (isApprovalQuestion(effectiveQuestion)
                         || isApprovalFollowUp(effectiveQuestion, history));
+                requiresRelativeTimeForApproval = requiresFreshApprovalData
+                        && isRelativeTimeQuestion(effectiveQuestion);
                 requiresFreshBoardData = intentResolution != null
                         ? "BOARD".equals(resolvedDomain) && !requiresFreshProjectData
                         : isBoardQuestion(effectiveQuestion);
@@ -665,7 +668,7 @@ public class ChatOrchestrator {
 
         private boolean isRelativeTimeQuestion(String question) {
             if (question == null || question.isBlank()) return false;
-            return question.matches(".*(今天|昨日|昨天|明天|本周|上周|下周|本月|上月|下月|今年|去年|明年|最近[0-9一二三四五六七八九十]+[天日周月年]).*");
+            return question.matches(".*(今天|昨日|昨天|明天|本周|上周|下周|本月|上月|下月|今年|去年|明年|最近[0-9一二三四五六七八九十]+[天日周月年]|[0-9一二三四五六七八九十]+[天日](没|未)(处理|办理|审批)).*");
         }
 
         private boolean isBoardQuestion(String question) {
@@ -689,7 +692,7 @@ public class ChatOrchestrator {
             if (requiresFreshBoardData) {
                 safe.append("\n[trusted-routing: 本轮是看板查询，只能调用 board.query、board.compare 或 board.detail；不得调用 project.query，也不要返回项目菜单权限提示]");
             } else if (requiresFreshApprovalData) {
-                safe.append("\n[trusted-routing: 本轮是审批查询，只能调用 approval.query 或 approval.getDetail；不得调用 project.* 或 board.*]");
+                safe.append("\n[trusted-routing: 本轮是审批查询；相对时间先调用 system.current_time，再调用 approval.query 或 approval.getDetail；不得调用 project.* 或 board.*。待办超过 N 天未处理是任务创建时间 taskCreateTime 早于当前时间减 N 天，不是到期时间、发起时间或所属部门。]");
             } else if (requiresFreshProjectData) {
                 safe.append("\n[trusted-routing: 本轮是项目查询，只能调用 project.query 或 project.getArchiveDetail；不得调用 approval.* 或 board.*。历史中的审批内容不改变本轮路由]");
             }
@@ -773,13 +776,17 @@ public class ChatOrchestrator {
             turnCompleted = null;
             boolean requireProjectTool = requiresFreshProjectData
                     && (!requiresRelativeTimeForProject || timeToolCompleted);
-            boolean requireApprovalTool = requiresFreshApprovalData && toolCalls == 0;
+            boolean requireApprovalTool = requiresFreshApprovalData && approvalToolCalls == 0
+                    && (!requiresRelativeTimeForApproval || timeToolCompleted);
             boolean requireBoardTool = requiresFreshBoardData && toolCalls == 0;
-            boolean requireTimeTool = requiresRelativeTimeForProject && !timeToolCompleted;
+            boolean requireTimeTool = (requiresRelativeTimeForProject || requiresRelativeTimeForApproval)
+                    && !timeToolCompleted;
             List<ModelRequest.AllowedToolSpecification> tools = toolRegistry.allowedReadOnlyTools(context).stream()
                     .filter(this::isRelevantTool)
                     .filter(tool -> {
-                        if (requiresFreshApprovalData) return tool.key().startsWith("approval.");
+                        if (requiresFreshApprovalData) return requireTimeTool
+                                ? "system.current_time".equals(tool.key())
+                                : tool.key().startsWith("approval.");
                         if (requiresFreshBoardData) return tool.key().startsWith("board.");
                         if (requiresFreshProjectData) {
                             return requireTimeTool
@@ -1244,10 +1251,13 @@ public class ChatOrchestrator {
                 if (request.toolKey().startsWith("approval.")) approvalToolCalls++;
                 if (request.toolKey().startsWith("board.")) boardToolCalls++;
                 String serializedResult = objectMapper.writeValueAsString(result);
-                if ("system.current_time".equals(request.toolKey()) && requiresRelativeTimeForProject) {
+                if ("system.current_time".equals(request.toolKey())
+                        && (requiresRelativeTimeForProject || requiresRelativeTimeForApproval)) {
                     timeToolCompleted = true;
                     messages.add(new ModelRequest.ConversationMessage("user",
-                            "[trusted-time-reference: system.current_time 返回结果如下，请据此把相对时间转换为明确日期范围，并立即调用 project.query 查询项目。结果："
+                            (requiresRelativeTimeForApproval
+                                    ? "[trusted-time-reference: system.current_time 返回结果如下，请据此把相对时间转换为明确日期时间，并立即调用 approval.query；待办超过 N 天未处理应筛选 taskCreateTime <= 当前时间减 N 天，值使用 yyyy-MM-dd HH:mm:ss。结果："
+                                    : "[trusted-time-reference: system.current_time 返回结果如下，请据此把相对时间转换为明确日期范围，并立即调用 project.query 查询项目。结果：")
                                     + serializedResult + "]"));
                 }
                 if ("approval.query".equals(request.toolKey()) && conversationContextService != null) {

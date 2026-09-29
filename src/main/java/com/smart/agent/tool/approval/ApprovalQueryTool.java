@@ -20,7 +20,7 @@ public class ApprovalQueryTool implements AgentTool<ApprovalQueryInput, Approval
                 + "\"visibility\":{\"type\":\"string\",\"description\":\"visibility只允许SELF或ALL；分别表示本人或全部，默认SELF\"},"
                 + "\"personKeyword\":{\"type\":\"string\"},\"page\":{\"type\":\"integer\"},"
                 + "\"pageSize\":{\"type\":\"integer\"},"
-                + "\"processType\":{\"type\":\"string\"},\"filter\":{\"type\":\"object\"},"
+                + "\"processType\":{\"type\":\"string\"},\"filter\":{\"type\":\"object\",\"description\":\"条件组格式为{logic:'and',conditions:[{field:'taskCreateTime',operator:'lte',value:'yyyy-MM-dd HH:mm:ss'}]}。待办超过N天未处理按任务创建时间taskCreateTime筛选，不使用发起部门、发起时间或到期时间\"},"
                 + "\"select\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},"
                 + "\"groupBy\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},"
                 + "\"aggregations\":{\"type\":\"array\",\"description\":\"统计总数时field必须省略；alias必须是英文字母开头的英文标识符\",\"items\":{\"type\":\"object\",\"properties\":{\"function\":{\"type\":\"string\",\"description\":\"count、sum、avg、min或max\"},\"field\":{\"type\":\"string\",\"description\":\"count总数时省略，其他聚合使用字段目录中的字段名或中文标签\"},\"alias\":{\"type\":\"string\",\"description\":\"英文字母开头，仅包含英文字母、数字或下划线\"}},\"additionalProperties\":false}},"
