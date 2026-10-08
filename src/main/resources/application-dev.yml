@@ -17,7 +17,8 @@ AGENT_LOCAL_CONTEXT_SECRET: smart-agent-local-demo-secret-2026
 agent:
   persistence:
     enabled: true
-
+  business:
+    base-url: http://127.0.0.1:5084
   # 公开互联网查询默认关闭。启用前需配置 ai:web-search 权限，且当前模型账号支持原生联网。
   web-search:
     enabled: false
