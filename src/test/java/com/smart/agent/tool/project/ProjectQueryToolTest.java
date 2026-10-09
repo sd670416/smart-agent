@@ -6,11 +6,33 @@ import static org.mockito.Mockito.verify;
 
 import com.smart.agent.tool.ToolContext;
 import com.smart.agent.tool.ToolRisk;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 class ProjectQueryToolTest {
+    @Test
+    void normalizesRegionGroupingFromRecordedModelToolCall() throws Exception {
+        ProjectQueryInput input = new ObjectMapper().readValue("""
+                {"aggregations":[{"alias":"项目数量","function":"count"}],
+                 "groupBy":["projectRegion"]}
+                """, ProjectQueryInput.class);
+
+        assertThat(input.groupBy()).containsExactly("projectProvince");
+        assertThat(input.aggregations().get(0).alias()).isEqualTo("projectCount");
+    }
+
+    @Test
+    void normalizesProvinceLabelsForSelectionAndGrouping() {
+        ProjectQueryInput input = new ProjectQueryInput(
+                List.of("项目区域", "省份"), null, List.of("省级区域"),
+                List.of(), List.of(), 1, 20);
+
+        assertThat(input.select()).containsExactly("projectProvince", "projectProvince");
+        assertThat(input.groupBy()).containsExactly("projectProvince");
+    }
+
     @Test
     void normalizesChineseProjectOverviewFieldNames() {
         ProjectQueryInput input = new ProjectQueryInput(

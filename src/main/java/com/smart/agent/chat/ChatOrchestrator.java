@@ -678,7 +678,6 @@ public class ChatOrchestrator {
         private boolean containsBoardKeyword(String question) {
             if (question == null || question.isBlank()) return false;
             return question.contains("经营看板") || question.contains("预算看板")
-                    || question.contains("项目区域分布")
                     || question.contains("应收看板") || question.contains("供应商看板")
                     || question.contains("投标看板") || question.contains("库存看板")
                     || question.contains("项目看板") || question.contains("甘特图")

@@ -9,13 +9,13 @@ import org.springframework.stereotype.Component;
 public class ProjectQueryTool implements AgentTool<ProjectQueryInput, ProjectQueryResult> {
     private static final String SCHEMA = """
             {"type":"object","properties":{
-              "select":{"type":"array","description":"要返回的项目业务字段。普通项目概况默认不传；如需指定，可用 projectName、projectCode、organizationName、projectNature、affiliatedCompanyName、projectType、constructionCompany、personInChargeName、projectStatus、approvalStatus、projectBudget、createDate","items":{"type":"string"}},
+              "select":{"type":"array","description":"要返回的项目业务字段。普通项目概况默认不传；如需指定，可用 projectName、projectCode、organizationName、projectNature、affiliatedCompanyName、projectType、constructionCompany、personInChargeName、projectStatus、approvalStatus、projectBudget、createDate、projectProvince（项目区域/省份）、regionName（完整项目地址）","items":{"type":"string"}},
               "filter":{"type":"object","properties":{
                 "logic":{"type":"string"},
                 "conditions":{"type":"array","items":{"type":"object","properties":{"field":{"type":"string"},"operator":{"type":"string"},"value":{}},"required":["field","operator"],"additionalProperties":false}},
                 "groups":{"type":"array","items":{"type":"object","properties":{"logic":{"type":"string"},"conditions":{"type":"array","items":{"type":"object","properties":{"field":{"type":"string"},"operator":{"type":"string"},"value":{}},"required":["field","operator"],"additionalProperties":false}}},"additionalProperties":false}}
               },"additionalProperties":false},
-              "groupBy":{"type":"array","items":{"type":"string"}},
+              "groupBy":{"type":"array","description":"使用已注册的项目业务字段分组。项目区域/省份分布使用 projectProvince，项目类型分布使用 projectType，项目状态分布使用 projectStatus；配合 aggregations 的 count 统计数量。完整地址 regionName 不用于省级区域统计。","items":{"type":"string"}},
               "aggregations":{"type":"array","items":{"type":"object","properties":{"function":{"type":"string"},"field":{"type":"string"},"alias":{"type":"string"}},"required":["function"],"additionalProperties":false}},
               "orderBy":{"type":"array","items":{"type":"object","properties":{"field":{"type":"string"},"direction":{"type":"string"}},"required":["field"],"additionalProperties":false}},
               "page":{"type":"integer"},"pageSize":{"type":"integer"}

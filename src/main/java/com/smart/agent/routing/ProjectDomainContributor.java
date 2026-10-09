@@ -1,6 +1,7 @@
 package com.smart.agent.routing;
 
 import com.smart.agent.security.AgentUserContext;
+import java.util.ArrayList;
 import java.util.List;
 import org.springframework.stereotype.Component;
 
@@ -10,7 +11,13 @@ public class ProjectDomainContributor implements BusinessDomainContributor {
             "PROJECT", "项目", List.of("project.query", "project.listAccessible", "project.getOverview",
                     "project.getArchiveDetail", "project.getContracts"),
             List.of(new DataScopeDescriptor("PROJECT_MENU", "项目菜单权限", List.of("MENU", "PROJECT_MEMBER"))),
-            "REALTIME", List.of("项目", "项目档案", "项目报备", "工程"));
+            "REALTIME", triggerTerms());
+
+    private static List<String> triggerTerms() {
+        List<String> terms = new ArrayList<>(List.of("项目", "项目档案", "项目报备", "工程"));
+        terms.addAll(ProjectBaseMetricTerms.TERMS);
+        return List.copyOf(terms);
+    }
 
     @Override
     public BusinessDomainDescriptor descriptor() { return DESCRIPTOR; }
