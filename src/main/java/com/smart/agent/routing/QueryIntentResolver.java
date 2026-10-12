@@ -21,6 +21,12 @@ public class QueryIntentResolver {
             String activeDomain, AgentUserContext userContext) {
         String normalized = question == null ? "" : question.trim().toLowerCase(Locale.ROOT);
         if (normalized.isBlank()) return IntentResolution.unknown(question);
+        boolean contractQuery = registry.findDomain(ConstructionContractDomainContributor.CODE).isPresent()
+                && ConstructionContractDomainContributor.matches(normalized)
+                && !ConstructionContractDomainContributor.isWorkflowQuery(normalized);
+        if (contractQuery && (userContext == null || !userContext.permissions().contains("menu:project"))) {
+            return IntentResolution.unknown(question);
+        }
         if (ProjectBaseMetricTerms.matches(normalized)
                 && (userContext == null || !userContext.permissions().contains("menu:project"))) {
             return IntentResolution.unknown(question);
@@ -43,6 +49,10 @@ public class QueryIntentResolver {
         return registry.findByTool(toolKey).map(BusinessDomainDescriptor::code).orElse(null);
     }
 
+    public java.util.Optional<BusinessDomainDescriptor> domain(String code) {
+        return registry.findDomain(code);
+    }
+
     public IntentResolution resolveSelectedDomain(
             String domainCode, String originalQuestion, AgentUserContext userContext) {
         return registry.availableDomains(userContext).stream()
@@ -56,6 +66,12 @@ public class QueryIntentResolver {
     private int score(BusinessDomainDescriptor domain, String question,
             Map<String, ?> pageContext, String activeDomain) {
         int score = 0;
+        if (registry.findDomain(ConstructionContractDomainContributor.CODE).isPresent()
+                && ConstructionContractDomainContributor.matches(question)) {
+            if (ConstructionContractDomainContributor.isWorkflowQuery(question))
+                return "APPROVAL".equals(domain.code()) ? 100 : 0;
+            if (ConstructionContractDomainContributor.CODE.equals(domain.code())) score += 50;
+        }
         for (String term : domain.triggerTerms()) {
             if (term != null && !term.isBlank() && question.contains(term.toLowerCase(Locale.ROOT))) score += 10;
         }
@@ -79,7 +95,7 @@ public class QueryIntentResolver {
     }
 
     private boolean isContextualFollowUp(String question) {
-        return question.matches(".*(查|看|多少|数量|统计|第|上一页|下一页|明细|详情|筛选|状态|比较|对比|继续|项目|审批|看板).*" );
+        return question.matches(".*(查|看|多少|数量|金额|总额|合计|总计|签订|创建|日期|第|上一页|下一页|明细|详情|筛选|状态|比较|对比|继续|项目|审批|看板).*" );
     }
 
     private String reason(BusinessDomainDescriptor domain, int score) {

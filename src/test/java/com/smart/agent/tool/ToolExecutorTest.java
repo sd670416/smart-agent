@@ -93,6 +93,7 @@ class ToolExecutorTest {
         assertThat(executor.timeoutFor("project.getArchiveDetail")).isEqualTo(Duration.ofSeconds(30));
         assertThat(executor.timeoutFor("approval.query")).isEqualTo(Duration.ofSeconds(30));
         assertThat(executor.timeoutFor("approval.getDetail")).isEqualTo(Duration.ofSeconds(30));
+        assertThat(executor.timeoutFor("constructionContract.query")).isEqualTo(Duration.ofSeconds(30));
     }
 
     @Test

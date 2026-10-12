@@ -10,6 +10,52 @@ import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 class QueryIntentResolverTest {
+    @Test
+    void constructionContractMetricOverridesLegacyBoardAndProjectTerms() {
+        QueryIntentResolver routing = contractResolver();
+        for (String question : List.of("经营看板的建设合同总金额", "查询项目的施工合同", "建设合同总金额是多少")) {
+            assertEquals("CONSTRUCTION_CONTRACT", routing.resolve(question, Map.of(), "PROJECT", user)
+                    .candidate().orElseThrow().domain().code(), question);
+        }
+    }
+
+    @Test
+    void workflowObjectKeepsApprovalEvenWhenItMentionsConstructionContract() {
+        assertEquals("APPROVAL", contractResolver().resolve("查询施工合同待办", Map.of(),
+                "CONSTRUCTION_CONTRACT", user).candidate().orElseThrow().domain().code());
+    }
+
+    @Test
+    void contractFollowUpRetainsDomainButExplicitProjectQuestionSwitches() {
+        QueryIntentResolver routing = contractResolver();
+        assertEquals("CONSTRUCTION_CONTRACT", routing.resolve("总金额呢", Map.of(), "CONSTRUCTION_CONTRACT", user)
+                .candidate().orElseThrow().domain().code());
+        assertEquals("PROJECT", routing.resolve("查询项目数量", Map.of(), "CONSTRUCTION_CONTRACT", user)
+                .candidate().orElseThrow().domain().code());
+    }
+
+    @Test
+    void contractTotalFollowUpsRetainTheActiveDomain() {
+        for (String question : List.of("合计呢", "总计呢")) {
+            IntentResolution result = contractResolver().resolve(question, Map.of(), "CONSTRUCTION_CONTRACT", user);
+            assertTrue(result.candidate().isPresent(), question);
+            assertEquals("CONSTRUCTION_CONTRACT", result.candidate().orElseThrow().domain().code(), question);
+        }
+    }
+
+    @Test
+    void boardPermissionCannotReadMigratedConstructionContractMetric() {
+        AgentUserContext boardOnly = new AgentUserContext("tenant", "user", "identity",
+                Set.of("menu:board:manage"), Set.of());
+        assertEquals(IntentResolution.Status.UNKNOWN, contractResolver().resolve(
+                "经营看板的建设合同总金额", Map.of(), null, boardOnly).status());
+    }
+
+    private QueryIntentResolver contractResolver() {
+        return new QueryIntentResolver(new BusinessDomainRegistry(List.of(new ProjectDomainContributor(),
+                new ApprovalDomainContributor(), new BoardDomainContributor(), new ConstructionContractDomainContributor())));
+    }
+
     private final BusinessDomainRegistry registry = new BusinessDomainRegistry(List.of(
             () -> new BusinessDomainDescriptor("PROJECT", "项目", List.of("project.query"), List.of(), "REALTIME",
                     List.of("项目")),

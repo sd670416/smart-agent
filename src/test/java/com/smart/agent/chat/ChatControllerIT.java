@@ -383,13 +383,13 @@ class ChatControllerIT {
         List<String> events = stream("帮我查询所有项目", Set.of(), Set.of());
 
         assertThat(events.getLast()).contains("AGENT_PROJECT_MENU_FORBIDDEN")
-                .contains("您当前没有项目报备或项目档案的访问权限，请联系管理员授权");
+                .contains("当前账号还没有项目的查看权限，暂时无法为你查询");
         AgentRun run = runRepository.findByTenantIdAndUserIdAndConversationId(
                 "tenant-1", "user-1", conversationId).getFirst();
         assertThat(run.status()).isEqualTo(AgentRunStatus.PERMISSION_DENIED);
         assertThat(conversationService.find("tenant-1", "user-1", conversationId).messages())
                 .extracting(com.smart.agent.conversation.Message::content)
-                .contains("您当前没有项目报备或项目档案的访问权限，请联系管理员授权。");
+                .contains("当前账号还没有项目的查看权限，暂时无法为你查询。可以联系管理员确认并开通相关权限后再试。");
         assertThat(scenarioModelGateway.requests()).isEmpty();
     }
 

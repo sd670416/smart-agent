@@ -1,5 +1,13 @@
 # Project Board Metrics Migration Implementation Plan
 
+## 最新口径：2026-10-12
+
+用户确认项目查询统一默认范围：审批完成 `2`，排除关闭 `10`、立项中 `1`、立项未通过 `3`。这覆盖 `project.query` 普通列表、数量、类型/区域/状态聚合，以及旧 `project.listAccessible` 列表入口，不再仅对状态分布追加排除。用户明确指定项目状态时沿用已有例外；审批完成限制始终生效。按明确项目 ID 查询详情不属于默认列表筛选，原有授权校验保持不变。
+
+本规则优先于本文 2026-10-09 的“普通列表不自动排除”和“仅状态分布排除 1/3”记录。可信授权集合、档案页面和待办/已办/我发起不修改。
+
+主查询回归测试 14 个通过；旧列表入口新增默认范围回归测试。生效仅需重启 smart-boot。复测“查询项目列表”“项目总数”“按类型统计数量”“按区域统计数量”“按状态统计数量”，默认均不包含三个排除状态；在相同筛选、完整分页且无空区域等差异时对账。带登录用户的页面验收仍待执行。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 将经营看板的项目数量、类型、状态和区域分布问题迁入 `project.query`，在可见项目范围内只统计审批完成记录。

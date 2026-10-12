@@ -6,11 +6,7 @@ final class AgentErrorMessageCatalog {
     private static final String FALLBACK = "抱歉，本次请求暂时未能完成，请稍后重试。";
     private static final Map<String, String> MESSAGES = Map.ofEntries(
             Map.entry("AGENT_PROJECT_NOT_FOUND", "未找到您有权访问的匹配项目，请检查项目名称或编号。"),
-            Map.entry("AGENT_PROJECT_FORBIDDEN", "您暂无权限查看该项目。"),
-            Map.entry("AGENT_PROJECT_MENU_FORBIDDEN", "您当前没有项目报备或项目档案的访问权限，请联系管理员授权。"),
             Map.entry("AGENT_PROJECT_ARCHIVE_TOO_LARGE", "该项目档案数据量较大，请指定要查看的部分。"),
-            Map.entry("AGENT_TOOL_PROJECT_FORBIDDEN", "您暂无权限查看该项目。"),
-            Map.entry("AGENT_TOOL_FORBIDDEN", "您暂无权限执行本次查询。"),
             Map.entry("AGENT_TOOL_INVALID_INPUT", "暂时无法识别本次查询条件，请换一种说法后重试。"),
             Map.entry("AGENT_TOOL_NOT_FOUND", "暂不支持这项查询，请尝试换一种提问方式。"),
             Map.entry("AGENT_TOOL_TIMEOUT", "业务数据查询超时，请稍后重试。"),
@@ -48,7 +44,6 @@ final class AgentErrorMessageCatalog {
             Map.entry("AGENT_MODEL_SWITCH_FORBIDDEN", "该模型不可用于当前会话，请刷新后重新选择。"),
             Map.entry("AGENT_MODEL_PROTOCOL_ERROR", "模型响应格式异常，请稍后重试。"),
             Map.entry("AGENT_PROJECT_DATA_NOT_REFRESHED", "未能获取最新项目数据，请稍后重试。"),
-            Map.entry("AGENT_APPROVAL_PERMISSION_DENIED", "您当前没有任务中心的访问权限，请联系管理员授权。"),
             Map.entry("AGENT_APPROVAL_FIELD_UNKNOWN", "暂未识别该审批字段，请补充具体字段或选择系统支持的字段。"),
             Map.entry("AGENT_APPROVAL_OPERATOR_INVALID", "暂不支持当前审批筛选方式，请换一种筛选条件表达。"),
             Map.entry("AGENT_APPROVAL_VALUE_INVALID", "审批筛选条件的取值格式不正确，请检查后重试。"),
@@ -78,10 +73,34 @@ final class AgentErrorMessageCatalog {
     }
 
     static String message(String code, boolean hasAttachments) {
+        return message(code, hasAttachments, null);
+    }
+
+    static String message(String code, boolean hasAttachments, String querySubject) {
+        String subject = querySubject == null || querySubject.isBlank() ? null : querySubject;
+        switch (code) {
+            case "AGENT_PROJECT_MENU_FORBIDDEN", "AGENT_APPROVAL_PERMISSION_DENIED", "AGENT_TOOL_FORBIDDEN" -> {
+                if (subject == null) subject = defaultPermissionSubject(code);
+                return "当前账号还没有" + subject + "的查看权限，暂时无法为你查询。可以联系管理员确认并开通相关权限后再试。";
+            }
+            case "AGENT_PROJECT_FORBIDDEN", "AGENT_TOOL_PROJECT_FORBIDDEN" -> {
+                if (subject == null) subject = "项目";
+                return "当前账号暂时无法查看所查询的" + subject + "信息。可以联系管理员确认相关数据的查看范围后再试。";
+            }
+            default -> { }
+        }
         if ("AGENT_MODEL_FAILED".equals(code) && hasAttachments) {
             return "当前模型暂不支持图片分析，请改用文字提问或切换支持视觉能力的模型。";
         }
         return MESSAGES.getOrDefault(code, FALLBACK);
+    }
+
+    private static String defaultPermissionSubject(String code) {
+        return switch (code) {
+            case "AGENT_PROJECT_MENU_FORBIDDEN" -> "项目";
+            case "AGENT_APPROVAL_PERMISSION_DENIED" -> "审批";
+            default -> "相关业务";
+        };
     }
 
     static String queryClarification(String code, String detail) {

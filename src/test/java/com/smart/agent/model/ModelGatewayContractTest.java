@@ -37,6 +37,26 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
 class ModelGatewayContractTest {
+    @Test
+    void constructionContractToolsUseSchemasAcceptedByTheProviderAdapter() {
+        var query = new com.smart.agent.tool.contract.ConstructionContractQueryTool((context, input) -> null);
+        var clarify = new com.smart.agent.tool.contract.ConstructionContractClarifyDateTool();
+        AtomicReference<ChatRequest> captured = new AtomicReference<>();
+        ModelGateway gateway = capturingModel(captured, handler -> handler.onCompleteResponse(response("done", 0, 0)));
+        ModelRequest request = new ModelRequest("contract-schema", "v1",
+                List.of(new ModelRequest.ConversationMessage("user", "建设合同总金额")),
+                List.of(new ModelRequest.AllowedToolSpecification(query.key(), query.description(), query.argumentsSchemaJson()),
+                        new ModelRequest.AllowedToolSpecification(clarify.key(), clarify.description(), clarify.argumentsSchemaJson())),
+                List.of(), ModelRequest.ToolUseMode.REQUIRED);
+
+        assertThat(eventsOf(gateway, request)).anyMatch(ModelEvent.Completed.class::isInstance);
+        assertThat(captured.get().toolSpecifications()).extracting(dev.langchain4j.agent.tool.ToolSpecification::name)
+                .containsExactly("constructionContract_query", "constructionContract_clarifyDate");
+        assertThat(((SystemMessage) captured.get().messages().getFirst()).text())
+                .contains("constructionContract.query", "constructionContract.clarifyDate", "最终合同金额合计")
+                .doesNotContain("合同金额、回款、利润等尚未迁移");
+    }
+
 
     private final ModelRequest request = ModelRequest.userQuestion(
             "run-1", "查询项目 project-1 概况", List.of("project.getOverview"));

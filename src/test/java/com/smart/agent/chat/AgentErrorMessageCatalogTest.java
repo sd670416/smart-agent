@@ -7,11 +7,25 @@ import org.junit.jupiter.api.Test;
 class AgentErrorMessageCatalogTest {
 
     @Test
+    void permissionMessagesUseBusinessSubjectAndLeaveOtherErrorsUnchanged() {
+        for (String subject : java.util.List.of("项目", "施工合同", "待办", "已办", "我发起的流程", "工程产值")) {
+            assertThat(AgentErrorMessageCatalog.message("AGENT_TOOL_FORBIDDEN", false, subject))
+                    .contains("当前账号还没有" + subject + "的查看权限", "管理员");
+            assertThat(AgentErrorMessageCatalog.message("AGENT_TOOL_PROJECT_FORBIDDEN", false, subject))
+                    .contains("所查询的" + subject + "信息", "查看范围").doesNotContain("开通");
+        }
+        assertThat(AgentErrorMessageCatalog.message("AGENT_TOOL_TIMEOUT", false, "施工合同"))
+                .isEqualTo("业务数据查询超时，请稍后重试。");
+        assertThat(AgentErrorMessageCatalog.message("AGENT_WEB_SEARCH_FORBIDDEN", false, "施工合同"))
+                .contains("联网搜索").doesNotContain("施工合同");
+    }
+
+    @Test
     void returnsFriendlyMessagesForKnownAndUnknownErrors() {
         assertThat(AgentErrorMessageCatalog.message("AGENT_PROJECT_NOT_FOUND", false))
                 .isEqualTo("未找到您有权访问的匹配项目，请检查项目名称或编号。");
         assertThat(AgentErrorMessageCatalog.message("AGENT_PROJECT_MENU_FORBIDDEN", false))
-                .isEqualTo("您当前没有项目报备或项目档案的访问权限，请联系管理员授权。");
+                .isEqualTo("当前账号还没有项目的查看权限，暂时无法为你查询。可以联系管理员确认并开通相关权限后再试。");
         assertThat(AgentErrorMessageCatalog.message("AGENT_TOOL_INVALID_INPUT", false))
                 .isEqualTo("暂时无法识别本次查询条件，请换一种说法后重试。");
         assertThat(AgentErrorMessageCatalog.message("AGENT_QUERY_INVALID_REQUEST", false))
