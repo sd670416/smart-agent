@@ -6,6 +6,8 @@ final class AgentErrorMessageCatalog {
     private static final String FALLBACK = "抱歉，本次请求暂时未能完成，请稍后重试。";
     private static final Map<String, String> MESSAGES = Map.ofEntries(
             Map.entry("AGENT_PROJECT_NOT_FOUND", "未找到您有权访问的匹配项目，请检查项目名称或编号。"),
+            Map.entry("AGENT_PROJECT_REFERENCE_NOT_FOUND", "未找到当前账号可查询的匹配项目。请确认项目编号或名称后再试。"),
+            Map.entry("AGENT_PROJECT_REFERENCE_AMBIGUOUS", "匹配到多个项目，暂时无法确定你要查看哪一个。请补充准确的项目编号或完整名称。"),
             Map.entry("AGENT_PROJECT_ARCHIVE_TOO_LARGE", "该项目档案数据量较大，请指定要查看的部分。"),
             Map.entry("AGENT_TOOL_INVALID_INPUT", "暂时无法识别本次查询条件，请换一种说法后重试。"),
             Map.entry("AGENT_TOOL_NOT_FOUND", "暂不支持这项查询，请尝试换一种提问方式。"),

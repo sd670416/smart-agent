@@ -33,6 +33,8 @@ class ConstructionContractChatTest {
     private final List<ConstructionContractQueryInput> queries = new CopyOnWriteArrayList<>();
     private final String conversationId = conversationService.create("tenant", "user", "合同查询").id();
     private ToolExecutor executor;
+    private List<Map<String, Object>> projectRows = List.of(Map.of("projectId", "p1", "projectName", "示例",
+            "projectCode", "20260708001"));
 
     @AfterEach void close() { if (executor != null) executor.close(); }
 
@@ -47,9 +49,17 @@ class ConstructionContractChatTest {
             return new ProjectQueryResult("aggregate", 1, 20, 1L, false, List.of(),
                     List.of(Map.of("contractCount", queries.size(), "finalContractAmount", 123.45)), List.of());
         };
-        ToolRegistry tools = new ToolRegistry(List.of(new ConstructionContractQueryTool(client),
+        var projects = new com.smart.agent.tool.project.LocalProjectBusinessClient() {
+            @Override public ProjectQueryResult query(ToolContext context, com.smart.agent.tool.project.ProjectQueryInput input) {
+                var rows = projectRows.stream().filter(row -> context.canAccessProject(row.get("projectId").toString()))
+                        .filter(row -> input.filter() == null || matchesProjectFilter(row, input.filter())).toList();
+                return new ProjectQueryResult("detail", 1, 6, (long) rows.size(), false, List.of(), rows, List.of());
+            }
+        };
+        ToolRegistry tools = new ToolRegistry(List.of(new ConstructionContractQueryTool(client,
+                new com.smart.agent.tool.project.ProjectReferenceResolver(projects)),
                 new com.smart.agent.tool.approval.ApprovalQueryTool(approvalClient),
-                new com.smart.agent.tool.project.ProjectQueryTool(new com.smart.agent.tool.project.LocalProjectBusinessClient()),
+                new com.smart.agent.tool.project.ProjectQueryTool(projects),
                 new ConstructionContractClarifyDateTool(), new com.smart.agent.tool.system.CurrentTimeTool(
                 java.time.Clock.fixed(java.time.Instant.parse("2026-10-12T02:00:00Z"), java.time.ZoneOffset.UTC),
                 java.time.ZoneId.of("Asia/Shanghai"))));
@@ -67,6 +77,14 @@ class ConstructionContractChatTest {
         return request.redactedConversationMessages().stream().anyMatch(ModelRequest.ToolResultMessage.class::isInstance);
     }
 
+    private boolean matchesProjectFilter(Map<String, Object> row, com.smart.agent.tool.project.ProjectQueryFilter filter) {
+        var checks = new ArrayList<Boolean>();
+        filter.conditions().forEach(condition -> checks.add(Objects.equals(row.get(condition.field()), condition.value())));
+        filter.groups().forEach(group -> checks.add(matchesProjectFilter(row, group)));
+        return "OR".equals(filter.logic()) ? checks.stream().anyMatch(Boolean::booleanValue)
+                : checks.stream().allMatch(Boolean::booleanValue);
+    }
+
     @Test void toolResultReturnsToModelAndEveryFollowUpRefreshes() {
         ChatOrchestrator chat = orchestrator(request -> hasCurrentResult(request)
                 ? Flux.just(new ModelEvent.Completed("模型根据本轮合同结果回答", 1, 1))
@@ -82,7 +100,7 @@ class ConstructionContractChatTest {
         assertThat(requests.get(1).toolUseMode()).isEqualTo(ModelRequest.ToolUseMode.AUTO);
         assertThat(contexts.find("tenant", "user", conversationId, ConversationContextService.ACTIVE_BUSINESS_DOMAIN)
                 .orElseThrow().payloadJson()).contains("CONSTRUCTION_CONTRACT");
-        assertThat(requests.get(2).redactedConversationMessages().toString()).contains("projectName", "示例");
+        assertThat(requests.get(2).redactedConversationMessages().toString()).contains("projectId", "p1");
     }
 
     @Test void historicalAnswerCannotEndTurnWithoutCurrentQuery() {
@@ -94,6 +112,108 @@ class ConstructionContractChatTest {
         assertThat(queries).hasSize(1);
         assertThat(events.stream().filter(event -> "message_delta".equals(event.type()))
                 .map(ChatEvent::text).toList()).contains("实时查询后的金额").doesNotContain("历史金额9999");
+    }
+
+    @Test void projectCodeInLegacyIdFieldIsResolvedInsteadOfReportedAsForbidden() {
+        ChatOrchestrator chat = orchestrator(request -> hasCurrentResult(request)
+                ? Flux.just(new ModelEvent.Completed("精确项目的施工合同", 1, 1))
+                : Flux.just(new ModelEvent.ToolRequested("contract", "constructionContract.query",
+                        "{\"projectId\":\"20260708001\"}")));
+        var events = chat.stream(new ChatCommand(conversationId, "看一下施工合同", null), user, "trace")
+                .collectList().block();
+        assertThat(queries).hasSize(1);
+        assertThat(queries.getFirst().projectId()).isEqualTo("p1");
+        assertThat(events).noneMatch(event -> "error".equals(event.type()));
+    }
+
+    @Test void projectNameDoesNotSilentlyBecomeAContainsFilter() {
+        ChatOrchestrator chat = orchestrator(request -> hasCurrentResult(request)
+                ? Flux.just(new ModelEvent.Completed("精确项目的施工合同", 1, 1))
+                : Flux.just(new ModelEvent.ToolRequested("contract", "constructionContract.query",
+                        "{\"projectName\":\"示例\"}")));
+        chat.stream(new ChatCommand(conversationId, "看一下示例项目的施工合同", null), user, "trace")
+                .collectList().block();
+        assertThat(queries).hasSize(1);
+        assertThat(queries.getFirst().projectId()).isEqualTo("p1");
+        assertThat(queries.getFirst().projectName()).isNull();
+    }
+
+    @Test void duplicateProjectNamesRequireSelectionAndPreserveQueryFilters() {
+        projectRows = List.of(Map.of("projectId", "p1", "projectName", "示例", "projectCode", "001"),
+                Map.of("projectId", "p2", "projectName", "示例", "projectCode", "002"));
+        var both = new AgentUserContext("tenant", "user", "identity", Set.of("menu:project"), Set.of("p1", "p2"));
+        ChatOrchestrator chat = orchestrator(request -> hasCurrentResult(request)
+                ? Flux.just(new ModelEvent.Completed("选定项目查询完成", 1, 1))
+                : Flux.just(new ModelEvent.ToolRequested("contract", "constructionContract.query",
+                        "{\"projectName\":\"示例\",\"mode\":\"summary\",\"dateField\":\"signingDate\",\"startDate\":\"2026-01-01\",\"endDate\":\"2026-01-31\"}")));
+        var first = chat.stream(new ChatCommand(conversationId, "示例项目1月签订的施工合同金额", null), both, "trace1")
+                .collectList().block();
+        assertThat(first.toString()).contains("PROJECT_REFERENCE", "project:p2");
+        assertThat(queries).isEmpty();
+        var pendingQuestion = pending.findActive("tenant", "user", conversationId).orElseThrow();
+        var second = chat.stream(new ChatCommand(conversationId, "选择第二个", List.of(), null,
+                new ChatCommand.ClarificationSelection(pendingQuestion.id(), "project:p2")), both, "trace2")
+                .collectList().block();
+        assertThat(second.toString()).contains("选定项目查询完成");
+        assertThat(queries).hasSize(1);
+        assertThat(queries.getFirst().projectId()).isEqualTo("p2");
+        assertThat(queries.getFirst().projectName()).isNull();
+        assertThat(queries.getFirst().startDate()).isEqualTo("2026-01-01");
+        assertThat(queries.getFirst().mode()).isEqualTo("summary");
+    }
+
+    @Test void projectQuerySuppliesVerifiedProjectReferenceForContractFollowUp() {
+        ChatOrchestrator chat = orchestrator(request -> hasCurrentResult(request)
+                ? Flux.just(new ModelEvent.Completed("查询完成", 1, 1))
+                : Flux.just(new ModelEvent.ToolRequested("project", "project.query", "{}")));
+        chat.stream(new ChatCommand(conversationId, "查询项目信息", null), user, "trace1").collectList().block();
+        contexts.upsert("tenant", "user", conversationId, "QUERY_CONSTRUCTION_CONTRACT",
+                "{\"arguments\":{\"projectName\":\"旧项目\"}}", "old");
+        var second = chat.stream(new ChatCommand(conversationId, "看一下施工合同", null), user, "trace2")
+                .collectList().block();
+        assertThat(requests.get(2).redactedConversationMessages().toString()).contains("projectId", "p1", "20260708001")
+                .doesNotContain("旧项目");
+    }
+
+    @Test void returningFromApprovalDoesNotInheritOldContractFilters() {
+        contexts.upsert("tenant", "user", conversationId, ConversationContextService.ACTIVE_BUSINESS_DOMAIN,
+                "{\"domain\":\"APPROVAL\",\"toolKey\":\"approval.query\"}", "old");
+        contexts.upsert("tenant", "user", conversationId, "QUERY_CONSTRUCTION_CONTRACT",
+                "{\"arguments\":{\"projectId\":\"old-project\",\"contractName\":\"old-contract\"}}", "old");
+        ChatOrchestrator chat = orchestrator(request -> hasCurrentResult(request)
+                ? Flux.just(new ModelEvent.Completed("查询完成", 1, 1))
+                : Flux.just(new ModelEvent.ToolRequested("contract", "constructionContract.query", "{}")));
+        chat.stream(new ChatCommand(conversationId, "查询施工合同", null), user, "trace").collectList().block();
+        assertThat(requests.getFirst().redactedConversationMessages().toString())
+                .doesNotContain("old-project", "old-contract");
+        assertThat(queries).hasSize(1);
+        assertThat(queries.getFirst().projectId()).isNull();
+    }
+
+    @Test void explicitContainsKeepsDeliberateMultiProjectFilter() {
+        ChatOrchestrator chat = orchestrator(request -> hasCurrentResult(request)
+                ? Flux.just(new ModelEvent.Completed("查询完成", 1, 1))
+                : Flux.just(new ModelEvent.ToolRequested("contract", "constructionContract.query",
+                        "{\"projectName\":\"示例\",\"projectNameMatch\":\"contains\"}")));
+        chat.stream(new ChatCommand(conversationId, "项目名称包含示例的施工合同", null), user, "trace").collectList().block();
+        assertThat(queries).hasSize(1);
+        assertThat(queries.getFirst().projectId()).isNull();
+        assertThat(queries.getFirst().projectName()).isEqualTo("示例");
+    }
+
+    @Test void changedPermissionsRejectPreviouslyOfferedProject() {
+        projectRows = List.of(Map.of("projectId", "p1", "projectName", "示例", "projectCode", "001"),
+                Map.of("projectId", "p2", "projectName", "示例", "projectCode", "002"));
+        var both = new AgentUserContext("tenant", "user", "identity", Set.of("menu:project"), Set.of("p1", "p2"));
+        ChatOrchestrator chat = orchestrator(request -> Flux.just(new ModelEvent.ToolRequested("contract",
+                "constructionContract.query", "{\"projectName\":\"示例\"}")));
+        chat.stream(new ChatCommand(conversationId, "查询示例项目施工合同", null), both, "trace1").collectList().block();
+        var pendingQuestion = pending.findActive("tenant", "user", conversationId).orElseThrow();
+        var events = chat.stream(new ChatCommand(conversationId, "选择第二个", List.of(), null,
+                new ChatCommand.ClarificationSelection(pendingQuestion.id(), "project:p2")), user, "trace2")
+                .collectList().block();
+        assertThat(queries).isEmpty();
+        assertThat(events).anyMatch(event -> "AGENT_TOOL_PROJECT_FORBIDDEN".equals(event.code()));
     }
 
     @Test void missingProjectPermissionCannotFallBackToLegacyBoardQuery() {
@@ -114,11 +234,11 @@ class ConstructionContractChatTest {
         var events = chat.stream(new ChatCommand(conversationId, "看一下施工合同", null), user, "trace")
                 .collectList().block();
         assertThat(events.stream().filter(event -> "error".equals(event.type())).map(ChatEvent::text))
-                .containsExactly("当前账号暂时无法查看所查询的施工合同信息。可以联系管理员确认相关数据的查看范围后再试。");
+                .containsExactly("未找到当前账号可查询的匹配项目。请确认项目编号或名称后再试。");
         assertThat(queries).isEmpty();
         assertThat(conversationService.find("tenant", "user", conversationId).messages())
                 .extracting(com.smart.agent.conversation.Message::content)
-                .contains("当前账号暂时无法查看所查询的施工合同信息。可以联系管理员确认相关数据的查看范围后再试。");
+                .contains("未找到当前账号可查询的匹配项目。请确认项目编号或名称后再试。");
     }
 
     @Test void projectScopeDenialKeepsProjectSubject() {

@@ -11,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class ConversationContextService {
     public static final String APPROVAL_QUERY = "APPROVAL_QUERY";
     public static final String PROJECT_QUERY = "PROJECT_QUERY";
+    public static final String CURRENT_PROJECT = "CURRENT_PROJECT";
     public static final String ACTIVE_BUSINESS_DOMAIN = "ACTIVE_BUSINESS_DOMAIN";
     static final int MAX_PAYLOAD_BYTES = 256 * 1024;
 

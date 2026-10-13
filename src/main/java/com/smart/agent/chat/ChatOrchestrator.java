@@ -262,6 +262,7 @@ public class ChatOrchestrator {
         private String activeBusinessDomain;
         private String permissionQuerySubject;
         private String effectiveQuestion;
+        private JsonNode projectClarificationArguments;
         private List<KnowledgeCitation> citations = List.of();
         private final StringBuilder turnDeltas = new StringBuilder();
         private final List<ModelEvent.ToolRequested> turnTools = new ArrayList<>();
@@ -437,6 +438,19 @@ public class ChatOrchestrator {
                             .contains(selection.optionId())) throw clarificationFailure();
                     effectiveQuestion += "\n[用户确认的日期字段=" + selection.optionId().substring("date:".length()) + "]";
                 }
+                if ("PROJECT_REFERENCE".equals(intent.path("ambiguityType").asText())) {
+                    if (!"CONSTRUCTION_CONTRACT".equals(domainCode)
+                            || !selection.optionId().startsWith("project:")
+                            || !intent.path("queryArguments").isObject()) throw clarificationFailure();
+                    String id = selection.optionId().substring("project:".length());
+                    if (!context.projectIds().contains(id)) throw new AgentException("AGENT_TOOL_PROJECT_FORBIDDEN",
+                            org.springframework.http.HttpStatus.FORBIDDEN, "Selected project is no longer permitted");
+                    var confirmed = (com.fasterxml.jackson.databind.node.ObjectNode) intent.path("queryArguments").deepCopy();
+                    confirmed.put("projectId", id);
+                    confirmed.remove(java.util.List.of("projectCode", "projectName", "projectNameMatch"));
+                    projectClarificationArguments = confirmed;
+                    effectiveQuestion += "\n[用户确认的真实项目ID=" + id + "，按已确认项目和原查询条件查询施工合同]";
+                }
                 IntentResolution resolution = queryIntentResolver.resolveSelectedDomain(
                         domainCode, originalQuestion, context);
                 persistDebug("CLARIFICATION_RESOLVED", "routing", objectMapper.writeValueAsString(Map.of(
@@ -472,6 +486,8 @@ public class ChatOrchestrator {
                 storedIntent.put("activeBusinessDomain", activeBusinessDomain);
                 storedIntent.put("ambiguityType", prompt.ambiguityType());
                 storedIntent.put("options", prompt.options());
+                if ("PROJECT_REFERENCE".equals(prompt.ambiguityType()) && projectClarificationArguments != null)
+                    storedIntent.put("queryArguments", projectClarificationArguments);
                 String intentJson = objectMapper.writeValueAsString(storedIntent);
                 String optionsJson = objectMapper.writeValueAsString(prompt.options());
                 PendingClarification clarification = withinBudget(() -> pendingClarificationService.create(
@@ -749,6 +765,25 @@ public class ChatOrchestrator {
 
         private void appendAdditionalQueryContext() {
             if (additionalQueryDomain == null || conversationContextService == null) return;
+            if ("CONSTRUCTION_CONTRACT".equals(additionalQueryDomain.code()) && "PROJECT".equals(activeBusinessDomain)) {
+                var selected = withinBudget(() -> conversationContextService.find(context.tenantId(), context.userId(),
+                        command.conversationId(), ConversationContextService.CURRENT_PROJECT));
+                if (selected.isPresent()) {
+                    try {
+                        JsonNode reference = objectMapper.readTree(selected.get().payloadJson());
+                        if (context.projectIds().contains(reference.path("projectId").asText()))
+                            messages.add(new ModelRequest.ConversationMessage("user",
+                                    "[trusted-project-reference: 最近项目工具确认的项目标识=" + reference
+                                            + "。仅在用户追问该项目施工合同时使用真实projectId；projectCode是编号，不是ID。"
+                                            + "用户明确查询其他项目或全部项目时，以新问题为准。必须重新调用合同工具获取实时数据。]"));
+                    } catch (java.io.IOException exception) {
+                        throw new IllegalStateException("Invalid project reference context", exception);
+                    }
+                }
+                // Do not inherit filters from an older, unrelated contract query after viewing a project.
+                return;
+            }
+            if (!additionalQueryDomain.code().equals(activeBusinessDomain)) return;
             withinBudget(() -> conversationContextService.find(context.tenantId(), context.userId(),
                     command.conversationId(), additionalQueryContextType())).ifPresent(snapshot -> {
                 try {
@@ -1288,6 +1323,9 @@ public class ChatOrchestrator {
                 if (input == null || !input.isObject()) {
                     throw new IllegalArgumentException("tool input must be an object");
                 }
+                if ("constructionContract.query".equals(request.toolKey()) && projectClarificationArguments != null)
+                    input = projectClarificationArguments.deepCopy();
+                final JsonNode executionInput = input;
                 String normalizedArguments = objectMapper.writeValueAsString(input);
                 String toolSubject = permissionSubjectForTool(request.toolKey(), input);
                 if (toolSubject != null) permissionQuerySubject = toolSubject;
@@ -1325,7 +1363,7 @@ public class ChatOrchestrator {
                     // 只在工具执行的工作线程内可见，不落日志、不进响应。
                     ModelCredentialSource.Credentials runCredentials = modelCredentialsForRun();
                     toolFuture = startToolWithinBudget(
-                            () -> toolExecutor.execute(request.toolKey(), input, context, modelBindingForRun,
+                            () -> toolExecutor.execute(request.toolKey(), executionInput, context, modelBindingForRun,
                                     runCredentials));
                 }
                 Object result = awaitTool(toolFuture);
@@ -1367,9 +1405,22 @@ public class ChatOrchestrator {
                             context.tenantId(), context.userId(), command.conversationId(),
                             ConversationContextService.PROJECT_QUERY, snapshot, run.id()));
                 }
+                persistCurrentProject(request.toolKey(), result);
                 if (additionalQueryDomain != null && additionalQueryDomain.ownsTool(request.toolKey())
                         && !clarificationResult && conversationContextService != null) {
-                    String snapshot = objectMapper.writeValueAsString(Map.of("arguments", input, "result", result));
+                    JsonNode effectiveArguments = input.deepCopy();
+                    if ("constructionContract.query".equals(request.toolKey())
+                            && result instanceof com.smart.agent.tool.project.ProjectQueryResult queryResult) {
+                        for (var filter : queryResult.appliedFilters()) {
+                            if ("projectId".equals(filter.get("field")) && "eq".equals(filter.get("op"))
+                                    && filter.get("value") instanceof String id && context.projectIds().contains(id)) {
+                                var canonical = (com.fasterxml.jackson.databind.node.ObjectNode) effectiveArguments;
+                                canonical.put("projectId", id);
+                                canonical.remove(java.util.List.of("projectCode", "projectName", "projectNameMatch"));
+                            }
+                        }
+                    }
+                    String snapshot = objectMapper.writeValueAsString(Map.of("arguments", effectiveArguments, "result", result));
                     withinBudget(() -> conversationContextService.upsert(context.tenantId(), context.userId(),
                             command.conversationId(), additionalQueryContextType(), snapshot, run.id()));
                 }
@@ -1420,6 +1471,7 @@ public class ChatOrchestrator {
                     emit(ChatEvent.toolResult(run.id(), traceId, request.toolKey()));
                 }
                 if (result instanceof ClarificationPrompt prompt) {
+                    if ("PROJECT_REFERENCE".equals(prompt.ambiguityType())) projectClarificationArguments = input.deepCopy();
                     completeClarificationPrompt(prompt);
                     return false;
                 }
@@ -1467,6 +1519,29 @@ public class ChatOrchestrator {
                 fail("AGENT_TOOL_INVALID_INPUT", AgentRunStatus.FAILED);
                 return false;
             }
+        }
+
+        private void persistCurrentProject(String toolKey, Object result) throws java.io.IOException {
+            if (conversationContextService == null || !java.util.Set.of("project.query", "project.getOverview",
+                    "project.getArchiveDetail").contains(toolKey)) return;
+            JsonNode reference = objectMapper.createObjectNode();
+            if (result instanceof com.smart.agent.tool.project.ProjectQueryResult query) {
+                if (query.rows().size() == 1 && Long.valueOf(1).equals(query.total())
+                        && Boolean.FALSE.equals(query.hasNext()) && "detail".equalsIgnoreCase(query.mode()))
+                    reference = objectMapper.valueToTree(query.rows().getFirst());
+            } else if (result instanceof com.smart.agent.tool.project.ProjectOverviewResult
+                    || result instanceof com.smart.agent.tool.project.ProjectArchiveDetailResult) {
+                reference = objectMapper.valueToTree(result);
+            }
+            var selected = objectMapper.createObjectNode();
+            if (context.projectIds().contains(reference.path("projectId").asText())) {
+                selected.put("projectId", reference.path("projectId").asText());
+                for (String field : java.util.List.of("projectName", "projectCode"))
+                    if (reference.path(field).isTextual()) selected.put(field, reference.path(field).asText());
+            }
+            String payload = objectMapper.writeValueAsString(selected);
+            withinBudget(() -> conversationContextService.upsert(context.tenantId(), context.userId(),
+                    command.conversationId(), ConversationContextService.CURRENT_PROJECT, payload, run.id()));
         }
 
         private void persistActiveBusinessDomain(String toolKey) {

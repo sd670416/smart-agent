@@ -1,8 +1,22 @@
 package com.smart.agent.tool.contract;
 
 public record ConstructionContractQueryInput(String projectId, String projectName, String contractName,
-        String mode, String dateField, String startDate, String endDate, Integer page, Integer pageSize) {
+        String mode, String dateField, String startDate, String endDate, Integer page, Integer pageSize,
+        String projectCode, String projectNameMatch) {
+    public ConstructionContractQueryInput(String projectId, String projectName, String contractName,
+            String mode, String dateField, String startDate, String endDate, Integer page, Integer pageSize) {
+        this(projectId, projectName, contractName, mode, dateField, startDate, endDate, page, pageSize, null, null);
+    }
+
     public ConstructionContractQueryInput {
+        projectId = clean(projectId);
+        projectCode = clean(projectCode);
+        projectName = clean(projectName);
+        projectNameMatch = projectNameMatch == null ? "exact" : projectNameMatch;
+        if (!java.util.List.of("exact", "contains").contains(projectNameMatch))
+            throw new IllegalArgumentException("Unsupported project name matching mode");
+        if ("contains".equals(projectNameMatch) && (projectName == null || projectId != null || projectCode != null))
+            throw new IllegalArgumentException("Contains matching cannot replace an exact project reference");
         mode = mode == null ? "detail" : mode;
         page = page == null ? 1 : page;
         pageSize = pageSize == null ? 20 : pageSize;
@@ -17,4 +31,11 @@ public record ConstructionContractQueryInput(String projectId, String projectNam
                 throw new IllegalArgumentException("Reversed date range");
         }
     }
+
+    public ConstructionContractQueryInput withProjectId(String id) {
+        return new ConstructionContractQueryInput(id, null, contractName, mode, dateField, startDate, endDate,
+                page, pageSize, null, "exact");
+    }
+
+    private static String clean(String value) { return value == null || value.isBlank() ? null : value.trim(); }
 }

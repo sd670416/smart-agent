@@ -39,7 +39,8 @@ import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 class ModelGatewayContractTest {
     @Test
     void constructionContractToolsUseSchemasAcceptedByTheProviderAdapter() {
-        var query = new com.smart.agent.tool.contract.ConstructionContractQueryTool((context, input) -> null);
+        var query = new com.smart.agent.tool.contract.ConstructionContractQueryTool((context, input) -> null,
+                new com.smart.agent.tool.project.ProjectReferenceResolver(new com.smart.agent.tool.project.LocalProjectBusinessClient()));
         var clarify = new com.smart.agent.tool.contract.ConstructionContractClarifyDateTool();
         AtomicReference<ChatRequest> captured = new AtomicReference<>();
         ModelGateway gateway = capturingModel(captured, handler -> handler.onCompleteResponse(response("done", 0, 0)));
