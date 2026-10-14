@@ -180,6 +180,7 @@ public class ToolExecutor implements AutoCloseable {
                 || "approval.query".equals(toolKey)
                 || "approval.getDetail".equals(toolKey)
                 || "constructionContract.query".equals(toolKey)
+                || "projectOutput.query".equals(toolKey)
                 || toolKey.startsWith("board.")
                 ? SLOW_BUSINESS_TOOL_TIMEOUT : timeout;
     }

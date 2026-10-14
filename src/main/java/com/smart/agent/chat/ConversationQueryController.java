@@ -119,6 +119,8 @@ public class ConversationQueryController {
     public static final class RunSummary {
         private final String id;
         private final String traceId;
+        private final String userMessageId;
+        private final String assistantMessageId;
         private final String status;
         private final String modelId;
         private final String modelDisplayName;
@@ -128,12 +130,15 @@ public class ConversationQueryController {
         private final java.time.Instant updatedAt;
         RunSummary(AgentRun run) {
             this.id = run.id(); this.traceId = run.traceId(); this.status = run.status().name();
+            this.userMessageId = run.userMessageId(); this.assistantMessageId = run.assistantMessageId();
             this.modelId = run.modelId(); this.modelDisplayName = run.modelDisplayName();
             this.modelName = run.modelName(); this.modelConfigVersion = run.modelConfigVersion();
             this.createdAt = run.createdAt(); this.updatedAt = run.updatedAt();
         }
         public String getId() { return id; }
         public String getTraceId() { return traceId; }
+        public String getUserMessageId() { return userMessageId; }
+        public String getAssistantMessageId() { return assistantMessageId; }
         public String getStatus() { return status; }
         public String getModelId() { return modelId; }
         public String getModelDisplayName() { return modelDisplayName; }

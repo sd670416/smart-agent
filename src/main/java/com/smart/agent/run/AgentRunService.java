@@ -120,6 +120,7 @@ public class AgentRunService {
                 .orElseThrow(() -> new IllegalArgumentException("Agent run not found: " + runId));
         if (run.status() != expected) throw new IllegalStateException("Unexpected run status");
         Message message = conversation.append(Message.Role.ASSISTANT, content);
+        run.bindAssistantMessage(message.id());
         run.recordUsage(inputTokens, outputTokens);
         run.transition(AgentRunStatus.COMPLETED);
         conversationRepository.save(conversation);
@@ -146,6 +147,7 @@ public class AgentRunService {
                 .orElseThrow(() -> new IllegalArgumentException("Agent run not found: " + runId));
         if (run.status() != expected) throw new IllegalStateException("Unexpected run status");
         Message message = conversation.append(Message.Role.ASSISTANT, content);
+        run.bindAssistantMessage(message.id());
         run.transition(AgentRunStatus.COMPLETED);
         conversationRepository.save(conversation);
         agentRunRepository.save(run);
@@ -192,6 +194,14 @@ public class AgentRunService {
     }
 
     public record Completion(AgentRun run, Message message) {}
+
+    @Transactional
+    public AgentRun bindMessages(String tenantId, String userId, String runId, String userMessageId, String assistantMessageId) {
+        AgentRun run = agentRunRepository.findByIdAndTenantIdAndUserId(tenantId, userId, runId).orElseThrow();
+        if (userMessageId != null) run.bindUserMessage(userMessageId);
+        if (assistantMessageId != null) run.bindAssistantMessage(assistantMessageId);
+        return agentRunRepository.save(run);
+    }
 
     private static String requireText(String value, String fieldName) {
         if (value == null || value.isBlank()) {

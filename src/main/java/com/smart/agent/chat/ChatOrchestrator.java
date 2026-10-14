@@ -78,6 +78,8 @@ public class ChatOrchestrator {
     /** Optional during compatibility construction; Spring production wiring supplies it. */
     private QueryIntentResolver queryIntentResolver;
     private PendingClarificationService pendingClarificationService;
+    private com.smart.agent.question.QuestionRecordService questionRecords;
+    public void setQuestionRecords(com.smart.agent.question.QuestionRecordService records) { this.questionRecords=records; }
 
     /**
      * 兼容构造：直接使用固定网关，不经过模型注册中心。
@@ -262,6 +264,8 @@ public class ChatOrchestrator {
         private String activeBusinessDomain;
         private String permissionQuerySubject;
         private String effectiveQuestion;
+        private String unsupportedReason;
+        private String questionDomain;
         private JsonNode projectClarificationArguments;
         private List<KnowledgeCitation> citations = List.of();
         private final StringBuilder turnDeltas = new StringBuilder();
@@ -303,6 +307,7 @@ public class ChatOrchestrator {
                         context.tenantId(), context.userId(), command.conversationId(), Message.Role.USER,
                         command.question(), attachmentUrls));
                 emit(ChatEvent.messageStart(run.id(), traceId, userMessage.id()));
+                run = withinBudget(() -> runService.bindMessages(context.tenantId(), context.userId(), run.id(), userMessage.id(), null));
                 messages.addAll(history);
                 preparationStage = "prepareContext";
                 IntentResolution confirmedResolution = resolveClarificationSelection();
@@ -314,6 +319,7 @@ public class ChatOrchestrator {
                         : confirmedResolution;
                 String resolvedDomain = intentResolution == null ? null
                         : intentResolution.candidate().map(candidate -> candidate.domain().code()).orElse(null);
+                questionDomain = resolvedDomain;
                 permissionQuerySubject = intentResolution == null ? null
                         : intentResolution.candidate().map(candidate -> candidate.domain().name()).orElse(null);
                 additionalQueryDomain = queryIntentResolver == null || resolvedDomain == null
@@ -361,6 +367,7 @@ public class ChatOrchestrator {
                 moveTo(AgentRunStatus.PLANNING);
                 emit(ChatEvent.status(run.id(), traceId, status));
                 if (completeClarification(intentResolution)) return;
+                if (completeOutputTypeClarification()) return;
                 retrieveKnowledgeIfRequired();
                 preparationStage = "callModel";
                 if (resolveProjectOrdinalFollowUp()) {
@@ -433,13 +440,15 @@ public class ChatOrchestrator {
                 }
                 effectiveQuestion = originalQuestion;
                 if ("DATE_FIELD".equals(intent.path("ambiguityType").asText())) {
-                    if (!"CONSTRUCTION_CONTRACT".equals(domainCode)
-                            || !java.util.Set.of("date:projectCreateDate", "date:signingDate", "date:createDate")
-                            .contains(selection.optionId())) throw clarificationFailure();
+                    boolean validDate = "CONSTRUCTION_CONTRACT".equals(domainCode)
+                            && java.util.Set.of("date:projectCreateDate", "date:signingDate", "date:createDate").contains(selection.optionId())
+                            || "PROJECT_OUTPUT".equals(domainCode)
+                            && java.util.Set.of("date:projectCreateDate", "date:createDate").contains(selection.optionId());
+                    if (!validDate) throw clarificationFailure();
                     effectiveQuestion += "\n[用户确认的日期字段=" + selection.optionId().substring("date:".length()) + "]";
                 }
                 if ("PROJECT_REFERENCE".equals(intent.path("ambiguityType").asText())) {
-                    if (!"CONSTRUCTION_CONTRACT".equals(domainCode)
+                    if (!isProjectScopedQueryDomain(domainCode)
                             || !selection.optionId().startsWith("project:")
                             || !intent.path("queryArguments").isObject()) throw clarificationFailure();
                     String id = selection.optionId().substring("project:".length());
@@ -449,7 +458,8 @@ public class ChatOrchestrator {
                     confirmed.put("projectId", id);
                     confirmed.remove(java.util.List.of("projectCode", "projectName", "projectNameMatch"));
                     projectClarificationArguments = confirmed;
-                    effectiveQuestion += "\n[用户确认的真实项目ID=" + id + "，按已确认项目和原查询条件查询施工合同]";
+                    effectiveQuestion += "\n[用户确认的真实项目ID=" + id + "，按已确认项目和原查询条件查询"
+                            + queryIntentResolver.domain(domainCode).orElseThrow().name() + "]";
                 }
                 IntentResolution resolution = queryIntentResolver.resolveSelectedDomain(
                         domainCode, originalQuestion, context);
@@ -476,6 +486,30 @@ public class ChatOrchestrator {
                     || pendingClarificationService == null) return false;
             ClarificationPrompt prompt = ClarificationPrompt.from(resolution);
             return completeClarificationPrompt(prompt);
+        }
+
+        private boolean isProjectScopedQueryDomain(String code) {
+            return "CONSTRUCTION_CONTRACT".equals(code) || "PROJECT_OUTPUT".equals(code);
+        }
+
+        private boolean isProjectScopedQueryTool(String key) {
+            return "constructionContract.query".equals(key) || "projectOutput.query".equals(key);
+        }
+
+        private boolean completeOutputTypeClarification() {
+            if (queryIntentResolver == null || queryIntentResolver.domain("PROJECT_OUTPUT").isEmpty()
+                    || isExplicitApprovalWorkflowQuestion(effectiveQuestion)) return false;
+            String answer;
+            if (com.smart.agent.routing.ProjectOutputDomainContributor.isOtherOutput(effectiveQuestion))
+                answer = "劳务产值和专包产值查询暂未接入，目前支持工程产值查询。";
+            else if (com.smart.agent.routing.ProjectOutputDomainContributor.isAmbiguousOutput(effectiveQuestion)
+                    && !"PROJECT_OUTPUT".equals(activeBusinessDomain))
+                answer = "您要查询工程产值、劳务产值还是专包产值？目前支持工程产值查询。";
+            else return false;
+            moveTo(AgentRunStatus.GENERATING);
+            turnCompleted = new ModelEvent.Completed(answer, 0, 0);
+            completeAnswer();
+            return true;
         }
 
         private boolean completeClarificationPrompt(ClarificationPrompt prompt) {
@@ -630,6 +664,14 @@ public class ChatOrchestrator {
         }
 
         private void validateProjectMenuPermission(List<ModelRequest.ConversationEntry> history) {
+            if (queryIntentResolver != null && queryIntentResolver.domain("PROJECT_OUTPUT").isPresent()
+                    && com.smart.agent.routing.ProjectOutputDomainContributor.matches(effectiveQuestion)
+                    && !isExplicitApprovalWorkflowQuestion(effectiveQuestion)
+                    && !context.permissions().contains("menu:project")) {
+                permissionQuerySubject = queryIntentResolver.domain("PROJECT_OUTPUT").orElseThrow().name();
+                throw new AgentException("AGENT_PROJECT_MENU_FORBIDDEN",
+                        org.springframework.http.HttpStatus.FORBIDDEN, "Project menu permission is required");
+            }
             if (queryIntentResolver != null && queryIntentResolver.domain("CONSTRUCTION_CONTRACT").isPresent()
                     && com.smart.agent.routing.ConstructionContractDomainContributor.matches(effectiveQuestion)
                     && !com.smart.agent.routing.ConstructionContractDomainContributor.isWorkflowQuery(effectiveQuestion)
@@ -765,7 +807,7 @@ public class ChatOrchestrator {
 
         private void appendAdditionalQueryContext() {
             if (additionalQueryDomain == null || conversationContextService == null) return;
-            if ("CONSTRUCTION_CONTRACT".equals(additionalQueryDomain.code()) && "PROJECT".equals(activeBusinessDomain)) {
+            if (isProjectScopedQueryDomain(additionalQueryDomain.code()) && "PROJECT".equals(activeBusinessDomain)) {
                 var selected = withinBudget(() -> conversationContextService.find(context.tenantId(), context.userId(),
                         command.conversationId(), ConversationContextService.CURRENT_PROJECT));
                 if (selected.isPresent()) {
@@ -774,8 +816,8 @@ public class ChatOrchestrator {
                         if (context.projectIds().contains(reference.path("projectId").asText()))
                             messages.add(new ModelRequest.ConversationMessage("user",
                                     "[trusted-project-reference: 最近项目工具确认的项目标识=" + reference
-                                            + "。仅在用户追问该项目施工合同时使用真实projectId；projectCode是编号，不是ID。"
-                                            + "用户明确查询其他项目或全部项目时，以新问题为准。必须重新调用合同工具获取实时数据。]"));
+                                            + "。仅在用户追问该项目" + additionalQueryDomain.name() + "时使用真实projectId；projectCode是编号，不是ID。"
+                                            + "用户明确查询其他项目或全部项目时，以新问题为准。必须重新调用业务工具获取实时数据。]"));
                     } catch (java.io.IOException exception) {
                         throw new IllegalStateException("Invalid project reference context", exception);
                     }
@@ -899,6 +941,11 @@ public class ChatOrchestrator {
                     .filter(tool -> !requireBoardTool || tool.key().startsWith("board."))
                     .map(this::toolSpecification)
                     .toList();
+            if (!requireTimeTool && !requireProjectTool && !requireApprovalTool && !requireBoardTool && !requireAdditionalTool) {
+                tools = new ArrayList<>(tools);
+                if (tools.stream().noneMatch(tool -> "system.unsupported_capability".equals(tool.key())))
+                    tools.add(toolSpecification(new com.smart.agent.question.UnsupportedCapabilityTool()));
+            }
             List<ModelRequest.RetrievedEvidence> evidence = citations.stream()
                     .map(citation -> new ModelRequest.RetrievedEvidence(citation.citationToken(), citation.excerpt()))
                     .toList();
@@ -1314,6 +1361,20 @@ public class ChatOrchestrator {
         private boolean executeTool(ModelEvent.ToolRequested request) {
             long toolStarted = System.nanoTime();
             try {
+                if ("system.unsupported_capability".equals(request.toolKey())) {
+                    if ((requiresFreshProjectData && projectToolCalls == 0)
+                            || (requiresFreshApprovalData && approvalToolCalls == 0)
+                            || (requiresFreshBoardData && boardToolCalls == 0)
+                            || (additionalQueryDomain != null && additionalToolCalls == 0 && "REALTIME".equals(additionalQueryDomain.refreshPolicy())))
+                        throw new IllegalArgumentException("Complete required real-time query before marking unsupported");
+                    JsonNode marker = objectMapper.readTree(request.argumentsJson());
+                    if (marker==null || !marker.isObject() || marker.size()!=1 || !marker.path("reason").isTextual()
+                            || marker.path("reason").asText().isBlank() || marker.path("reason").asText().length()>500)
+                        throw new IllegalArgumentException("Invalid capability marker");
+                    unsupportedReason = com.smart.agent.question.QuestionSnapshot.safe(marker.path("reason").asText());
+                    messages.add(new ModelRequest.ToolResultMessage(request.callId(), request.toolKey(), request.argumentsJson(), "{\"marked\":true}"));
+                    return true;
+                }
                 if (additionalQueryDomain != null && !additionalQueryDomain.ownsTool(request.toolKey())
                         && !("system.current_time".equals(request.toolKey()) && requiresRelativeTimeForAdditionalDomain)) {
                     throw new AgentException("AGENT_QUERY_INVALID_REQUEST", org.springframework.http.HttpStatus.BAD_REQUEST,
@@ -1323,7 +1384,7 @@ public class ChatOrchestrator {
                 if (input == null || !input.isObject()) {
                     throw new IllegalArgumentException("tool input must be an object");
                 }
-                if ("constructionContract.query".equals(request.toolKey()) && projectClarificationArguments != null)
+                if (isProjectScopedQueryTool(request.toolKey()) && projectClarificationArguments != null)
                     input = projectClarificationArguments.deepCopy();
                 final JsonNode executionInput = input;
                 String normalizedArguments = objectMapper.writeValueAsString(input);
@@ -1369,6 +1430,7 @@ public class ChatOrchestrator {
                 Object result = awaitTool(toolFuture);
                 if (terminated.get() || sink.isCancelled()) return false;
                 if (request.toolKey().startsWith("project.")) projectToolCalls++;
+                if (!"system.current_time".equals(request.toolKey())) unsupportedReason = null;
                 if (request.toolKey().startsWith("approval.")) approvalToolCalls++;
                 if (request.toolKey().startsWith("board.")) boardToolCalls++;
                 String serializedResult = objectMapper.writeValueAsString(result);
@@ -1409,7 +1471,7 @@ public class ChatOrchestrator {
                 if (additionalQueryDomain != null && additionalQueryDomain.ownsTool(request.toolKey())
                         && !clarificationResult && conversationContextService != null) {
                     JsonNode effectiveArguments = input.deepCopy();
-                    if ("constructionContract.query".equals(request.toolKey())
+                    if (isProjectScopedQueryTool(request.toolKey())
                             && result instanceof com.smart.agent.tool.project.ProjectQueryResult queryResult) {
                         for (var filter : queryResult.appliedFilters()) {
                             if ("projectId".equals(filter.get("field")) && "eq".equals(filter.get("op"))
@@ -1635,6 +1697,8 @@ public class ChatOrchestrator {
                                     + completed.outputTokens() + "}"));
                     run = completion.run();
                     status = AgentRunStatus.COMPLETED;
+                    if (questionRecords != null && unsupportedReason != null)
+                        questionRecords.collectSafely(context, run.id(), "MODEL", questionDomain, unsupportedReason);
                     terminated.set(true);
                     sink.next(ChatEvent.messageEnd(run.id(), traceId, completion.message().id()));
                     sink.complete();
@@ -1706,14 +1770,17 @@ public class ChatOrchestrator {
                         run = runService.finishTerminal(context.tenantId(), context.userId(), run.id(), status,
                                 terminalStatus, code);
                         status = terminalStatus;
-                        conversationService.appendMessage(context.tenantId(), context.userId(),
+                        Message failureMessage = conversationService.appendMessage(context.tenantId(), context.userId(),
                                 command.conversationId(), Message.Role.ASSISTANT, message);
+                        run = runService.bindMessages(context.tenantId(), context.userId(), run.id(), null, failureMessage.id());
                     } catch (RuntimeException persistenceFailure) {
                         code = "AGENT_PERSISTENCE_FAILED";
                         message = errorMessage(code);
                     }
                 }
                 if (!sink.isCancelled()) {
+                    if (questionRecords != null && run != null)
+                        questionRecords.collectSafely(context, run.id(), "SYSTEM", questionDomain, message);
                     sink.next(ChatEvent.error(run == null ? null : run.id(), traceId, code, message));
                     sink.complete();
                 }

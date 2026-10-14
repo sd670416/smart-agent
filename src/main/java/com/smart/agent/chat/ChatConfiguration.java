@@ -33,20 +33,25 @@ class ChatConfiguration {
             ObjectProvider<com.smart.agent.attachment.AttachmentService> attachmentService,
             com.smart.agent.context.ConversationContextService conversationContextService,
             QueryIntentResolver queryIntentResolver,
-            PendingClarificationService pendingClarificationService) {
+            PendingClarificationService pendingClarificationService,
+            ObjectProvider<com.smart.agent.question.QuestionRecordService> questionRecords) {
         DynamicModelRegistry registry = modelRegistry.getIfAvailable();
         if (registry == null) {
-            return new ChatOrchestrator(
+            ChatOrchestrator orchestrator = new ChatOrchestrator(
                     conversationService, runService, modelGateway, toolRegistry, toolExecutor, objectMapper,
                     knowledgeSearchService.getIfAvailable(), com.smart.agent.chat.ChatOrchestrator.MAX_RUN_DURATION,
                     attachmentService.getIfAvailable(), attachmentPublicBaseUrl, conversationContextService,
                     queryIntentResolver, pendingClarificationService);
+            orchestrator.setQuestionRecords(questionRecords.getIfAvailable());
+            return orchestrator;
         }
-        return new ChatOrchestrator(
+        ChatOrchestrator orchestrator = new ChatOrchestrator(
                 conversationService, runService, registry, toolRegistry, toolExecutor, objectMapper,
                 knowledgeSearchService.getIfAvailable(), com.smart.agent.chat.ChatOrchestrator.MAX_RUN_DURATION,
                 attachmentService.getIfAvailable(), attachmentPublicBaseUrl, conversationContextService,
                 queryIntentResolver, pendingClarificationService);
+        orchestrator.setQuestionRecords(questionRecords.getIfAvailable());
+        return orchestrator;
     }
 
     @Bean

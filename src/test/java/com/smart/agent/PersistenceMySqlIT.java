@@ -45,6 +45,31 @@ class PersistenceMySqlIT {
     @Autowired
     private EntityManagerFactory entityManagerFactory;
 
+    @Autowired private com.smart.agent.question.QuestionRecordService questionRecords;
+    @Autowired private org.springframework.jdbc.core.JdbcTemplate jdbc;
+
+    @Test
+    void persistsIdempotentSourcesAndExcludesFutureContextAndModelPayloads() {
+        var c = conversationService.create("question-tenant", "question-user", "question");
+        var user = conversationService.appendMessage("question-tenant", "question-user", c.id(), Message.Role.USER, "password=secret question");
+        var run = agentRunService.start("question-tenant", "question-user", c.id());
+        agentRunService.bindMessages("question-tenant", "question-user", run.id(), user.id(), null);
+        agentRunService.finishTerminal("question-tenant", "question-user", run.id(), AgentRunStatus.RECEIVED, AgentRunStatus.FAILED, "AGENT_MODEL_FAILED");
+        var answer = conversationService.appendMessage("question-tenant", "question-user", c.id(), Message.Role.ASSISTANT, "failure");
+        agentRunService.bindMessages("question-tenant", "question-user", run.id(), null, answer.id());
+        conversationService.appendMessage("question-tenant", "question-user", c.id(), Message.Role.USER, "future message");
+        agentRunService.recordStep("question-tenant", "question-user", run.id(), "AI_DEBUG_MODEL_REQUEST", "secret", "raw payload");
+        var context = new com.smart.agent.security.AgentUserContext("question-tenant", "question-user", "i", java.util.Set.of("aiQuestion:menu"), java.util.Set.of());
+        questionRecords.collectSafely(context, run.id(), "SYSTEM", "PROJECT", "failure");
+        var detail = questionRecords.feedback(context, c.id(), run.id(), answer.id());
+        questionRecords.feedback(context, c.id(), run.id(), answer.id());
+        assertThat(detail.get("sources")).isEqualTo(java.util.List.of("SYSTEM", "USER"));
+        assertThat(detail.toString()).doesNotContain("secret", "future message", "raw payload");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM ai_question_record WHERE tenant_id=? AND run_id=?", Long.class, "question-tenant", run.id())).isEqualTo(1L);
+        var other = new com.smart.agent.security.AgentUserContext("other-tenant", "question-user", "i", java.util.Set.of("aiQuestion:menu"), java.util.Set.of());
+        assertThatThrownBy(() -> questionRecords.detail(other, (String) detail.get("id"))).isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+    }
+
     @DynamicPropertySource
     static void databaseProperties(DynamicPropertyRegistry registry) {
         registry.add("spring.datasource.url", MYSQL::getJdbcUrl);

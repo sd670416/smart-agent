@@ -68,6 +68,16 @@ public class AgentRun {
     @Column(name = "safe_error_code", length = 128)
     private String safeErrorCode;
 
+    @Column(name = "user_message_id", length = 36)
+    private String userMessageId;
+    @Column(name = "assistant_message_id", length = 36)
+    private String assistantMessageId;
+
+    public String userMessageId() { return userMessageId; }
+    public String assistantMessageId() { return assistantMessageId; }
+    public void bindUserMessage(String id) { userMessageId = requireText(id, "userMessageId"); }
+    public void bindAssistantMessage(String id) { assistantMessageId = requireText(id, "assistantMessageId"); }
+
     @Column(name = "input_tokens", nullable = false)
     private int inputTokens;
 

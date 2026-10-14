@@ -21,6 +21,15 @@ public class QueryIntentResolver {
             String activeDomain, AgentUserContext userContext) {
         String normalized = question == null ? "" : question.trim().toLowerCase(Locale.ROOT);
         if (normalized.isBlank()) return IntentResolution.unknown(question);
+        boolean workflow = ConstructionContractDomainContributor.isWorkflowQuery(normalized);
+        if (!workflow && ProjectOutputDomainContributor.isOtherOutput(normalized)) return IntentResolution.unknown(question);
+        if (!workflow && ProjectOutputDomainContributor.isAmbiguousOutput(normalized)
+                && !ProjectOutputDomainContributor.CODE.equals(activeDomain)) return IntentResolution.unknown(question);
+        boolean outputQuery = registry.findDomain(ProjectOutputDomainContributor.CODE).isPresent()
+                && ProjectOutputDomainContributor.matches(normalized)
+                && !ConstructionContractDomainContributor.isWorkflowQuery(normalized);
+        if (outputQuery && (userContext == null || !userContext.permissions().contains("menu:project")))
+            return IntentResolution.unknown(question);
         boolean contractQuery = registry.findDomain(ConstructionContractDomainContributor.CODE).isPresent()
                 && ConstructionContractDomainContributor.matches(normalized)
                 && !ConstructionContractDomainContributor.isWorkflowQuery(normalized);
@@ -66,6 +75,12 @@ public class QueryIntentResolver {
     private int score(BusinessDomainDescriptor domain, String question,
             Map<String, ?> pageContext, String activeDomain) {
         int score = 0;
+        if (registry.findDomain(ProjectOutputDomainContributor.CODE).isPresent()
+                && ProjectOutputDomainContributor.matches(question)) {
+            if (ConstructionContractDomainContributor.isWorkflowQuery(question))
+                return "APPROVAL".equals(domain.code()) ? 100 : 0;
+            if (ProjectOutputDomainContributor.CODE.equals(domain.code())) score += 50;
+        }
         if (registry.findDomain(ConstructionContractDomainContributor.CODE).isPresent()
                 && ConstructionContractDomainContributor.matches(question)) {
             if (ConstructionContractDomainContributor.isWorkflowQuery(question))

@@ -38,6 +38,25 @@ import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
 class ModelGatewayContractTest {
     @Test
+    void projectOutputToolsUseSchemasAcceptedByTheProviderAdapter() {
+        var query = new com.smart.agent.tool.output.ProjectOutputQueryTool((context, input) -> null,
+                new com.smart.agent.tool.project.ProjectReferenceResolver(new com.smart.agent.tool.project.LocalProjectBusinessClient()));
+        var clarify = new com.smart.agent.tool.output.ProjectOutputClarifyDateTool();
+        AtomicReference<ChatRequest> captured = new AtomicReference<>();
+        ModelGateway gateway = capturingModel(captured, handler -> handler.onCompleteResponse(response("done", 0, 0)));
+        ModelRequest request = new ModelRequest("output-schema", "v1",
+                List.of(new ModelRequest.ConversationMessage("user", "工程产值合计")),
+                List.of(new ModelRequest.AllowedToolSpecification(query.key(), query.description(), query.argumentsSchemaJson()),
+                        new ModelRequest.AllowedToolSpecification(clarify.key(), clarify.description(), clarify.argumentsSchemaJson())),
+                List.of(), ModelRequest.ToolUseMode.REQUIRED);
+        assertThat(eventsOf(gateway, request)).anyMatch(ModelEvent.Completed.class::isInstance);
+        assertThat(captured.get().toolSpecifications()).extracting(dev.langchain4j.agent.tool.ToolSpecification::name)
+                .containsExactly("projectOutput_query", "projectOutput_clarifyDate");
+        assertThat(((SystemMessage) captured.get().messages().getFirst()).text())
+                .contains("projectOutput.query", "projectOutput.clarifyDate", "累计结算金额", "本期完成产值");
+        assertThat(query.argumentsSchemaJson()).doesNotContain("signingDate", "userId", "tenantId", "projectIds");
+    }
+    @Test
     void constructionContractToolsUseSchemasAcceptedByTheProviderAdapter() {
         var query = new com.smart.agent.tool.contract.ConstructionContractQueryTool((context, input) -> null,
                 new com.smart.agent.tool.project.ProjectReferenceResolver(new com.smart.agent.tool.project.LocalProjectBusinessClient()));
@@ -445,6 +464,18 @@ class ModelGatewayContractTest {
 
         assertThat(eventsOf(gateway, webSearchRequest))
                 .containsExactly(new ModelEvent.Completed("联网工具可用", 1, 1));
+        assertThat(captured.get()).isNotNull();
+    }
+
+    @Test
+    void unsupportedCapabilityMarkerSchemaCanReachProvider() {
+        AtomicReference<ChatRequest> captured = new AtomicReference<>();
+        ModelGateway gateway = capturingModel(captured, handler -> handler.onCompleteResponse(response("marker available", 1, 1)));
+        var tool = new com.smart.agent.question.UnsupportedCapabilityTool();
+        ModelRequest request = new ModelRequest("run-marker", "v1",
+                List.of(new ModelRequest.ConversationMessage("user", "hello")),
+                List.of(new ModelRequest.AllowedToolSpecification(tool.key(), tool.description(), tool.argumentsSchemaJson())), List.of());
+        assertThat(eventsOf(gateway, request)).containsExactly(new ModelEvent.Completed("marker available", 1, 1));
         assertThat(captured.get()).isNotNull();
     }
 
