@@ -180,7 +180,16 @@ public class ToolExecutor implements AutoCloseable {
                 || "approval.query".equals(toolKey)
                 || "approval.getDetail".equals(toolKey)
                 || "constructionContract.query".equals(toolKey)
+                || "constructionContract.compare".equals(toolKey)
                 || "projectOutput.query".equals(toolKey)
+                || "projectOutput.compare".equals(toolKey)
+                || "paymentRegistration.query".equals(toolKey)
+                || "paymentRequest.query".equals(toolKey)
+                || "otherPaymentRequest.query".equals(toolKey)
+                || "projectReimburse.query".equals(toolKey)
+                || "otherIncomeRegistration.query".equals(toolKey)
+                || "projectReceipts.query".equals(toolKey)
+                || "projectReceipts.compare".equals(toolKey)
                 || toolKey.startsWith("board.")
                 ? SLOW_BUSINESS_TOOL_TIMEOUT : timeout;
     }

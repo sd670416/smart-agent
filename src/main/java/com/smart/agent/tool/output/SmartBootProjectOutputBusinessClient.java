@@ -28,6 +28,19 @@ public class SmartBootProjectOutputBusinessClient implements ProjectOutputBusine
     }
 
     @Override public ProjectQueryResult query(ToolContext context, ProjectOutputQueryInput input) {
+        return post(PATH, context, body(context, input));
+    }
+
+    @Override public ProjectQueryResult compare(ToolContext context, ProjectOutputCompareInput input) {
+        Map<String, Object> request = new LinkedHashMap<>();
+        request.put("comparisonType", input.comparisonType());
+        request.put("periodUnit", input.periodUnit());
+        request.put("current", body(context, input.current()));
+        if (input.baseline() != null) request.put("baseline", body(context, input.baseline()));
+        return post("/internal/ai/tools/project-output-compare", context, request);
+    }
+
+    private Map<String, Object> body(ToolContext context, ProjectOutputQueryInput input) {
         if (input.projectId() != null && !context.canAccessProject(input.projectId()))
             throw new SecurityException("Project is outside trusted scope");
         Map<String, Object> body = new LinkedHashMap<>();
@@ -40,11 +53,12 @@ public class SmartBootProjectOutputBusinessClient implements ProjectOutputBusine
         body.put("endDate", input.endDate());
         body.put("page", input.page());
         body.put("pageSize", input.pageSize());
-        org.slf4j.LoggerFactory.getLogger(getClass()).info(
-                "调用工程产值查询工具: userId={}, trustedProjectCount={}, mode={}, page={}, pageSize={}",
-                context.userId(), context.projectIds().size(), input.mode(), input.page(), input.pageSize());
+        return body;
+    }
+
+    private ProjectQueryResult post(String path, ToolContext context, Map<String, Object> body) {
         try {
-            String raw = client.post().uri(PATH).headers(headers -> sign(headers, context))
+            String raw = client.post().uri(path).headers(headers -> sign(headers, context, path))
                     .bodyValue(body).retrieve().bodyToMono(String.class).block();
             if (raw == null || raw.isBlank()) throw new AgentException("AGENT_TOOL_EXECUTION_FAILED",
                     HttpStatus.BAD_GATEWAY, "工程产值查询响应为空");
@@ -61,7 +75,7 @@ public class SmartBootProjectOutputBusinessClient implements ProjectOutputBusine
         }
     }
 
-    private void sign(HttpHeaders headers, ToolContext context) {
+    private void sign(HttpHeaders headers, ToolContext context, String path) {
         String timestamp = String.valueOf(Instant.now().getEpochSecond());
         String roles = String.join(",", new TreeSet<>(context.roleIds()));
         String permissions = String.join(",", new TreeSet<>(context.permissions()));
@@ -76,7 +90,7 @@ public class SmartBootProjectOutputBusinessClient implements ProjectOutputBusine
         try {
             Mac mac = Mac.getInstance("HmacSHA256");
             mac.init(new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
-            String canonical = timestamp + "\nPOST\n" + PATH + "\n" + context.tenantId() + "\n" + context.userId()
+            String canonical = timestamp + "\nPOST\n" + path + "\n" + context.tenantId() + "\n" + context.userId()
                     + "\n" + context.identityId() + "\n" + roles + "\n" + permissions + "\n" + projects;
             headers.set("X-Agent-Internal-Signature", Base64.getUrlEncoder().withoutPadding().encodeToString(
                     mac.doFinal(canonical.getBytes(StandardCharsets.UTF_8))));

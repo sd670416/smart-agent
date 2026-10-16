@@ -9,7 +9,7 @@ public class ProjectOutputDomainContributor implements BusinessDomainContributor
     public static final String CODE = "PROJECT_OUTPUT";
     private static final List<String> TERMS = List.of("工程产值", "工程产值单", "累计结算金额");
     private static final BusinessDomainDescriptor DESCRIPTOR = new BusinessDomainDescriptor(
-            CODE, "工程产值", List.of("projectOutput.query", "projectOutput.clarifyDate"),
+            CODE, "工程产值", List.of("projectOutput.query", "projectOutput.clarifyDate", "projectOutput.compare"),
             List.of(new DataScopeDescriptor("PROJECT_MENU", "项目菜单及可见项目范围", List.of("MENU", "PROJECT_MEMBER"))),
             "REALTIME", TERMS);
 

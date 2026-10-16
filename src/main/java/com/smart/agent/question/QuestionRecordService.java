@@ -74,6 +74,12 @@ public class QuestionRecordService {
                     else if(tool.startsWith("board.")) domain="BOARD";
                     else if(tool.startsWith("constructionContract.")) domain="CONSTRUCTION_CONTRACT";
                     else if(tool.startsWith("projectOutput.")) domain="PROJECT_OUTPUT";
+                    else if(tool.startsWith("paymentRegistration.")) domain="PAYMENT_REGISTRATION";
+                    else if(tool.startsWith("paymentRequest.")) domain="PAYMENT_REQUEST";
+                    else if(tool.startsWith("otherPaymentRequest.")) domain="OTHER_PAYMENT_REQUEST";
+                    else if(tool.startsWith("projectReimburse.")) domain="PROJECT_REIMBURSE";
+                    else if(tool.startsWith("otherIncomeRegistration.")) domain="OTHER_INCOME_REGISTRATION";
+                    else if(tool.startsWith("projectReceipts.")) domain="PROJECT_RECEIPTS";
                 } catch(Exception ignored) { /* Missing optional audit data must not affect collection. */ }
             }
         }

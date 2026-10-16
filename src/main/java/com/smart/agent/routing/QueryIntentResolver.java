@@ -22,6 +22,33 @@ public class QueryIntentResolver {
         String normalized = question == null ? "" : question.trim().toLowerCase(Locale.ROOT);
         if (normalized.isBlank()) return IntentResolution.unknown(question);
         boolean workflow = ConstructionContractDomainContributor.isWorkflowQuery(normalized);
+        if (!workflow && registry.findDomain(ProjectReimburseDomainContributor.CODE).isPresent()
+                && ProjectReimburseDomainContributor.matches(normalized)
+                && (userContext == null || !userContext.permissions().contains(ProjectReimburseDomainContributor.PERMISSION)))
+            return IntentResolution.unknown(question);
+        if (!workflow && registry.findDomain(OtherPaymentRequestDomainContributor.CODE).isPresent()
+                && OtherPaymentRequestDomainContributor.matches(normalized)
+                && (userContext == null || !userContext.permissions().contains(OtherPaymentRequestDomainContributor.PERMISSION)))
+            return IntentResolution.unknown(question);
+        if (!workflow && registry.findDomain(PaymentRequestDomainContributor.CODE).isPresent()
+                && PaymentRequestDomainContributor.matches(normalized)
+                && (userContext == null || !userContext.permissions().contains(PaymentRequestDomainContributor.PERMISSION)))
+            return IntentResolution.unknown(question);
+        boolean receipts = registry.findDomain(ProjectReceiptsDomainContributor.CODE).isPresent()
+                && ProjectReceiptsDomainContributor.matches(normalized);
+        if (!workflow && receipts && (userContext == null || !ProjectReceiptsDomainContributor.canAccess(userContext.permissions())))
+            return IntentResolution.unknown(question);
+        if (!workflow && registry.findDomain(OtherIncomeRegistrationDomainContributor.CODE).isPresent()
+                && !receipts
+                && OtherIncomeRegistrationDomainContributor.matches(normalized)
+                && (userContext == null || !userContext.permissions().contains(OtherIncomeRegistrationDomainContributor.PERMISSION)))
+            return IntentResolution.unknown(question);
+        if (!workflow && registry.findDomain(PaymentRegistrationDomainContributor.CODE).isPresent()
+                && !receipts
+                && !OtherIncomeRegistrationDomainContributor.matches(normalized)
+                && PaymentRegistrationDomainContributor.matches(normalized)
+                && (userContext == null || !userContext.permissions().contains(PaymentRegistrationDomainContributor.PERMISSION)))
+            return IntentResolution.unknown(question);
         if (!workflow && ProjectOutputDomainContributor.isOtherOutput(normalized)) return IntentResolution.unknown(question);
         if (!workflow && ProjectOutputDomainContributor.isAmbiguousOutput(normalized)
                 && !ProjectOutputDomainContributor.CODE.equals(activeDomain)) return IntentResolution.unknown(question);
@@ -75,6 +102,43 @@ public class QueryIntentResolver {
     private int score(BusinessDomainDescriptor domain, String question,
             Map<String, ?> pageContext, String activeDomain) {
         int score = 0;
+        if (registry.findDomain(ProjectReimburseDomainContributor.CODE).isPresent()
+                && ProjectReimburseDomainContributor.matches(question)) {
+            if (ConstructionContractDomainContributor.isWorkflowQuery(question))
+                return "APPROVAL".equals(domain.code()) ? 100 : 0;
+            return ProjectReimburseDomainContributor.CODE.equals(domain.code()) ? 100 : 0;
+        }
+        if (registry.findDomain(OtherPaymentRequestDomainContributor.CODE).isPresent()
+                && OtherPaymentRequestDomainContributor.matches(question)) {
+            if (ConstructionContractDomainContributor.isWorkflowQuery(question))
+                return "APPROVAL".equals(domain.code()) ? 100 : 0;
+            return OtherPaymentRequestDomainContributor.CODE.equals(domain.code()) ? 100 : 0;
+        }
+        if (PaymentRequestDomainContributor.CODE.equals(domain.code()) && question.contains("其他付款")) return 0;
+        if (registry.findDomain(PaymentRequestDomainContributor.CODE).isPresent()
+                && PaymentRequestDomainContributor.matches(question)) {
+            if (ConstructionContractDomainContributor.isWorkflowQuery(question))
+                return "APPROVAL".equals(domain.code()) ? 100 : 0;
+            return PaymentRequestDomainContributor.CODE.equals(domain.code()) ? 100 : 0;
+        }
+        if (registry.findDomain(ProjectReceiptsDomainContributor.CODE).isPresent()
+                && ProjectReceiptsDomainContributor.matches(question)) {
+            if (ConstructionContractDomainContributor.isWorkflowQuery(question))
+                return "APPROVAL".equals(domain.code()) ? 100 : 0;
+            return ProjectReceiptsDomainContributor.CODE.equals(domain.code()) ? 100 : 0;
+        }
+        if (registry.findDomain(OtherIncomeRegistrationDomainContributor.CODE).isPresent()
+                && OtherIncomeRegistrationDomainContributor.matches(question)) {
+            if (ConstructionContractDomainContributor.isWorkflowQuery(question))
+                return "APPROVAL".equals(domain.code()) ? 100 : 0;
+            return OtherIncomeRegistrationDomainContributor.CODE.equals(domain.code()) ? 100 : 0;
+        }
+        if (registry.findDomain(PaymentRegistrationDomainContributor.CODE).isPresent()
+                && PaymentRegistrationDomainContributor.matches(question)) {
+            if (ConstructionContractDomainContributor.isWorkflowQuery(question))
+                return "APPROVAL".equals(domain.code()) ? 100 : 0;
+            return PaymentRegistrationDomainContributor.CODE.equals(domain.code()) ? 100 : 0;
+        }
         if (registry.findDomain(ProjectOutputDomainContributor.CODE).isPresent()
                 && ProjectOutputDomainContributor.matches(question)) {
             if (ConstructionContractDomainContributor.isWorkflowQuery(question))

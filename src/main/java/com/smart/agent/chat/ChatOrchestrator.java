@@ -267,6 +267,7 @@ public class ChatOrchestrator {
         private String unsupportedReason;
         private String questionDomain;
         private JsonNode projectClarificationArguments;
+        private JsonNode comparisonClarificationArguments;
         private List<KnowledgeCitation> citations = List.of();
         private final StringBuilder turnDeltas = new StringBuilder();
         private final List<ModelEvent.ToolRequested> turnTools = new ArrayList<>();
@@ -439,11 +440,31 @@ public class ChatOrchestrator {
                     throw clarificationFailure();
                 }
                 effectiveQuestion = originalQuestion;
+                if ("COMPARISON_PERIOD".equals(intent.path("ambiguityType").asText())) {
+                    if (!java.util.Set.of("PROJECT_RECEIPTS", "CONSTRUCTION_CONTRACT", "PROJECT_OUTPUT").contains(domainCode)) throw clarificationFailure();
+                    String period = switch (selection.optionId()) {
+                        case "period:MONTH" -> "本月截至今天";
+                        case "period:QUARTER" -> "本季度截至今天";
+                        case "period:YEAR" -> "今年截至今天";
+                        default -> throw clarificationFailure();
+                    };
+                    effectiveQuestion += "\n[用户确认比较期间=" + period + "，保留原问题的同比或环比、项目和日期维度，先取当前时间]";
+                }
                 if ("DATE_FIELD".equals(intent.path("ambiguityType").asText())) {
                     boolean validDate = "CONSTRUCTION_CONTRACT".equals(domainCode)
                             && java.util.Set.of("date:projectCreateDate", "date:signingDate", "date:createDate").contains(selection.optionId())
+                            || "PROJECT_REIMBURSE".equals(domainCode)
+                            || "OTHER_PAYMENT_REQUEST".equals(domainCode)
+                            || "PAYMENT_REQUEST".equals(domainCode)
+                            && java.util.Set.of("date:projectCreateDate", "date:createDate").contains(selection.optionId())
                             || "PROJECT_OUTPUT".equals(domainCode)
-                            && java.util.Set.of("date:projectCreateDate", "date:createDate").contains(selection.optionId());
+                            && java.util.Set.of("date:projectCreateDate", "date:createDate").contains(selection.optionId())
+                            || "PAYMENT_REGISTRATION".equals(domainCode)
+                            && java.util.Set.of("date:projectCreateDate", "date:createDate", "date:receivedDate").contains(selection.optionId())
+                            || "OTHER_INCOME_REGISTRATION".equals(domainCode)
+                            && java.util.Set.of("date:projectCreateDate", "date:createDate", "date:receivedDate").contains(selection.optionId())
+                            || "PROJECT_RECEIPTS".equals(domainCode)
+                            && java.util.Set.of("date:projectCreateDate", "date:createDate", "date:receivedDate").contains(selection.optionId());
                     if (!validDate) throw clarificationFailure();
                     effectiveQuestion += "\n[用户确认的日期字段=" + selection.optionId().substring("date:".length()) + "]";
                 }
@@ -460,6 +481,21 @@ public class ChatOrchestrator {
                     projectClarificationArguments = confirmed;
                     effectiveQuestion += "\n[用户确认的真实项目ID=" + id + "，按已确认项目和原查询条件查询"
                             + queryIntentResolver.domain(domainCode).orElseThrow().name() + "]";
+                }
+                if ("COMPARISON_PROJECT_REFERENCE".equals(intent.path("ambiguityType").asText())) {
+                    if (!java.util.Set.of("PROJECT_RECEIPTS", "CONSTRUCTION_CONTRACT", "PROJECT_OUTPUT").contains(domainCode) || !intent.path("queryArguments").isObject())
+                        throw clarificationFailure();
+                    String[] parts = selection.optionId().split(":", 3);
+                    if (parts.length != 3 || !java.util.Set.of("current", "baseline").contains(parts[0])
+                            || !"project".equals(parts[1])) throw clarificationFailure();
+                    if (!context.projectIds().contains(parts[2])) throw new AgentException("AGENT_TOOL_PROJECT_FORBIDDEN",
+                            org.springframework.http.HttpStatus.FORBIDDEN, "Selected project is no longer permitted");
+                    var confirmed = (com.fasterxml.jackson.databind.node.ObjectNode) intent.path("queryArguments").deepCopy();
+                    if (!confirmed.path(parts[0]).isObject()) throw clarificationFailure();
+                    var group = (com.fasterxml.jackson.databind.node.ObjectNode) confirmed.path(parts[0]);
+                    group.put("projectId", parts[2]); group.remove(java.util.List.of("projectCode", "projectName", "projectNameMatch"));
+                    comparisonClarificationArguments = confirmed;
+                    effectiveQuestion += "\n[用户已确认比较条件=" + confirmed + "，重新调用比较工具，不得丢失另一组条件]";
                 }
                 IntentResolution resolution = queryIntentResolver.resolveSelectedDomain(
                         domainCode, originalQuestion, context);
@@ -489,11 +525,13 @@ public class ChatOrchestrator {
         }
 
         private boolean isProjectScopedQueryDomain(String code) {
-            return "CONSTRUCTION_CONTRACT".equals(code) || "PROJECT_OUTPUT".equals(code);
+            return "PROJECT_REIMBURSE".equals(code) || "OTHER_PAYMENT_REQUEST".equals(code) || "PAYMENT_REQUEST".equals(code) || "CONSTRUCTION_CONTRACT".equals(code) || "PROJECT_OUTPUT".equals(code) || "PAYMENT_REGISTRATION".equals(code)
+                    || "OTHER_INCOME_REGISTRATION".equals(code) || "PROJECT_RECEIPTS".equals(code);
         }
 
         private boolean isProjectScopedQueryTool(String key) {
-            return "constructionContract.query".equals(key) || "projectOutput.query".equals(key);
+            return "projectReimburse.query".equals(key) || "otherPaymentRequest.query".equals(key) || "paymentRequest.query".equals(key) || "constructionContract.query".equals(key) || "projectOutput.query".equals(key) || "paymentRegistration.query".equals(key)
+                    || "otherIncomeRegistration.query".equals(key) || "projectReceipts.query".equals(key);
         }
 
         private boolean completeOutputTypeClarification() {
@@ -522,6 +560,8 @@ public class ChatOrchestrator {
                 storedIntent.put("options", prompt.options());
                 if ("PROJECT_REFERENCE".equals(prompt.ambiguityType()) && projectClarificationArguments != null)
                     storedIntent.put("queryArguments", projectClarificationArguments);
+                if ("COMPARISON_PROJECT_REFERENCE".equals(prompt.ambiguityType()) && comparisonClarificationArguments != null)
+                    storedIntent.put("queryArguments", comparisonClarificationArguments);
                 String intentJson = objectMapper.writeValueAsString(storedIntent);
                 String optionsJson = objectMapper.writeValueAsString(prompt.options());
                 PendingClarification clarification = withinBudget(() -> pendingClarificationService.create(
@@ -664,6 +704,60 @@ public class ChatOrchestrator {
         }
 
         private void validateProjectMenuPermission(List<ModelRequest.ConversationEntry> history) {
+            if (queryIntentResolver != null && queryIntentResolver.domain("PROJECT_REIMBURSE").isPresent()
+                    && com.smart.agent.routing.ProjectReimburseDomainContributor.matches(effectiveQuestion)
+                    && !isExplicitApprovalWorkflowQuestion(effectiveQuestion)
+                    && !context.permissions().contains("menu:finance:project-reimburse")) {
+                permissionQuerySubject = "项目报销";
+                throw new AgentException("AGENT_TOOL_FORBIDDEN", org.springframework.http.HttpStatus.FORBIDDEN,
+                        "Payment request menu permission is required");
+            }
+            if (additionalQueryDomain != null && "PROJECT_REIMBURSE".equals(additionalQueryDomain.code())) return;
+            if (queryIntentResolver != null && queryIntentResolver.domain("OTHER_PAYMENT_REQUEST").isPresent()
+                    && com.smart.agent.routing.OtherPaymentRequestDomainContributor.matches(effectiveQuestion)
+                    && !isExplicitApprovalWorkflowQuestion(effectiveQuestion)
+                    && !context.permissions().contains("menu:finance:other-payment-request")) {
+                permissionQuerySubject = "其他付款申请";
+                throw new AgentException("AGENT_TOOL_FORBIDDEN", org.springframework.http.HttpStatus.FORBIDDEN,
+                        "Payment request menu permission is required");
+            }
+            if (additionalQueryDomain != null && "OTHER_PAYMENT_REQUEST".equals(additionalQueryDomain.code())) return;
+            if (queryIntentResolver != null && queryIntentResolver.domain("PAYMENT_REQUEST").isPresent()
+                    && com.smart.agent.routing.PaymentRequestDomainContributor.matches(effectiveQuestion)
+                    && !isExplicitApprovalWorkflowQuestion(effectiveQuestion)
+                    && !context.permissions().contains("menu:finance:payment-request")) {
+                permissionQuerySubject = "付款申请";
+                throw new AgentException("AGENT_TOOL_FORBIDDEN", org.springframework.http.HttpStatus.FORBIDDEN,
+                        "Payment request menu permission is required");
+            }
+            if (additionalQueryDomain != null && "PAYMENT_REQUEST".equals(additionalQueryDomain.code())) return;
+            if (queryIntentResolver != null && queryIntentResolver.domain("PROJECT_RECEIPTS").isPresent()
+                    && com.smart.agent.routing.ProjectReceiptsDomainContributor.matches(effectiveQuestion)
+                    && !isExplicitApprovalWorkflowQuestion(effectiveQuestion)
+                    && !com.smart.agent.routing.ProjectReceiptsDomainContributor.canAccess(context.permissions())) {
+                permissionQuerySubject = "完整已收项目款（需同时具备回款登记和其他收入登记权限）";
+                throw new AgentException("AGENT_TOOL_FORBIDDEN", org.springframework.http.HttpStatus.FORBIDDEN,
+                        "Both financial menu permissions are required");
+            }
+            if (additionalQueryDomain != null && "PROJECT_RECEIPTS".equals(additionalQueryDomain.code())) return;
+            if (queryIntentResolver != null && queryIntentResolver.domain("OTHER_INCOME_REGISTRATION").isPresent()
+                    && com.smart.agent.routing.OtherIncomeRegistrationDomainContributor.matches(effectiveQuestion)
+                    && !isExplicitApprovalWorkflowQuestion(effectiveQuestion)
+                    && !context.permissions().contains("menu:finance:other-income-registration")) {
+                permissionQuerySubject = "其他收入登记";
+                throw new AgentException("AGENT_TOOL_FORBIDDEN", org.springframework.http.HttpStatus.FORBIDDEN,
+                        "Other income registration menu permission is required");
+            }
+            if (additionalQueryDomain != null && "OTHER_INCOME_REGISTRATION".equals(additionalQueryDomain.code())) return;
+            if (queryIntentResolver != null && queryIntentResolver.domain("PAYMENT_REGISTRATION").isPresent()
+                    && com.smart.agent.routing.PaymentRegistrationDomainContributor.matches(effectiveQuestion)
+                    && !isExplicitApprovalWorkflowQuestion(effectiveQuestion)
+                    && !context.permissions().contains("menu:finance:payment-registration")) {
+                permissionQuerySubject = "回款登记";
+                throw new AgentException("AGENT_TOOL_FORBIDDEN", org.springframework.http.HttpStatus.FORBIDDEN,
+                        "Payment registration menu permission is required");
+            }
+            if (additionalQueryDomain != null && "PAYMENT_REGISTRATION".equals(additionalQueryDomain.code())) return;
             if (queryIntentResolver != null && queryIntentResolver.domain("PROJECT_OUTPUT").isPresent()
                     && com.smart.agent.routing.ProjectOutputDomainContributor.matches(effectiveQuestion)
                     && !isExplicitApprovalWorkflowQuestion(effectiveQuestion)
@@ -760,7 +854,7 @@ public class ChatOrchestrator {
 
         private boolean isRelativeTimeQuestion(String question) {
             if (question == null || question.isBlank()) return false;
-            return question.matches(".*(今天|昨日|昨天|明天|本周|上周|下周|本月|上月|下月|今年|去年|明年|最近[0-9一二三四五六七八九十]+[天日周月年]|[0-9一二三四五六七八九十]+[天日](没|未)(处理|办理|审批)).*");
+            return question.matches("(?s).*(今天|昨日|昨天|明天|本周|上周|下周|本月|上月|下月|本季度|上季度|下季度|本季|上季|下季|本年|上年|今年|去年|明年|截至目前|最近[0-9一二三四五六七八九十]+[天日周月年]|[0-9一二三四五六七八九十]+[天日](没|未)(处理|办理|审批)).*");
         }
 
         private boolean isBoardQuestion(String question) {
@@ -829,11 +923,39 @@ public class ChatOrchestrator {
             withinBudget(() -> conversationContextService.find(context.tenantId(), context.userId(),
                     command.conversationId(), additionalQueryContextType())).ifPresent(snapshot -> {
                 try {
-                    JsonNode arguments = objectMapper.readTree(snapshot.payloadJson()).path("arguments");
+                    JsonNode savedQuery = objectMapper.readTree(snapshot.payloadJson());
+                    JsonNode arguments = savedQuery.path("arguments");
                     messages.add(new ModelRequest.ConversationMessage("user",
                             "[trusted-query-context: 上一次" + additionalQueryDomain.name() + "查询条件=" + arguments
                                     + "。仅用于追问时继承用户未更改的筛选条件和分页；当前提问明确的新条件优先。"
                                     + "历史结果不可作为本轮数据，必须重新调用工具。]"));
+                    if (("PAYMENT_REQUEST".equals(additionalQueryDomain.code()) || "OTHER_PAYMENT_REQUEST".equals(additionalQueryDomain.code()) || "PROJECT_REIMBURSE".equals(additionalQueryDomain.code()))
+                            && "detail".equals(arguments.path("mode").asText("detail"))) {
+                        var references = objectMapper.createArrayNode();
+                        JsonNode previousResult = savedQuery.path("result");
+                        int index = 0;
+                        for (JsonNode row : previousResult.path("rows")) {
+                            index++;
+                            if (index > 100) break;
+                            var scopedProjects = objectMapper.createArrayNode();
+                            if ("PROJECT_REIMBURSE".equals(additionalQueryDomain.code())) {
+                                for (JsonNode id : row.path("projectIds"))
+                                    if (context.projectIds().contains(id.asText())) scopedProjects.add(id.asText());
+                            } else if (context.projectIds().contains(row.path("projectId").asText())) {
+                                scopedProjects.add(row.path("projectId").asText());
+                            }
+                            if (scopedProjects.isEmpty() || row.path("requestId").asText().isBlank()) continue;
+                            var reference = references.addObject().put("pagePosition", index)
+                                    .put("requestId", row.path("requestId").asText())
+                                    .put("registrationCode", row.path("registrationCode").asText());
+                            if ("PROJECT_REIMBURSE".equals(additionalQueryDomain.code())) reference.set("projectIds", scopedProjects);
+                            else reference.put("projectId", row.path("projectId").asText());
+                        }
+                        if (!references.isEmpty()) messages.add(new ModelRequest.ConversationMessage("user",
+                                "[" + ("PROJECT_REIMBURSE".equals(additionalQueryDomain.code()) ? "trusted-project-reimburse-references" : "OTHER_PAYMENT_REQUEST".equals(additionalQueryDomain.code()) ? "trusted-other-payment-request-references" : "trusted-payment-request-references") + ": 上次" + additionalQueryDomain.name() + "列表第"
+                                        + previousResult.path("page").asInt(1) + "页的单据定位信息=" + references
+                                        + "。仅帮助理解第几单或单号，不能视为当前事实；必须按requestId重新查询明细。指代不明确先确认。]"));
+                    }
                 } catch (java.io.IOException exception) {
                     throw new IllegalStateException("Invalid query context", exception);
                 }
@@ -1386,6 +1508,8 @@ public class ChatOrchestrator {
                 }
                 if (isProjectScopedQueryTool(request.toolKey()) && projectClarificationArguments != null)
                     input = projectClarificationArguments.deepCopy();
+                if (java.util.Set.of("projectReceipts.compare", "constructionContract.compare", "projectOutput.compare").contains(request.toolKey()) && comparisonClarificationArguments != null)
+                    input = comparisonClarificationArguments.deepCopy();
                 final JsonNode executionInput = input;
                 String normalizedArguments = objectMapper.writeValueAsString(input);
                 String toolSubject = permissionSubjectForTool(request.toolKey(), input);
@@ -1482,6 +1606,18 @@ public class ChatOrchestrator {
                             }
                         }
                     }
+                    if (java.util.Set.of("projectReceipts.compare", "constructionContract.compare", "projectOutput.compare").contains(request.toolKey())
+                            && result instanceof com.smart.agent.tool.project.ProjectQueryResult queryResult) {
+                        for (var filter : queryResult.appliedFilters()) {
+                            String groupName = String.valueOf(filter.get("comparisonGroup"));
+                            if (java.util.Set.of("current", "baseline").contains(groupName)
+                                    && effectiveArguments.path(groupName).isObject()
+                                    && filter.get("projectId") instanceof String id && context.projectIds().contains(id)) {
+                                var group = (com.fasterxml.jackson.databind.node.ObjectNode) effectiveArguments.path(groupName);
+                                group.put("projectId", id); group.remove(java.util.List.of("projectCode", "projectName", "projectNameMatch"));
+                            }
+                        }
+                    }
                     String snapshot = objectMapper.writeValueAsString(Map.of("arguments", effectiveArguments, "result", result));
                     withinBudget(() -> conversationContextService.upsert(context.tenantId(), context.userId(),
                             command.conversationId(), additionalQueryContextType(), snapshot, run.id()));
@@ -1534,6 +1670,7 @@ public class ChatOrchestrator {
                 }
                 if (result instanceof ClarificationPrompt prompt) {
                     if ("PROJECT_REFERENCE".equals(prompt.ambiguityType())) projectClarificationArguments = input.deepCopy();
+                    if ("COMPARISON_PROJECT_REFERENCE".equals(prompt.ambiguityType())) comparisonClarificationArguments = input.deepCopy();
                     completeClarificationPrompt(prompt);
                     return false;
                 }

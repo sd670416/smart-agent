@@ -9,7 +9,7 @@ public class ConstructionContractDomainContributor implements BusinessDomainCont
     public static final String CODE = "CONSTRUCTION_CONTRACT";
     private static final List<String> TERMS = List.of("施工合同", "建设合同");
     private static final BusinessDomainDescriptor DESCRIPTOR = new BusinessDomainDescriptor(
-            CODE, "施工合同", List.of("constructionContract.query", "constructionContract.clarifyDate"),
+            CODE, "施工合同", List.of("constructionContract.query", "constructionContract.clarifyDate", "constructionContract.compare"),
             List.of(new DataScopeDescriptor("PROJECT_MENU", "项目菜单及可见项目范围", List.of("MENU", "PROJECT_MEMBER"))),
             "REALTIME", TERMS);
 

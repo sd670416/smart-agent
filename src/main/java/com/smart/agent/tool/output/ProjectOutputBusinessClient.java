@@ -5,5 +5,8 @@ import com.smart.agent.tool.project.ProjectQueryResult;
 
 public interface ProjectOutputBusinessClient {
     ProjectQueryResult query(ToolContext context, ProjectOutputQueryInput input);
+    default ProjectQueryResult compare(ToolContext context, ProjectOutputCompareInput input) {
+        throw new UnsupportedOperationException("Comparison not configured");
+    }
 }
 

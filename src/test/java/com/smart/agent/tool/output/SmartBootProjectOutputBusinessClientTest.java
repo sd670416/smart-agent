@@ -52,6 +52,32 @@ class SmartBootProjectOutputBusinessClientTest {
         } finally { server.disposeNow(); }
     }
 
+    @Test void comparisonSignsItsOwnPathAndRejectsUnauthorizedBaseline() throws Exception {
+        AtomicReference<org.springframework.web.reactive.function.client.ClientRequest> captured = new AtomicReference<>();
+        var client = new SmartBootProjectOutputBusinessClient(WebClient.builder().exchangeFunction(request -> {
+            captured.set(request);
+            return Mono.just(org.springframework.web.reactive.function.client.ClientResponse
+                    .create(org.springframework.http.HttpStatus.OK).header("Content-Type", "application/json")
+                    .body("{\"mode\":\"aggregate\",\"rows\":[],\"columns\":[],\"appliedFilters\":[]}").build());
+        }).build(), new ObjectMapper(), "test-secret");
+        var context = new ToolContext("tenant", "user", "identity", Set.of("role"), Set.of("p1"), Set.of("menu:project"));
+        var current = new ProjectOutputQueryInput("p1", null, null, "summary", "createDate", "2026-09-01", "2026-09-30", 1, 20);
+        client.compare(context, new ProjectOutputCompareInput("YOY", "MONTH", current, null));
+        var request = captured.get();
+        assertThat(request.url().getPath()).isEqualTo("/internal/ai/tools/project-output-compare");
+        String timestamp = request.headers().getFirst("X-Agent-Internal-Timestamp");
+        Mac mac = Mac.getInstance("HmacSHA256");
+        mac.init(new SecretKeySpec("test-secret".getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+        String canonical = timestamp + "\nPOST\n/internal/ai/tools/project-output-compare\ntenant\nuser\nidentity\nrole\nmenu:project\np1";
+        assertThat(request.headers().getFirst("X-Agent-Internal-Signature")).isEqualTo(
+                Base64.getUrlEncoder().withoutPadding().encodeToString(mac.doFinal(canonical.getBytes(StandardCharsets.UTF_8))));
+        captured.set(null);
+        var denied = new ProjectOutputQueryInput("denied", null, null, "summary", "createDate", null, null, 1, 20);
+        assertThatThrownBy(() -> client.compare(context, new ProjectOutputCompareInput("CUSTOM", null, current, denied)))
+                .isInstanceOf(SecurityException.class);
+        assertThat(captured.get()).isNull();
+    }
+
     @Test void explicitlyUnauthorizedProjectNeverMakesAnHttpRequest() {
         WebClient client = WebClient.builder().exchangeFunction(request -> { throw new AssertionError("must not call"); }).build();
         var business = new SmartBootProjectOutputBusinessClient(client, new ObjectMapper(), "test-secret");

@@ -31,6 +31,7 @@ class ConstructionContractChatTest {
     private final AgentUserContext user = new AgentUserContext("tenant", "user", "identity", Set.of("menu:project"), Set.of("p1"));
     private final List<ModelRequest> requests = new CopyOnWriteArrayList<>();
     private final List<ConstructionContractQueryInput> queries = new CopyOnWriteArrayList<>();
+    private final List<ConstructionContractCompareInput> comparisons = new CopyOnWriteArrayList<>();
     private final String conversationId = conversationService.create("tenant", "user", "合同查询").id();
     private ToolExecutor executor;
     private List<Map<String, Object>> projectRows = List.of(Map.of("projectId", "p1", "projectName", "示例",
@@ -44,10 +45,17 @@ class ConstructionContractChatTest {
 
     private ChatOrchestrator orchestrator(ModelGateway model,
             com.smart.agent.tool.approval.ApprovalBusinessClient approvalClient) {
-        ConstructionContractBusinessClient client = (context, input) -> {
+        ConstructionContractBusinessClient client = new ConstructionContractBusinessClient() {
+            @Override public ProjectQueryResult compare(ToolContext context, ConstructionContractCompareInput input) {
+                comparisons.add(input);
+                return new ProjectQueryResult("aggregate", 1, 2, 2L, false, List.of(),
+                        List.of(Map.of("metric", "建设合同总金额", "difference", 10)), List.of());
+            }
+            @Override public ProjectQueryResult query(ToolContext context, ConstructionContractQueryInput input) {
             queries.add(input);
             return new ProjectQueryResult("aggregate", 1, 20, 1L, false, List.of(),
                     List.of(Map.of("contractCount", queries.size(), "finalContractAmount", 123.45)), List.of());
+            }
         };
         var projects = new com.smart.agent.tool.project.LocalProjectBusinessClient() {
             @Override public ProjectQueryResult query(ToolContext context, com.smart.agent.tool.project.ProjectQueryInput input) {
@@ -58,6 +66,7 @@ class ConstructionContractChatTest {
         };
         ToolRegistry tools = new ToolRegistry(List.of(new ConstructionContractQueryTool(client,
                 new com.smart.agent.tool.project.ProjectReferenceResolver(projects)),
+                new ConstructionContractCompareTool(client, new com.smart.agent.tool.project.ProjectReferenceResolver(projects)),
                 new com.smart.agent.tool.approval.ApprovalQueryTool(approvalClient),
                 new com.smart.agent.tool.project.ProjectQueryTool(projects),
                 new ConstructionContractClarifyDateTool(), new com.smart.agent.tool.system.CurrentTimeTool(
@@ -95,12 +104,72 @@ class ConstructionContractChatTest {
         assertThat(first.toString()).contains("模型根据本轮合同结果回答");
         assertThat(second.toString()).contains("模型根据本轮合同结果回答");
         assertThat(requests.get(0).allowedToolSpecifications()).extracting(ModelRequest.AllowedToolSpecification::key)
-                .containsExactlyInAnyOrder("constructionContract.query", "constructionContract.clarifyDate");
+                .containsExactlyInAnyOrder("constructionContract.query", "constructionContract.clarifyDate", "constructionContract.compare");
         assertThat(requests.get(0).toolUseMode()).isEqualTo(ModelRequest.ToolUseMode.REQUIRED);
         assertThat(requests.get(1).toolUseMode()).isEqualTo(ModelRequest.ToolUseMode.AUTO);
         assertThat(contexts.find("tenant", "user", conversationId, ConversationContextService.ACTIVE_BUSINESS_DOMAIN)
                 .orElseThrow().payloadJson()).contains("CONSTRUCTION_CONTRACT");
         assertThat(requests.get(2).redactedConversationMessages().toString()).contains("projectId", "p1");
+    }
+
+    @Test void comparisonReturnsToModelAndRefreshesEveryTurn() {
+        ChatOrchestrator chat = orchestrator(request -> hasCurrentResult(request)
+                ? Flux.just(new ModelEvent.Completed("实时合同比较完成", 1, 1))
+                : Flux.just(new ModelEvent.ToolRequested("compare", "constructionContract.compare",
+                "{\"comparisonType\":\"YOY\",\"periodUnit\":\"MONTH\",\"current\":{\"projectName\":\"示例\",\"dateField\":\"signingDate\",\"startDate\":\"2026-09-01\",\"endDate\":\"2026-09-30\"}}")));
+        var first = chat.stream(new ChatCommand(conversationId, "9月签订的施工合同同比", null), user, "trace1").collectList().block();
+        var second = chat.stream(new ChatCommand(conversationId, "再查一次", null), user, "trace2").collectList().block();
+        assertThat(first.toString()).contains("实时合同比较完成");
+        assertThat(second.toString()).contains("实时合同比较完成");
+        assertThat(comparisons).hasSize(2);
+        assertThat(queries).isEmpty();
+        assertThat(requests.get(2).redactedConversationMessages().toString()).contains("p1", "current", "2026-09-30");
+    }
+
+    @Test void comparisonPeriodSelectionRequiresTimeBeforeResuming() {
+        ChatOrchestrator chat = orchestrator(request -> {
+            if (request.allowedToolSpecifications().size() == 1
+                    && request.allowedToolSpecifications().getFirst().key().equals("system.current_time")) {
+                assertThat(request.toolUseMode()).isEqualTo(ModelRequest.ToolUseMode.REQUIRED);
+                return Flux.just(new ModelEvent.ToolRequested("time", "system.current_time", "{}"));
+            }
+            if (request.redactedConversationMessages().stream().anyMatch(entry ->
+                    entry instanceof ModelRequest.ToolResultMessage result && result.toolKey().equals("constructionContract.compare")))
+                return Flux.just(new ModelEvent.Completed("本月合同比较完成", 1, 1));
+            if (request.redactedConversationMessages().toString().contains("用户确认比较期间"))
+                return Flux.just(new ModelEvent.ToolRequested("compare", "constructionContract.compare",
+                    "{\"comparisonType\":\"YOY\",\"periodUnit\":\"MONTH\",\"current\":{\"dateField\":\"signingDate\",\"startDate\":\"2026-10-01\",\"endDate\":\"2026-10-12\"}}"));
+            return Flux.just(new ModelEvent.ToolRequested("clarify", "constructionContract.clarifyDate", "{\"ambiguity\":\"PERIOD\"}"));
+        });
+        var first = chat.stream(new ChatCommand(conversationId, "按签订日期比较施工合同同比", null), user, "t1").collectList().block();
+        assertThat(first.toString()).contains("COMPARISON_PERIOD");
+        assertThat(comparisons).isEmpty();
+        var question = pending.findActive("tenant", "user", conversationId).orElseThrow();
+        var second = chat.stream(new ChatCommand(conversationId, "本月", List.of(), null,
+                new ChatCommand.ClarificationSelection(question.id(), "period:MONTH")), user, "t2").collectList().block();
+        assertThat(second.toString()).contains("本月合同比较完成");
+        assertThat(comparisons).hasSize(1);
+    }
+
+    @Test void comparisonProjectSelectionPreservesOtherGroupAndContractFilters() {
+        projectRows = List.of(Map.of("projectId", "p1", "projectName", "示例", "projectCode", "001"),
+                Map.of("projectId", "p2", "projectName", "示例", "projectCode", "002"));
+        var both = new AgentUserContext("tenant", "user", "identity", Set.of("menu:project"), Set.of("p1", "p2"));
+        ChatOrchestrator chat = orchestrator(request -> hasCurrentResult(request)
+                ? Flux.just(new ModelEvent.Completed("选定项目比较完成", 1, 1))
+                : Flux.just(new ModelEvent.ToolRequested("compare", "constructionContract.compare",
+                "{\"comparisonType\":\"CUSTOM\",\"current\":{\"projectName\":\"示例\",\"contractName\":\"主体\",\"dateField\":\"signingDate\",\"startDate\":\"2026-09-01\",\"endDate\":\"2026-09-30\"},\"baseline\":{\"projectId\":\"p1\",\"dateField\":\"signingDate\",\"startDate\":\"2025-09-01\",\"endDate\":\"2025-09-30\"}}")));
+        var first = chat.stream(new ChatCommand(conversationId, "比较示例项目施工合同和另一组", null), both, "t1").collectList().block();
+        assertThat(first.toString()).contains("COMPARISON_PROJECT_REFERENCE", "current:project:p2");
+        assertThat(comparisons).isEmpty();
+        var question = pending.findActive("tenant", "user", conversationId).orElseThrow();
+        chat.stream(new ChatCommand(conversationId, "选择第二个", List.of(), null,
+                new ChatCommand.ClarificationSelection(question.id(), "current:project:p2")), both, "t2").collectList().block();
+        assertThat(comparisons).hasSize(1);
+        assertThat(comparisons.getFirst().current().projectId()).isEqualTo("p2");
+        assertThat(comparisons.getFirst().current().contractName()).isEqualTo("主体");
+        assertThat(comparisons.getFirst().baseline().projectId()).isEqualTo("p1");
+        assertThat(comparisons.getFirst().baseline().startDate()).isEqualTo("2025-09-01");
     }
 
     @Test void historicalAnswerCannotEndTurnWithoutCurrentQuery() {
