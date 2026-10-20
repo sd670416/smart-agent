@@ -66,7 +66,7 @@ public class ConstructionContractCompareTool implements AgentTool<ConstructionCo
     private ConstructionContractQueryInput summary(ConstructionContractQueryInput input) {
         return new ConstructionContractQueryInput(input.projectId(), input.projectName(), input.contractName(),
                 "summary", input.dateField(), input.startDate(), input.endDate(), 1, 20,
-                input.projectCode(), input.projectNameMatch());
+                input.projectCode(), input.projectNameMatch(), null, input.projectType(), input.projectTypeName());
     }
     private Object resolve(ConstructionContractQueryInput input, String group, ToolContext context) {
         if ("contains".equals(input.projectNameMatch()) || input.projectId() == null && input.projectName() == null && input.projectCode() == null)

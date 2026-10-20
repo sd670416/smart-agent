@@ -48,6 +48,9 @@ public class SmartBootConstructionContractBusinessClient implements Construction
         body.put("projectName", input.projectName());
         body.put("contractName", input.contractName());
         body.put("mode", input.mode());
+        body.put("groupBy", input.groupBy());
+        body.put("projectType", input.projectType());
+        body.put("projectTypeName", input.projectTypeName());
         body.put("dateField", input.dateField());
         body.put("startDate", input.startDate());
         body.put("endDate", input.endDate());

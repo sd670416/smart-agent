@@ -1,0 +1,1 @@
+package com.smart.agent.tool.progress;import com.smart.agent.tool.*;import com.smart.agent.tool.project.ProjectQueryResult;public interface ProjectProgressBusinessClient{ProjectQueryResult query(ToolContext context,ProjectProgressQueryInput input);}

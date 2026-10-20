@@ -86,6 +86,25 @@ class ConstructionContractChatTest {
         return request.redactedConversationMessages().stream().anyMatch(ModelRequest.ToolResultMessage.class::isInstance);
     }
 
+    @Test void projectTypeDistributionAndTypeDetailStayInContractDomainAndRefresh() {
+        ChatOrchestrator chat = orchestrator(request -> {
+            assertThat(request.allowedToolSpecifications()).extracting(ModelRequest.AllowedToolSpecification::key)
+                    .contains("constructionContract.query").doesNotContain("project.query", "board.query");
+            if (hasCurrentResult(request)) return Flux.just(new ModelEvent.Completed("已按项目类型查询合同", 1, 1));
+            return Flux.just(new ModelEvent.ToolRequested("type", "constructionContract.query", queries.isEmpty()
+                    ? "{\"mode\":\"summary\",\"groupBy\":\"projectType\"}"
+                    : "{\"mode\":\"detail\",\"projectTypeName\":\"土建\"}"));
+        });
+        var first=chat.stream(new ChatCommand(conversationId,"各类型项目合同金额分布",null),user,"t1").collectList().block();
+        var second=chat.stream(new ChatCommand(conversationId,"看土建类型的合同明细",null),user,"t2").collectList().block();
+        assertThat(first.toString()).contains("已按项目类型查询合同");
+        assertThat(second.toString()).contains("已按项目类型查询合同");
+        assertThat(queries).hasSize(2);
+        assertThat(queries.get(0).groupBy()).isEqualTo("projectType");
+        assertThat(queries.get(1).groupBy()).isNull();
+        assertThat(queries.get(1).projectTypeName()).isEqualTo("土建");
+    }
+
     private boolean matchesProjectFilter(Map<String, Object> row, com.smart.agent.tool.project.ProjectQueryFilter filter) {
         var checks = new ArrayList<Boolean>();
         filter.conditions().forEach(condition -> checks.add(Objects.equals(row.get(condition.field()), condition.value())));

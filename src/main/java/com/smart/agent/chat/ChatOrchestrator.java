@@ -267,6 +267,7 @@ public class ChatOrchestrator {
         private String unsupportedReason;
         private String questionDomain;
         private JsonNode projectClarificationArguments;
+        private String progressDateSelection;
         private JsonNode comparisonClarificationArguments;
         private List<KnowledgeCitation> citations = List.of();
         private final StringBuilder turnDeltas = new StringBuilder();
@@ -453,6 +454,12 @@ public class ChatOrchestrator {
                 if ("DATE_FIELD".equals(intent.path("ambiguityType").asText())) {
                     boolean validDate = "CONSTRUCTION_CONTRACT".equals(domainCode)
                             && java.util.Set.of("date:projectCreateDate", "date:signingDate", "date:createDate").contains(selection.optionId())
+                            || "INVOICE_APPLICATION".equals(domainCode)
+                            && java.util.Set.of("date:projectCreateDate", "date:createDate").contains(selection.optionId())
+                            || ("PROJECT_PROGRESS".equals(domainCode) || "COMPANY_OPERATING".equals(domainCode) || "COST_CONTRACT".equals(domainCode) || "PROJECT_FUNDING".equals(domainCode) || "BUDGET_COST".equals(domainCode) || "PROJECT_PROFIT".equals(domainCode))
+                            && java.util.Set.of("date:projectCreateDate", "date:allProjectDates").contains(selection.optionId())
+                            || "MATERIAL_REFUND".equals(domainCode)
+                            && java.util.Set.of("date:projectCreateDate", "date:returnDate", "date:createDate").contains(selection.optionId())
                             || "PROJECT_REIMBURSE".equals(domainCode)
                             || "OTHER_PAYMENT_REQUEST".equals(domainCode)
                             || "PAYMENT_REQUEST".equals(domainCode)
@@ -466,7 +473,19 @@ public class ChatOrchestrator {
                             || "PROJECT_RECEIPTS".equals(domainCode)
                             && java.util.Set.of("date:projectCreateDate", "date:createDate", "date:receivedDate").contains(selection.optionId());
                     if (!validDate) throw clarificationFailure();
-                    effectiveQuestion += "\n[用户确认的日期字段=" + selection.optionId().substring("date:".length()) + "]";
+                    if ("PROJECT_PROGRESS".equals(domainCode)) progressDateSelection = selection.optionId();
+                    effectiveQuestion += ("PROJECT_PROGRESS".equals(domainCode) || "COMPANY_OPERATING".equals(domainCode) || "COST_CONTRACT".equals(domainCode) || "PROJECT_FUNDING".equals(domainCode) || "BUDGET_COST".equals(domainCode) || "PROJECT_PROFIT".equals(domainCode)) && "date:allProjectDates".equals(selection.optionId())
+                            ? "\n[用户确认不限定日期，删除dateField、startDate、endDate，不继承原问题或历史日期条件，查询" + ("PROJECT_PROGRESS".equals(domainCode) ? "当前施工进度" : "累计金额") + "]"
+                            : "\n[用户确认的日期字段=" + selection.optionId().substring("date:".length()) + "]";
+                }
+                if ("COMPANY_REFERENCE".equals(intent.path("ambiguityType").asText())) {
+                    if (!"COMPANY_OPERATING".equals(domainCode) || !selection.optionId().startsWith("company:")
+                            || !intent.path("queryArguments").isObject()) throw clarificationFailure();
+                    String id = selection.optionId().substring("company:".length());
+                    var confirmed = (com.fasterxml.jackson.databind.node.ObjectNode) intent.path("queryArguments").deepCopy();
+                    confirmed.put("companyId", id); confirmed.remove("companyName");
+                    projectClarificationArguments = confirmed;
+                    effectiveQuestion += "\n[用户确认的真实公司ID=" + id + "，保留原项目、指标、日期和分页条件，重新查询]";
                 }
                 if ("PROJECT_REFERENCE".equals(intent.path("ambiguityType").asText())) {
                     if (!isProjectScopedQueryDomain(domainCode)
@@ -525,12 +544,20 @@ public class ChatOrchestrator {
         }
 
         private boolean isProjectScopedQueryDomain(String code) {
-            return "PROJECT_REIMBURSE".equals(code) || "OTHER_PAYMENT_REQUEST".equals(code) || "PAYMENT_REQUEST".equals(code) || "CONSTRUCTION_CONTRACT".equals(code) || "PROJECT_OUTPUT".equals(code) || "PAYMENT_REGISTRATION".equals(code)
+            if ("COMPANY_OPERATING".equals(code) || "PROJECT_PROGRESS".equals(code)) return true;
+            if ("COST_CONTRACT".equals(code)) return true;
+            if ("INVOICE_APPLICATION".equals(code)) return true;
+            if ("PROJECT_FUNDING".equals(code) || "BUDGET_COST".equals(code) || "PROJECT_PROFIT".equals(code)) return true;
+            return "MATERIAL_REFUND".equals(code) || "PROJECT_REIMBURSE".equals(code) || "OTHER_PAYMENT_REQUEST".equals(code) || "PAYMENT_REQUEST".equals(code) || "CONSTRUCTION_CONTRACT".equals(code) || "PROJECT_OUTPUT".equals(code) || "PAYMENT_REGISTRATION".equals(code)
                     || "OTHER_INCOME_REGISTRATION".equals(code) || "PROJECT_RECEIPTS".equals(code);
         }
 
         private boolean isProjectScopedQueryTool(String key) {
-            return "projectReimburse.query".equals(key) || "otherPaymentRequest.query".equals(key) || "paymentRequest.query".equals(key) || "constructionContract.query".equals(key) || "projectOutput.query".equals(key) || "paymentRegistration.query".equals(key)
+            if ("companyOperating.query".equals(key) || "projectProgress.query".equals(key)) return true;
+            if ("costContract.query".equals(key)) return true;
+            if ("invoiceApplication.query".equals(key)) return true;
+            if ("projectFunding.query".equals(key) || "budgetCost.query".equals(key) || "projectProfit.query".equals(key)) return true;
+            return "materialRefund.query".equals(key) || "projectReimburse.query".equals(key) || "otherPaymentRequest.query".equals(key) || "paymentRequest.query".equals(key) || "constructionContract.query".equals(key) || "projectOutput.query".equals(key) || "paymentRegistration.query".equals(key)
                     || "otherIncomeRegistration.query".equals(key) || "projectReceipts.query".equals(key);
         }
 
@@ -558,7 +585,7 @@ public class ChatOrchestrator {
                 storedIntent.put("activeBusinessDomain", activeBusinessDomain);
                 storedIntent.put("ambiguityType", prompt.ambiguityType());
                 storedIntent.put("options", prompt.options());
-                if ("PROJECT_REFERENCE".equals(prompt.ambiguityType()) && projectClarificationArguments != null)
+                if (("PROJECT_REFERENCE".equals(prompt.ambiguityType()) || "COMPANY_REFERENCE".equals(prompt.ambiguityType())) && projectClarificationArguments != null)
                     storedIntent.put("queryArguments", projectClarificationArguments);
                 if ("COMPARISON_PROJECT_REFERENCE".equals(prompt.ambiguityType()) && comparisonClarificationArguments != null)
                     storedIntent.put("queryArguments", comparisonClarificationArguments);
@@ -703,7 +730,102 @@ public class ChatOrchestrator {
             }
         }
 
+        private String companyMetricForQuestion() {
+            if (projectClarificationArguments != null && projectClarificationArguments.hasNonNull("metric"))
+                return projectClarificationArguments.path("metric").asText();
+            if (com.smart.agent.routing.CompanyOperatingDomainContributor.hasExplicitMetric(effectiveQuestion)
+                    || !"COMPANY_OPERATING".equals(activeBusinessDomain) || conversationContextService == null)
+                return com.smart.agent.routing.CompanyOperatingDomainContributor.metric(effectiveQuestion);
+            return withinBudget(() -> conversationContextService.find(context.tenantId(), context.userId(),
+                    command.conversationId(), "QUERY_COMPANY_OPERATING")).map(snapshot -> {
+                try {
+                    String metric = objectMapper.readTree(snapshot.payloadJson()).path("arguments").path("metric").asText("all");
+                    com.smart.agent.routing.CompanyOperatingDomainContributor.permissions(metric); return metric;
+                } catch (java.io.IOException exception) {throw new IllegalStateException("Invalid company query context",exception);}
+            }).orElse("all");
+        }
+
+        private String profitMetricForQuestion() {
+            if (com.smart.agent.routing.ProjectProfitDomainContributor.hasExplicitMetric(effectiveQuestion)
+                    || !"PROJECT_PROFIT".equals(activeBusinessDomain) || conversationContextService == null)
+                return com.smart.agent.routing.ProjectProfitDomainContributor.metric(effectiveQuestion);
+            return withinBudget(() -> conversationContextService.find(context.tenantId(), context.userId(),
+                    command.conversationId(), "QUERY_PROJECT_PROFIT")).map(snapshot -> {
+                try {
+                    String metric = objectMapper.readTree(snapshot.payloadJson()).path("arguments").path("metric").asText("both");
+                    com.smart.agent.routing.ProjectProfitDomainContributor.permissions(metric);
+                    return metric;
+                } catch (java.io.IOException exception) {
+                    throw new IllegalStateException("Invalid profit query context", exception);
+                }
+            }).orElse("both");
+        }
+
         private void validateProjectMenuPermission(List<ModelRequest.ConversationEntry> history) {
+            if (queryIntentResolver != null && queryIntentResolver.domain("COMPANY_OPERATING").isPresent()
+                    && (com.smart.agent.routing.CompanyOperatingDomainContributor.matches(effectiveQuestion)
+                            || additionalQueryDomain != null && "COMPANY_OPERATING".equals(additionalQueryDomain.code()))
+                    && !isExplicitApprovalWorkflowQuestion(effectiveQuestion)
+                    && !context.permissions().containsAll(com.smart.agent.routing.CompanyOperatingDomainContributor.permissions(
+                            companyMetricForQuestion()))) {
+                permissionQuerySubject = "所查询的自持公司经营指标";
+                throw new AgentException("AGENT_TOOL_FORBIDDEN",org.springframework.http.HttpStatus.FORBIDDEN,"Required company operating source menus missing");
+            }
+            if (additionalQueryDomain != null && "COMPANY_OPERATING".equals(additionalQueryDomain.code())) return;
+            if (queryIntentResolver != null && queryIntentResolver.domain("COST_CONTRACT").isPresent()
+                    && com.smart.agent.routing.CostContractDomainContributor.matches(effectiveQuestion)
+                    && !isExplicitApprovalWorkflowQuestion(effectiveQuestion)
+                    && !context.permissions().containsAll(com.smart.agent.routing.CostContractDomainContributor.permissions(
+                            com.smart.agent.routing.CostContractDomainContributor.source(effectiveQuestion)))) {
+                permissionQuerySubject = "所查询成本合同类别（完整占比需要五类合同）";
+                throw new AgentException("AGENT_TOOL_FORBIDDEN",org.springframework.http.HttpStatus.FORBIDDEN,"Required cost contract source menus missing");
+            }
+            if (additionalQueryDomain != null && "COST_CONTRACT".equals(additionalQueryDomain.code())) return;
+            if (queryIntentResolver != null && queryIntentResolver.domain("PROJECT_PROFIT").isPresent()
+                    && (com.smart.agent.routing.ProjectProfitDomainContributor.matches(effectiveQuestion)
+                            || additionalQueryDomain != null && "PROJECT_PROFIT".equals(additionalQueryDomain.code()))
+                    && !isExplicitApprovalWorkflowQuestion(effectiveQuestion)
+                    && !context.permissions().containsAll(com.smart.agent.routing.ProjectProfitDomainContributor.permissions(
+                            profitMetricForQuestion()))) {
+                permissionQuerySubject = "项目利润统计所需的全部来源";
+                throw new AgentException("AGENT_TOOL_FORBIDDEN", org.springframework.http.HttpStatus.FORBIDDEN, "Required profit source menus missing");
+            }
+            if (additionalQueryDomain != null && "PROJECT_PROFIT".equals(additionalQueryDomain.code())) return;
+            if (queryIntentResolver != null && queryIntentResolver.domain("INVOICE_APPLICATION").isPresent()
+                    && com.smart.agent.routing.InvoiceApplicationDomainContributor.matches(effectiveQuestion)
+                    && !isExplicitApprovalWorkflowQuestion(effectiveQuestion)
+                    && !context.permissions().contains("menu:finance:invoice-application")) {
+                permissionQuerySubject = "开票申请";
+                throw new AgentException("AGENT_TOOL_FORBIDDEN",org.springframework.http.HttpStatus.FORBIDDEN,"Invoice application menu required");
+            }
+            if (additionalQueryDomain != null && "INVOICE_APPLICATION".equals(additionalQueryDomain.code())) return;
+            if (queryIntentResolver != null && queryIntentResolver.domain("BUDGET_COST").isPresent()
+                    && com.smart.agent.routing.BudgetCostDomainContributor.matches(effectiveQuestion)
+                    && !isExplicitApprovalWorkflowQuestion(effectiveQuestion)
+                    && !context.permissions().contains("menu:budget:cost")) {
+                permissionQuerySubject = "预算成本";
+                throw new AgentException("AGENT_TOOL_FORBIDDEN", org.springframework.http.HttpStatus.FORBIDDEN, "Budget archive menu required");
+            }
+            if (additionalQueryDomain != null && "BUDGET_COST".equals(additionalQueryDomain.code())) return;
+            if (queryIntentResolver != null && queryIntentResolver.domain("PROJECT_FUNDING").isPresent()
+                    && com.smart.agent.routing.ProjectFundingDomainContributor.matches(effectiveQuestion)
+                    && !isExplicitApprovalWorkflowQuestion(effectiveQuestion)
+                    && !context.permissions().containsAll(com.smart.agent.routing.ProjectFundingDomainContributor.permissions(
+                            com.smart.agent.routing.ProjectFundingDomainContributor.metric(effectiveQuestion)))) {
+                permissionQuerySubject = "总付款与项目垫资统计所需的全部来源";
+                throw new AgentException("AGENT_TOOL_FORBIDDEN", org.springframework.http.HttpStatus.FORBIDDEN,
+                        "Required funding source menus missing");
+            }
+            if (additionalQueryDomain != null && "PROJECT_FUNDING".equals(additionalQueryDomain.code())) return;
+            if (queryIntentResolver != null && queryIntentResolver.domain("MATERIAL_REFUND").isPresent()
+                    && com.smart.agent.routing.MaterialRefundDomainContributor.matches(effectiveQuestion)
+                    && !isExplicitApprovalWorkflowQuestion(effectiveQuestion)
+                    && !context.permissions().contains("menu:material:refund")) {
+                permissionQuerySubject = "材料退货退款";
+                throw new AgentException("AGENT_TOOL_FORBIDDEN", org.springframework.http.HttpStatus.FORBIDDEN,
+                        "Material return menu permission is required");
+            }
+            if (additionalQueryDomain != null && "MATERIAL_REFUND".equals(additionalQueryDomain.code())) return;
             if (queryIntentResolver != null && queryIntentResolver.domain("PROJECT_REIMBURSE").isPresent()
                     && com.smart.agent.routing.ProjectReimburseDomainContributor.matches(effectiveQuestion)
                     && !isExplicitApprovalWorkflowQuestion(effectiveQuestion)
@@ -831,8 +953,7 @@ public class ChatOrchestrator {
         }
 
         private boolean isExplicitApprovalWorkflowQuestion(String text) {
-            if (text == null || text.isBlank()) return false;
-            return text.matches(".*(待办|已办|我发起|审批流|流程|办理记录|审批节点|办理人|处理人|谁在审批|超时审批).*" );
+            return com.smart.agent.routing.ConstructionContractDomainContributor.isWorkflowQuery(text);
         }
 
         private String loadActiveBusinessDomain() {
@@ -929,7 +1050,53 @@ public class ChatOrchestrator {
                             "[trusted-query-context: 上一次" + additionalQueryDomain.name() + "查询条件=" + arguments
                                     + "。仅用于追问时继承用户未更改的筛选条件和分页；当前提问明确的新条件优先。"
                                     + "历史结果不可作为本轮数据，必须重新调用工具。]"));
-                    if (("PAYMENT_REQUEST".equals(additionalQueryDomain.code()) || "OTHER_PAYMENT_REQUEST".equals(additionalQueryDomain.code()) || "PROJECT_REIMBURSE".equals(additionalQueryDomain.code()))
+                    if ("COMPANY_OPERATING".equals(additionalQueryDomain.code())) {
+                        var references = objectMapper.createArrayNode();
+                        int position = 0;
+                        for (JsonNode row : savedQuery.path("result").path("rows")) {
+                            position++;
+                            if (position > 100) break;
+                            boolean detail = "detail".equals(arguments.path("mode").asText());
+                            if (detail && !context.projectIds().contains(row.path("projectId").asText())) continue;
+                            var ref = references.addObject().put("pagePosition",position).put("companyId",row.path("companyId").asText())
+                                    .put("companyName",row.path("companyName").asText()).put("companyCode",row.path("companyCode").asText());
+                            if (detail) ref.put("projectId",row.path("projectId").asText()).put("projectName",row.path("projectName").asText()).put("projectCode",row.path("projectCode").asText());
+                        }
+                        messages.add(new ModelRequest.ConversationMessage("user","[trusted-company-operating-references: 上次公司经营列表第"
+                                + savedQuery.path("result").path("page").asInt(1) + "页，查询方式=" + arguments.path("mode").asText("summary")
+                                + "，定位信息=" + references + "。序号只用于定位，使用真实companyId或projectId重新查询；历史公司范围由接口按当前权限重新校验。指代不清先确认。]"));
+                    }
+                    if (("PROJECT_PROGRESS".equals(additionalQueryDomain.code()) || "PROJECT_FUNDING".equals(additionalQueryDomain.code()) || "BUDGET_COST".equals(additionalQueryDomain.code()) || "PROJECT_PROFIT".equals(additionalQueryDomain.code())) && "detail".equals(arguments.path("mode").asText("detail"))) {
+                        var references = objectMapper.createArrayNode();
+                        int position = 0;
+                        for (JsonNode row : savedQuery.path("result").path("rows")) {
+                            position++;
+                            if (context.projectIds().contains(row.path("projectId").asText()))
+                                references.addObject().put("pagePosition", position).put("projectId", row.path("projectId").asText())
+                                        .put("projectName", row.path("projectName").asText()).put("projectCode", row.path("projectCode").asText());
+                        }
+                        messages.add(new ModelRequest.ConversationMessage("user", "[" + ("PROJECT_PROGRESS".equals(additionalQueryDomain.code()) ? "trusted-project-progress-references" : "PROJECT_PROFIT".equals(additionalQueryDomain.code()) ? "trusted-project-profit-references" : "BUDGET_COST".equals(additionalQueryDomain.code()) ? "trusted-budget-cost-references" : "trusted-project-funding-references") + ": 上次项目列表第"
+                                + savedQuery.path("result").path("page").asInt(1) + "页项目定位信息=" + references
+                                + "。仅用于序号指代，不能作为当前金额；必须按真实projectId重新查询。指代不明确先追问。]"));
+                    }
+                    if ("COST_CONTRACT".equals(additionalQueryDomain.code()) && "detail".equals(arguments.path("mode").asText())) {
+                        var references = objectMapper.createArrayNode();
+                        int position = 0;
+                        for (JsonNode row : savedQuery.path("result").path("rows")) {
+                            position++;
+                            String source = row.path("source").asText();
+                            if (context.projectIds().contains(row.path("projectId").asText())
+                                    && context.permissions().containsAll(com.smart.agent.routing.CostContractDomainContributor.permissions(source))) {
+                                references.addObject().put("pagePosition",position).put("contractId",row.path("contractId").asText())
+                                        .put("source",source).put("projectId",row.path("projectId").asText())
+                                        .put("contractCode",row.path("contractCode").asText()).put("contractName",row.path("contractName").asText());
+                            }
+                        }
+                        messages.add(new ModelRequest.ConversationMessage("user","[trusted-cost-contract-references: 上次合同列表第"
+                                + savedQuery.path("result").path("page").asInt(1) + "页定位信息=" + references
+                                + "。仅用于序号指代，不是当前事实；必须使用source与contractId重新查询。指代不明确先追问。]"));
+                    }
+                    if (("INVOICE_APPLICATION".equals(additionalQueryDomain.code()) || "MATERIAL_REFUND".equals(additionalQueryDomain.code()) || "PAYMENT_REQUEST".equals(additionalQueryDomain.code()) || "OTHER_PAYMENT_REQUEST".equals(additionalQueryDomain.code()) || "PROJECT_REIMBURSE".equals(additionalQueryDomain.code()))
                             && "detail".equals(arguments.path("mode").asText("detail"))) {
                         var references = objectMapper.createArrayNode();
                         JsonNode previousResult = savedQuery.path("result");
@@ -952,7 +1119,7 @@ public class ChatOrchestrator {
                             else reference.put("projectId", row.path("projectId").asText());
                         }
                         if (!references.isEmpty()) messages.add(new ModelRequest.ConversationMessage("user",
-                                "[" + ("PROJECT_REIMBURSE".equals(additionalQueryDomain.code()) ? "trusted-project-reimburse-references" : "OTHER_PAYMENT_REQUEST".equals(additionalQueryDomain.code()) ? "trusted-other-payment-request-references" : "trusted-payment-request-references") + ": 上次" + additionalQueryDomain.name() + "列表第"
+                                "[" + ("INVOICE_APPLICATION".equals(additionalQueryDomain.code()) ? "trusted-invoice-application-references" : "MATERIAL_REFUND".equals(additionalQueryDomain.code()) ? "trusted-material-refund-references" : "PROJECT_REIMBURSE".equals(additionalQueryDomain.code()) ? "trusted-project-reimburse-references" : "OTHER_PAYMENT_REQUEST".equals(additionalQueryDomain.code()) ? "trusted-other-payment-request-references" : "trusted-payment-request-references") + ": 上次" + additionalQueryDomain.name() + "列表第"
                                         + previousResult.path("page").asInt(1) + "页的单据定位信息=" + references
                                         + "。仅帮助理解第几单或单号，不能视为当前事实；必须按requestId重新查询明细。指代不明确先确认。]"));
                     }
@@ -1508,6 +1675,12 @@ public class ChatOrchestrator {
                 }
                 if (isProjectScopedQueryTool(request.toolKey()) && projectClarificationArguments != null)
                     input = projectClarificationArguments.deepCopy();
+                if ("projectProgress.query".equals(request.toolKey()) && progressDateSelection != null) {
+                    var confirmed = (com.fasterxml.jackson.databind.node.ObjectNode) input;
+                    if ("date:allProjectDates".equals(progressDateSelection))
+                        confirmed.remove(java.util.List.of("dateField", "startDate", "endDate"));
+                    else confirmed.put("dateField", "projectCreateDate");
+                }
                 if (java.util.Set.of("projectReceipts.compare", "constructionContract.compare", "projectOutput.compare").contains(request.toolKey()) && comparisonClarificationArguments != null)
                     input = comparisonClarificationArguments.deepCopy();
                 final JsonNode executionInput = input;
@@ -1598,6 +1771,11 @@ public class ChatOrchestrator {
                     if (isProjectScopedQueryTool(request.toolKey())
                             && result instanceof com.smart.agent.tool.project.ProjectQueryResult queryResult) {
                         for (var filter : queryResult.appliedFilters()) {
+                            if ("companyOperating.query".equals(request.toolKey()) && "companyId".equals(filter.get("field"))
+                                    && "eq".equals(filter.get("op")) && filter.get("value") instanceof String companyId) {
+                                var canonical = (com.fasterxml.jackson.databind.node.ObjectNode) effectiveArguments;
+                                canonical.put("companyId", companyId); canonical.remove("companyName");
+                            }
                             if ("projectId".equals(filter.get("field")) && "eq".equals(filter.get("op"))
                                     && filter.get("value") instanceof String id && context.projectIds().contains(id)) {
                                 var canonical = (com.fasterxml.jackson.databind.node.ObjectNode) effectiveArguments;
@@ -1669,7 +1847,7 @@ public class ChatOrchestrator {
                     emit(ChatEvent.toolResult(run.id(), traceId, request.toolKey()));
                 }
                 if (result instanceof ClarificationPrompt prompt) {
-                    if ("PROJECT_REFERENCE".equals(prompt.ambiguityType())) projectClarificationArguments = input.deepCopy();
+                    if ("PROJECT_REFERENCE".equals(prompt.ambiguityType()) || "COMPANY_REFERENCE".equals(prompt.ambiguityType())) projectClarificationArguments = input.deepCopy();
                     if ("COMPARISON_PROJECT_REFERENCE".equals(prompt.ambiguityType())) comparisonClarificationArguments = input.deepCopy();
                     completeClarificationPrompt(prompt);
                     return false;

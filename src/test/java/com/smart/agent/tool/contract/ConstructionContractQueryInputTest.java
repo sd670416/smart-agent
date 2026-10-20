@@ -5,6 +5,18 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
 
 class ConstructionContractQueryInputTest {
+    @Test void projectTypeGroupingSurvivesCanonicalProjectResolution() throws Exception {
+        var input = new ObjectMapper().readValue("{\"mode\":\"summary\",\"groupBy\":\"projectType\",\"projectTypeName\":\"土建\"}", ConstructionContractQueryInput.class);
+        var resolved = new ObjectMapper().valueToTree(input.withProjectId("p1"));
+        assertThat(resolved.path("groupBy").asText()).isEqualTo("projectType");
+        assertThat(resolved.path("projectTypeName").asText()).isEqualTo("土建");
+    }
+
+    @Test void unsupportedGroupingAndGroupedDetailAreRejected() {
+        var mapper = new ObjectMapper();
+        assertThatThrownBy(() -> mapper.readValue("{\"mode\":\"summary\",\"groupBy\":\"company\"}", ConstructionContractQueryInput.class)).hasRootCauseInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> mapper.readValue("{\"mode\":\"detail\",\"groupBy\":\"projectType\"}", ConstructionContractQueryInput.class)).hasRootCauseInstanceOf(IllegalArgumentException.class);
+    }
     @Test void omittedOptionsHaveBoundedDefaults() throws Exception {
         ConstructionContractQueryInput input = new ObjectMapper().readValue("{}", ConstructionContractQueryInput.class);
         assertThat(input.mode()).isEqualTo("detail");

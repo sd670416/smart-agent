@@ -23,6 +23,7 @@ public class ConstructionContractQueryTool implements AgentTool<ConstructionCont
     @Override public Optional<String> projectId(ConstructionContractQueryInput input) { return Optional.empty(); }
     @Override public String description() {
         return "查询当前用户可见项目的审批完成登记施工合同：明细、数量及建设合同总金额（最终合同金额合计）。"
+                + "支持summary按projectType分组返回合同数量、最终金额及金额占比；按类型追问明细使用detail及projectType或准确projectTypeName，不设置groupBy。"
                 + "不查询待办或其他种类合同。日期维度不明确时先调用 constructionContract.clarifyDate；"
                 + "原经营看板指标日期是项目创建日期，明确签订日期时用 signingDate。数量或金额合计用 summary，不对分页明细自行求总额。";
     }
@@ -34,6 +35,9 @@ public class ConstructionContractQueryTool implements AgentTool<ConstructionCont
                   "projectName":{"type":"string","description":"默认精确项目名称筛选，同名多项时追问确认，不得默认包含匹配扩大范围"},
                   "projectNameMatch":{"type":"string","description":"仅允许exact或contains，默认exact。只有用户明确要求名称包含或模糊匹配时用contains，不能作为失败后的降级重试"},
                   "contractName":{"type":"string","description":"合同名称包含筛选"},
+                  "groupBy":{"type":"string","description":"只允许projectType，仅summary支持按项目类型分组；返回全部类型与全范围金额占比，不按分页明细求和。查看类型明细时清除groupBy"},
+                  "projectType":{"type":"string","description":"上轮真实返回的项目类型值，不能猜编号；__UNCLASSIFIED__表示未分类"},
+                  "projectTypeName":{"type":"string","description":"准确项目类型名称，如土建；接口按业务字典精确识别，不认识或重名时需确认，不得退化为不筛选"},
                   "mode":{"type":"string","description":"只允许 detail 或 summary：detail 返回分页明细；summary 返回合同数量及最终金额总计"},
                   "dateField":{"type":"string","description":"只允许 projectCreateDate（项目创建日期）、signingDate（合同签订日期）、createDate（合同创建日期）。日期不明确先追问"},
                   "startDate":{"type":"string","description":"开始日期 yyyy-MM-dd，含当天"},

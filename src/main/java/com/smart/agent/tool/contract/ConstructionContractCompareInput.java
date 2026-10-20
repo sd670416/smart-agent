@@ -7,6 +7,8 @@ public record ConstructionContractCompareInput(String comparisonType, String per
     public ConstructionContractCompareInput {
         if (!List.of("YOY", "MOM", "CUSTOM").contains(comparisonType == null ? "" : comparisonType) || current == null)
             throw new IllegalArgumentException("Comparison type and current group required");
+        if (current.groupBy() != null || baseline != null && baseline.groupBy() != null)
+            throw new IllegalArgumentException("Grouped comparisons are not supported");
         if ("CUSTOM".equals(comparisonType)) {
             if (baseline == null || !java.util.Objects.equals(current.dateField(), baseline.dateField()))
                 throw new IllegalArgumentException("Both groups must use the same date dimension");

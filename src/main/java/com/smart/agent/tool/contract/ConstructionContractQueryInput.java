@@ -2,7 +2,13 @@ package com.smart.agent.tool.contract;
 
 public record ConstructionContractQueryInput(String projectId, String projectName, String contractName,
         String mode, String dateField, String startDate, String endDate, Integer page, Integer pageSize,
-        String projectCode, String projectNameMatch) {
+        String projectCode, String projectNameMatch, String groupBy, String projectType, String projectTypeName) {
+    public ConstructionContractQueryInput(String projectId, String projectName, String contractName,
+            String mode, String dateField, String startDate, String endDate, Integer page, Integer pageSize,
+            String projectCode, String projectNameMatch) {
+        this(projectId, projectName, contractName, mode, dateField, startDate, endDate, page, pageSize,
+                projectCode, projectNameMatch, null, null, null);
+    }
     public ConstructionContractQueryInput(String projectId, String projectName, String contractName,
             String mode, String dateField, String startDate, String endDate, Integer page, Integer pageSize) {
         this(projectId, projectName, contractName, mode, dateField, startDate, endDate, page, pageSize, null, null);
@@ -21,6 +27,11 @@ public record ConstructionContractQueryInput(String projectId, String projectNam
         page = page == null ? 1 : page;
         pageSize = pageSize == null ? 20 : pageSize;
         if (!java.util.List.of("detail", "summary").contains(mode)) throw new IllegalArgumentException("Unsupported mode");
+        groupBy = clean(groupBy);
+        projectType = clean(projectType);
+        projectTypeName = clean(projectTypeName);
+        if (groupBy != null && (!"projectType".equals(groupBy) || !"summary".equals(mode)))
+            throw new IllegalArgumentException("Project type grouping requires summary mode");
         if (page < 1 || pageSize < 1 || pageSize > 100) throw new IllegalArgumentException("Invalid pagination");
         if (dateField != null && !java.util.List.of("projectCreateDate", "signingDate", "createDate").contains(dateField))
             throw new IllegalArgumentException("Unsupported date field");
@@ -34,7 +45,7 @@ public record ConstructionContractQueryInput(String projectId, String projectNam
 
     public ConstructionContractQueryInput withProjectId(String id) {
         return new ConstructionContractQueryInput(id, null, contractName, mode, dateField, startDate, endDate,
-                page, pageSize, null, "exact");
+                page, pageSize, null, "exact", groupBy, projectType, projectTypeName);
     }
 
     private static String clean(String value) { return value == null || value.isBlank() ? null : value.trim(); }

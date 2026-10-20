@@ -20,6 +20,7 @@ import org.springframework.web.server.ResponseStatusException;
 @Service
 @ConditionalOnProperty(name="agent.persistence.enabled", havingValue="true", matchIfMissing=true)
 public class QuestionRecordService {
+    public static final Set<String> HANDLING_STATUSES = Set.of("PENDING", "RESOLVED", "NO_ACTION");
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(QuestionRecordService.class);
     private final JdbcTemplate jdbc;
     private final AgentRunRepository runs;
@@ -37,11 +38,16 @@ public class QuestionRecordService {
         catch (RuntimeException failure) { log.warn("question_record_collection_failed runId={} type={}", runId, failure.getClass().getSimpleName()); }
     }
     public Map<String,Object> feedback(AgentUserContext c, String conversationId, String runId, String messageId) {
+        return feedback(c,conversationId,runId,messageId,null);
+    }
+    public Map<String,Object> feedback(AgentUserContext c, String conversationId, String runId, String messageId,String description) {
+        if(description!=null && description.length()>2000) throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Description is too long");
         return tx.execute(status -> {
             AgentRun run=owned(c, runId);
             if (!Objects.equals(run.conversationId(),conversationId) || messageId==null
                     || !messageId.equals(run.assistantMessageId())) throw missing();
             collect(c,runId,"USER",null,"USER_UNRESOLVED");
+            if(description!=null) jdbc.update("UPDATE ai_question_record SET description=? WHERE tenant_id=? AND user_id=? AND run_id=?",description,c.tenantId(),c.userId(),runId);
             return detailInternal(c.tenantId(), runId, true);
         });
     }
@@ -78,7 +84,12 @@ public class QuestionRecordService {
                     else if(tool.startsWith("paymentRequest.")) domain="PAYMENT_REQUEST";
                     else if(tool.startsWith("otherPaymentRequest.")) domain="OTHER_PAYMENT_REQUEST";
                     else if(tool.startsWith("projectReimburse.")) domain="PROJECT_REIMBURSE";
+                    else if(tool.startsWith("materialRefund.")) domain="MATERIAL_REFUND";
+                    else if(tool.startsWith("projectFunding.")) domain="PROJECT_FUNDING";
+                    else if(tool.startsWith("projectProfit.")) domain="PROJECT_PROFIT";
+                    else if(tool.startsWith("budgetCost.")) domain="BUDGET_COST";
                     else if(tool.startsWith("otherIncomeRegistration.")) domain="OTHER_INCOME_REGISTRATION";
+                    else if(tool.startsWith("invoiceApplication.")) domain="INVOICE_APPLICATION";
                     else if(tool.startsWith("projectReceipts.")) domain="PROJECT_RECEIPTS";
                 } catch(Exception ignored) { /* Missing optional audit data must not affect collection. */ }
             }
@@ -87,13 +98,13 @@ public class QuestionRecordService {
                 .filter(s->Set.of("TOOL","TERMINAL","INTENT_RESOLUTION").contains(s.type())).limit(16)
                 .map(s->Map.of("type",s.type(),"input",QuestionSnapshot.safe(s.safeInputSummary()),"output",QuestionSnapshot.safe(s.safeOutputSummary()))).toList();
         String code=source.equals("SYSTEM") ? run.safeErrorCode() : source.equals("MODEL") ? "CAPABILITY_UNSUPPORTED" : "USER_UNRESOLVED";
-        jdbc.update("INSERT INTO ai_question_record (id,tenant_id,user_id,conversation_id,run_id,trace_id,question,answer,domain,source_system,source_model,source_user,reason_code,reason,context_json,steps_json,created_at,event_cutoff) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE source_system=(source_system OR VALUES(source_system)),source_model=(source_model OR VALUES(source_model)),source_user=(source_user OR VALUES(source_user))",
+        jdbc.update("INSERT INTO ai_question_record (id,tenant_id,user_id,conversation_id,run_id,trace_id,question,answer,domain,source_system,source_model,source_user,reason_code,reason,context_json,steps_json,created_at,event_cutoff,handling_status) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE source_system=(source_system OR VALUES(source_system)),source_model=(source_model OR VALUES(source_model)),source_user=(source_user OR VALUES(source_user))",
                 UUID.randomUUID().toString(),c.tenantId(),c.userId(),run.conversationId(),runId,run.traceId(),QuestionSnapshot.safe(question.content()),QuestionSnapshot.safe(answer==null?null:answer.content()),domain,
-                source.equals("SYSTEM"),source.equals("MODEL"),source.equals("USER"),QuestionSnapshot.safe(code==null?"AGENT_FAILED":code),QuestionSnapshot.safe(reason),encode(context),encode(safeSteps),Timestamp.from(Instant.now()),Timestamp.from(run.updatedAt()));
+                source.equals("SYSTEM"),source.equals("MODEL"),source.equals("USER"),QuestionSnapshot.safe(code==null?"AGENT_FAILED":code),QuestionSnapshot.safe(reason),encode(context),encode(safeSteps),Timestamp.from(Instant.now()),Timestamp.from(run.updatedAt()),"PENDING");
     }
     private String encode(Object value) { try { return json.writeValueAsString(value); } catch(Exception e) { throw new IllegalStateException(e); } }
     private Object decode(String value) { try { return json.readValue(value,new TypeReference<List<Map<String,String>>>(){}); } catch(Exception e) { throw new IllegalStateException(e); } }
-    public Map<String,Object> page(AgentUserContext c,String keyword,String userId,String domain,String source,LocalDate startDate,LocalDate endDate,int page,int size) {
+    public Map<String,Object> page(AgentUserContext c,String keyword,String userId,String domain,String source,String handlingStatus,LocalDate startDate,LocalDate endDate,int page,int size) {
         permitted(c);
         if(page<0 || size<1 || size>100) throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Invalid page");
         if(startDate!=null && endDate!=null && startDate.isAfter(endDate)) throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Invalid date range");
@@ -102,6 +113,7 @@ public class QuestionRecordService {
         if(userId!=null && !userId.isBlank()) { where.append(" AND user_id=?"); args.add(userId); }
         if(domain!=null && !domain.isBlank()) { where.append(" AND domain=?"); args.add(domain); }
         if(source!=null && !source.isBlank()) { if(!Set.of("SYSTEM","MODEL","USER").contains(source)) throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Invalid source"); where.append(" AND source_"+source.toLowerCase(Locale.ROOT)+"=TRUE"); }
+        if(handlingStatus!=null && !handlingStatus.isBlank()) { if(!HANDLING_STATUSES.contains(handlingStatus)) throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Invalid handling status"); where.append(" AND handling_status=?"); args.add(handlingStatus); }
         ZoneId zone=ZoneId.of("Asia/Shanghai");
         if(startDate!=null) { where.append(" AND created_at>=?"); args.add(Timestamp.from(startDate.atStartOfDay(zone).toInstant())); }
         if(endDate!=null) { where.append(" AND created_at<?"); args.add(Timestamp.from(endDate.plusDays(1).atStartOfDay(zone).toInstant())); }
@@ -117,11 +129,21 @@ public class QuestionRecordService {
     }
     private Map<String,Object> row(java.sql.ResultSet rs,boolean detail) throws java.sql.SQLException {
         Map<String,Object> result=new LinkedHashMap<>();
-        for(String[] field:new String[][]{{"id","id"},{"userId","user_id"},{"conversationId","conversation_id"},{"runId","run_id"},{"traceId","trace_id"},{"question","question"},{"domain","domain"},{"reasonCode","reason_code"},{"reason","reason"}}) result.put(field[0],rs.getString(field[1]));
+        for(String[] field:new String[][]{{"id","id"},{"userId","user_id"},{"conversationId","conversation_id"},{"runId","run_id"},{"traceId","trace_id"},{"question","question"},{"domain","domain"},{"reasonCode","reason_code"},{"reason","reason"},{"description","description"},{"handlingStatus","handling_status"}}) result.put(field[0],rs.getString(field[1]));
         List<String> sources=new ArrayList<>(); for(String s:List.of("SYSTEM","MODEL","USER")) if(rs.getBoolean("source_"+s.toLowerCase(Locale.ROOT))) sources.add(s);
         result.put("sources",sources); result.put("createdAt",rs.getTimestamp("created_at").toInstant());
         if(detail) { result.put("answer",rs.getString("answer")); result.put("context",decode(rs.getString("context_json"))); result.put("steps",decode(rs.getString("steps_json"))); }
         return result;
+    }
+    public Map<String,Object> updateDescription(AgentUserContext c,String id,String description) {
+        permitted(c); if(description!=null && description.length()>2000) throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Description is too long");
+        int count=jdbc.update("UPDATE ai_question_record SET description=? WHERE tenant_id=? AND id=?",description,c.tenantId(),id);
+        if(count==0) throw missing(); return detailInternal(c.tenantId(),id,false);
+    }
+    public Map<String,Object> updateStatus(AgentUserContext c,String id,String status) {
+        permitted(c); if(status==null || !HANDLING_STATUSES.contains(status)) throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Invalid handling status");
+        int count=jdbc.update("UPDATE ai_question_record SET handling_status=? WHERE tenant_id=? AND id=?",status,c.tenantId(),id);
+        if(count==0) throw missing(); return detailInternal(c.tenantId(),id,false);
     }
     private static void permitted(AgentUserContext c) { if(!c.permissions().contains("aiQuestion:menu")) throw new ResponseStatusException(HttpStatus.FORBIDDEN,"Permission denied"); }
     private static ResponseStatusException missing() { return new ResponseStatusException(HttpStatus.NOT_FOUND,"Question or message not found"); }

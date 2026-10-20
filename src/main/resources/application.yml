@@ -5,7 +5,7 @@ spring:
   application:
     name: smart-agent
   profiles:
-    default: local
+    default: dev
   datasource:
     url: ${AGENT_DB_URL:jdbc:mysql://localhost:3306/smart_agent?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai}
     username: ${AGENT_DB_USERNAME:root}

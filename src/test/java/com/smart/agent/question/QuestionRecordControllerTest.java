@@ -64,4 +64,25 @@ class QuestionRecordControllerTest {
         mvc.perform(get("/agent/question-records/page").param("startDate","2026-10-15").param("endDate","2026-10-14")
                 .requestAttr(AgentUserContext.class.getName(),managerUser)).andExpect(status().isBadRequest());
     }
+    @Test void managementWritesValidatePermissionAndInputBeforeTouchingDatabase() throws Exception {
+        var mvc=MockMvcBuilders.standaloneSetup(new QuestionRecordController(service())).build();
+        var admin=new AgentUserContext("tenant","user","identity",Set.of("aiQuestion:menu"),Set.of());
+        mvc.perform(post("/agent/question-records/id/description").requestAttr(AgentUserContext.class.getName(),user)
+                .contentType("application/json").content("{\"description\":\"test\"}")).andExpect(status().isForbidden());
+        mvc.perform(post("/agent/question-records/id/status").requestAttr(AgentUserContext.class.getName(),admin)
+                .contentType("application/json").content("{\"handlingStatus\":null}")).andExpect(status().isBadRequest());
+        mvc.perform(post("/agent/question-records/id/status").requestAttr(AgentUserContext.class.getName(),admin)
+                .contentType("application/json").content("{\"handlingStatus\":\"INVALID\"}")).andExpect(status().isBadRequest());
+        mvc.perform(post("/agent/question-records/id/description").requestAttr(AgentUserContext.class.getName(),admin)
+                .contentType("application/json").content(new ObjectMapper().writeValueAsString(Map.of("description","x".repeat(2001)))))
+                .andExpect(status().isBadRequest());
+        verifyNoInteractions(jdbc);
+    }
+    @Test void missingRecordUpdatesAreScopedToTenant() throws Exception {
+        var admin=new AgentUserContext("tenant","user","identity",Set.of("aiQuestion:menu"),Set.of());
+        var mvc=MockMvcBuilders.standaloneSetup(new QuestionRecordController(service())).build();
+        mvc.perform(post("/agent/question-records/foreign/status").requestAttr(AgentUserContext.class.getName(),admin)
+                .contentType("application/json").content("{\"handlingStatus\":\"RESOLVED\"}")).andExpect(status().isNotFound());
+        verify(jdbc).update("UPDATE ai_question_record SET handling_status=? WHERE tenant_id=? AND id=?","RESOLVED","tenant","foreign");
+    }
 }

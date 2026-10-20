@@ -38,11 +38,14 @@ class SmartBootConstructionContractBusinessClientTest {
                     WebClient.builder().baseUrl("http://127.0.0.1:" + server.port()).build(), new ObjectMapper(), "test-secret");
             var context = new ToolContext("tenant", "user", "identity", Set.of("role"), Set.of("p2", "p1"), Set.of("menu:project"));
             var input = new ConstructionContractQueryInput("p1", "测试项目", null, "summary", "signingDate",
-                    "2026-01-01", "2026-01-31", 1, 20);
+                    "2026-01-01", "2026-01-31", 1, 20, null, "exact", "projectType", "1", "土建");
             var result = client.query(context, input);
             assertThat(uri.get()).isEqualTo("/internal/ai/tools/construction-contract-query");
             assertThat(new ObjectMapper().readTree(body.get()).path("projectIds").get(0).asText()).isEqualTo("p1");
             assertThat(new ObjectMapper().readTree(body.get()).path("dateField").asText()).isEqualTo("signingDate");
+            assertThat(new ObjectMapper().readTree(body.get()).path("groupBy").asText()).isEqualTo("projectType");
+            assertThat(new ObjectMapper().readTree(body.get()).path("projectType").asText()).isEqualTo("1");
+            assertThat(new ObjectMapper().readTree(body.get()).path("projectTypeName").asText()).isEqualTo("土建");
             assertThat(result.rows().getFirst().get("finalContractAmount").toString()).isEqualTo("123456789012345.67");
             Mac mac = Mac.getInstance("HmacSHA256");
             mac.init(new SecretKeySpec("test-secret".getBytes(StandardCharsets.UTF_8), "HmacSHA256"));

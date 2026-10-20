@@ -7,6 +7,12 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
 
 class ConstructionContractCompareToolTest {
+    @Test void groupedComparisonCannotSilentlyReturnAnUngroupedTotal() throws Exception {
+        var grouped = new com.fasterxml.jackson.databind.ObjectMapper().readValue(
+                "{\"mode\":\"summary\",\"groupBy\":\"projectType\",\"dateField\":\"signingDate\",\"startDate\":\"2026-01-01\",\"endDate\":\"2026-01-31\"}",ConstructionContractQueryInput.class);
+        assertThatThrownBy(() -> new ConstructionContractCompareInput("YOY","MONTH",grouped,null))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
     private ConstructionContractQueryInput group() {
         return new ConstructionContractQueryInput("p1", null, "主体", "detail", "signingDate", "2026-09-01", "2026-09-30", 9, 20);
     }

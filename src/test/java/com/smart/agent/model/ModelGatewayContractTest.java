@@ -37,6 +37,25 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
 class ModelGatewayContractTest {
+    @Test void invoiceApplicationToolsReachProviderAndKeepApplicationAmountSemantics() {
+        var query = new com.smart.agent.tool.invoice.InvoiceApplicationQueryTool((context, input) -> null,
+                new com.smart.agent.tool.project.ProjectReferenceResolver(new com.smart.agent.tool.project.LocalProjectBusinessClient()));
+        var clarify = new com.smart.agent.tool.invoice.InvoiceApplicationClarifyDateTool();
+        AtomicReference<ChatRequest> captured = new AtomicReference<>();
+        ModelGateway gateway = capturingModel(captured, handler -> handler.onCompleteResponse(response("done", 0, 0)));
+        ModelRequest request = new ModelRequest("invoice-schema", "v1",
+                List.of(new ModelRequest.ConversationMessage("user", "开票申请金额合计")),
+                List.of(new ModelRequest.AllowedToolSpecification(query.key(), query.description(), query.argumentsSchemaJson()),
+                        new ModelRequest.AllowedToolSpecification(clarify.key(), clarify.description(), clarify.argumentsSchemaJson())),
+                List.of(), ModelRequest.ToolUseMode.REQUIRED);
+        assertThat(eventsOf(gateway, request)).anyMatch(ModelEvent.Completed.class::isInstance);
+        assertThat(captured.get().toolSpecifications()).extracting(dev.langchain4j.agent.tool.ToolSpecification::name)
+                .containsExactly("invoiceApplication_query", "invoiceApplication_clarifyDate");
+        assertThat(captured.get().toolSpecifications().getFirst().parameters().properties())
+                .containsKeys("dateField", "projectCode", "requestId", "mode");
+        assertThat(((SystemMessage) captured.get().messages().getFirst()).text())
+                .contains("开票申请金额不等于实际已开票金额", "invoiceApplication.clarifyDate");
+    }
     @Test
     void projectReceiptsToolsReachTheProviderWithoutListOnlyFields() {
         var query = new com.smart.agent.tool.receipts.ProjectReceiptsQueryTool((context, input) -> null,
@@ -119,6 +138,8 @@ class ModelGatewayContractTest {
         assertThat(eventsOf(gateway, request)).anyMatch(ModelEvent.Completed.class::isInstance);
         assertThat(captured.get().toolSpecifications()).extracting(dev.langchain4j.agent.tool.ToolSpecification::name)
                 .containsExactly("constructionContract_query", "constructionContract_compare", "constructionContract_clarifyDate");
+        assertThat(captured.get().toolSpecifications().getFirst().parameters().properties())
+                .containsKeys("groupBy", "projectType", "projectTypeName");
         assertThat(((SystemMessage) captured.get().messages().getFirst()).text())
                 .contains("constructionContract.query", "constructionContract.clarifyDate", "最终合同金额合计")
                 .doesNotContain("合同金额、回款、利润等尚未迁移");
