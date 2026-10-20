@@ -104,13 +104,17 @@ public class QuestionRecordService {
     }
     private String encode(Object value) { try { return json.writeValueAsString(value); } catch(Exception e) { throw new IllegalStateException(e); } }
     private Object decode(String value) { try { return json.readValue(value,new TypeReference<List<Map<String,String>>>(){}); } catch(Exception e) { throw new IllegalStateException(e); } }
-    public Map<String,Object> page(AgentUserContext c,String keyword,String userId,String domain,String source,String handlingStatus,LocalDate startDate,LocalDate endDate,int page,int size) {
+    public Map<String,Object> page(AgentUserContext c,String keyword,String userId,List<String> userIds,String domain,String source,String handlingStatus,LocalDate startDate,LocalDate endDate,int page,int size) {
         permitted(c);
         if(page<0 || size<1 || size>100) throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Invalid page");
         if(startDate!=null && endDate!=null && startDate.isAfter(endDate)) throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Invalid date range");
         StringBuilder where=new StringBuilder(" WHERE tenant_id=?"); List<Object> args=new ArrayList<>(); args.add(c.tenantId());
         if(keyword!=null && !keyword.isBlank()) { where.append(" AND question LIKE ?"); args.add("%"+keyword+"%"); }
         if(userId!=null && !userId.isBlank()) { where.append(" AND user_id=?"); args.add(userId); }
+        if(userIds!=null) {
+            if(userIds.isEmpty()) where.append(" AND 1=0");
+            else { where.append(" AND user_id IN (").append(String.join(",",Collections.nCopies(userIds.size(),"?"))).append(")"); args.addAll(userIds); }
+        }
         if(domain!=null && !domain.isBlank()) { where.append(" AND domain=?"); args.add(domain); }
         if(source!=null && !source.isBlank()) { if(!Set.of("SYSTEM","MODEL","USER").contains(source)) throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Invalid source"); where.append(" AND source_"+source.toLowerCase(Locale.ROOT)+"=TRUE"); }
         if(handlingStatus!=null && !handlingStatus.isBlank()) { if(!HANDLING_STATUSES.contains(handlingStatus)) throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Invalid handling status"); where.append(" AND handling_status=?"); args.add(handlingStatus); }

@@ -134,7 +134,7 @@ class ProjectFundingChatTest {
             if(pending.findActive("tenant","user",conversationId).isPresent())throw new AssertionError("pending must be resolved first");
             if(request.redactedConversationMessages().toString().contains("用户确认的日期字段=projectCreateDate"))
                 return Flux.just(new ModelEvent.ToolRequested("f","projectFunding.query",
-                        "{\"dateField\":\"projectCreateDate\",\"startDate\":\"2026-01-01\",\"endDate\":\"2026-01-31\"}"));
+                        "{\"dateField\":\"receivedDate\",\"startDate\":\"2026-01-01\",\"endDate\":\"2026-01-31\"}"));
             return Flux.just(new ModelEvent.ToolRequested("date","projectFunding.clarifyDate","{}"));
         });
         chat.stream(new ChatCommand(conversationId,"查2026年1月项目垫资",null),user,"t1").collectList().block();
@@ -163,7 +163,7 @@ class ProjectFundingChatTest {
             String messages=request.redactedConversationMessages().toString();
             if(messages.contains("用户确认不限定日期")) {
                 assertThat(messages).contains("删除dateField、startDate、endDate");
-                return Flux.just(new ModelEvent.ToolRequested("f","projectFunding.query","{\"metric\":\"funding\"}"));
+                return Flux.just(new ModelEvent.ToolRequested("f","projectFunding.query","{\"metric\":\"funding\",\"dateField\":\"projectCreateDate\",\"startDate\":\"2025-01-01\",\"endDate\":\"2025-01-31\"}"));
             }
             return Flux.just(new ModelEvent.ToolRequested("date","projectFunding.clarifyDate","{}"));
         });

@@ -186,7 +186,7 @@ class BudgetCostChatTest {
             String messages=request.redactedConversationMessages().toString();
             if(messages.contains("用户确认不限定日期")) {
                 assertThat(messages).contains("删除dateField、startDate、endDate");
-                return Flux.just(new ModelEvent.ToolRequested("f","budgetCost.query","{}"));
+                return Flux.just(new ModelEvent.ToolRequested("f","budgetCost.query","{\"dateField\":\"projectCreateDate\",\"startDate\":\"2025-01-01\",\"endDate\":\"2025-01-31\"}"));
             }
             return Flux.just(new ModelEvent.ToolRequested("date","budgetCost.clarifyDate","{}"));
         });

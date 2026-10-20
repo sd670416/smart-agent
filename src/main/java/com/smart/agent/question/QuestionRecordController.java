@@ -16,14 +16,22 @@ public class QuestionRecordController {
     @GetMapping("/page")
     public Map<String,Object> page(@RequestAttribute("com.smart.agent.security.AgentUserContext") AgentUserContext c,
             @RequestParam(required=false) String keyword,@RequestParam(required=false) String userId,
+            @RequestParam(required=false) java.util.List<String> userIds,
             @RequestParam(required=false) String domain,@RequestParam(required=false) String source,
             @RequestParam(required=false) String handlingStatus,
             @RequestParam(required=false) @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam(required=false) @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) LocalDate endDate,
             @RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="20") int size) {
-        return service.page(c,keyword,userId,domain,source,handlingStatus,startDate,endDate,page,size);
+        return service.page(c,keyword,userId,userIds,domain,source,handlingStatus,startDate,endDate,page,size);
     }
     @GetMapping("/{id}") public Map<String,Object> detail(@RequestAttribute("com.smart.agent.security.AgentUserContext") AgentUserContext c,@PathVariable String id) { return service.detail(c,id); }
+    public record Search(String keyword,String userId,java.util.List<String> userIds,String domain,String source,
+                         String handlingStatus,LocalDate startDate,LocalDate endDate,int page,int size) {}
+    @PostMapping("/search")
+    public Map<String,Object> search(@RequestAttribute("com.smart.agent.security.AgentUserContext") AgentUserContext c,@RequestBody Search body) {
+        return service.page(c,body.keyword(),body.userId(),body.userIds(),body.domain(),body.source(),body.handlingStatus(),
+                body.startDate(),body.endDate(),body.page(),body.size());
+    }
     public record Feedback(String conversationId,String runId,String messageId,String description) {
         @com.fasterxml.jackson.annotation.JsonAnySetter
         public void rejectUnknown(String name,Object value) { throw new IllegalArgumentException("Unknown feedback field: "+name); }

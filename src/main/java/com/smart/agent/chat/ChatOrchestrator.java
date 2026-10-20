@@ -473,7 +473,9 @@ public class ChatOrchestrator {
                             || "PROJECT_RECEIPTS".equals(domainCode)
                             && java.util.Set.of("date:projectCreateDate", "date:createDate", "date:receivedDate").contains(selection.optionId());
                     if (!validDate) throw clarificationFailure();
-                    if ("PROJECT_PROGRESS".equals(domainCode)) progressDateSelection = selection.optionId();
+                    if (java.util.Set.of("PROJECT_PROGRESS", "COMPANY_OPERATING", "PROJECT_FUNDING",
+                            "BUDGET_COST", "PROJECT_PROFIT").contains(domainCode))
+                        progressDateSelection = selection.optionId();
                     effectiveQuestion += ("PROJECT_PROGRESS".equals(domainCode) || "COMPANY_OPERATING".equals(domainCode) || "COST_CONTRACT".equals(domainCode) || "PROJECT_FUNDING".equals(domainCode) || "BUDGET_COST".equals(domainCode) || "PROJECT_PROFIT".equals(domainCode)) && "date:allProjectDates".equals(selection.optionId())
                             ? "\n[用户确认不限定日期，删除dateField、startDate、endDate，不继承原问题或历史日期条件，查询" + ("PROJECT_PROGRESS".equals(domainCode) ? "当前施工进度" : "累计金额") + "]"
                             : "\n[用户确认的日期字段=" + selection.optionId().substring("date:".length()) + "]";
@@ -1000,6 +1002,15 @@ public class ChatOrchestrator {
                         .append("查询，只能调用 ").append(String.join("、", additionalQueryDomain.toolKeys()))
                         .append("；相对日期先调用 system.current_time。每轮事实查询必须重新取数，历史结果仅用于理解条件。"
                                 + "日期维度不明确时调用该业务域的确认工具追问，不得自行假定。]");
+                if (java.util.Set.of("COMPANY_OPERATING", "PROJECT_FUNDING", "BUDGET_COST", "PROJECT_PROFIT")
+                        .contains(additionalQueryDomain.code())) {
+                    safe.append("\n[trusted-cumulative-date: 这些指标仅支持按项目创建期间选择项目后的当前累计值。"
+                            + "用户说某年、某月、期间发生、截至历史日期、历史余额或同比环比时，不能默认为项目创建日期，"
+                            + "也不能将当前累计值称为历史余额或期间金额。日期含义不明确或请求历史快照、期间金额、比较时，"
+                            + "先调用本域clarifyDate说明能力限制，让用户确认是否改查所选项目的当前累计值。"
+                            + "用户明确说这段时间创建的项目时才使用projectCreateDate；保留项目、公司和指标等其他条件。"
+                            + "回复用业务语言说明是这些项目当前的累计数据，不输出技术字段名。]");
+                }
             } else if (requiresFreshBoardData) {
                 safe.append("\n[trusted-routing: 本轮是看板查询，只能调用 board.query、board.compare 或 board.detail；不得调用 project.query，也不要返回项目菜单权限提示]");
             } else if (requiresFreshApprovalData) {
@@ -1675,7 +1686,8 @@ public class ChatOrchestrator {
                 }
                 if (isProjectScopedQueryTool(request.toolKey()) && projectClarificationArguments != null)
                     input = projectClarificationArguments.deepCopy();
-                if ("projectProgress.query".equals(request.toolKey()) && progressDateSelection != null) {
+                if (java.util.Set.of("projectProgress.query", "companyOperating.query", "projectFunding.query",
+                        "budgetCost.query", "projectProfit.query").contains(request.toolKey()) && progressDateSelection != null) {
                     var confirmed = (com.fasterxml.jackson.databind.node.ObjectNode) input;
                     if ("date:allProjectDates".equals(progressDateSelection))
                         confirmed.remove(java.util.List.of("dateField", "startDate", "endDate"));

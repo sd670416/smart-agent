@@ -85,4 +85,31 @@ class QuestionRecordControllerTest {
                 .contentType("application/json").content("{\"handlingStatus\":\"RESOLVED\"}")).andExpect(status().isNotFound());
         verify(jdbc).update("UPDATE ai_question_record SET handling_status=? WHERE tenant_id=? AND id=?","RESOLVED","tenant","foreign");
     }
+    @Test void resolvedUserIdsFilterBeforeCountingAndPagination() throws Exception {
+        var admin=new AgentUserContext("tenant","user","identity",Set.of("aiQuestion:menu"),Set.of());
+        when(jdbc.queryForObject(anyString(),eq(Long.class),any(Object[].class))).thenReturn(0L);
+        var mvc=MockMvcBuilders.standaloneSetup(new QuestionRecordController(service())).build();
+        mvc.perform(get("/agent/question-records/page").param("userIds","u1,u2")
+                .requestAttr(AgentUserContext.class.getName(),admin)).andExpect(status().isOk());
+        verify(jdbc).queryForObject("SELECT COUNT(*) FROM ai_question_record WHERE tenant_id=? AND user_id IN (?,?)",Long.class,"tenant","u1","u2");
+    }
+    @Test void nameResolvedIdsCanBePostedInSearchBody() throws Exception {
+        var admin=new AgentUserContext("tenant","user","identity",Set.of("aiQuestion:menu"),Set.of());
+        when(jdbc.queryForObject(anyString(),eq(Long.class),any(Object[].class))).thenReturn(0L);
+        var mvc=MockMvcBuilders.standaloneSetup(new QuestionRecordController(service())).build();
+        mvc.perform(post("/agent/question-records/search").contentType("application/json")
+                .content("{\"userIds\":[\"u1\",\"u2\"],\"page\":0,\"size\":20}")
+                .requestAttr(AgentUserContext.class.getName(),admin)).andExpect(status().isOk());
+        verify(jdbc).queryForObject("SELECT COUNT(*) FROM ai_question_record WHERE tenant_id=? AND user_id IN (?,?)",Long.class,"tenant","u1","u2");
+    }
+    @Test void postedSearchEnforcesPermissionAndDateValidation() throws Exception {
+        var admin=new AgentUserContext("tenant","user","identity",Set.of("aiQuestion:menu"),Set.of());
+        var mvc=MockMvcBuilders.standaloneSetup(new QuestionRecordController(service())).build();
+        String body="{\"userIds\":[\"u1\"],\"page\":0,\"size\":20,\"startDate\":\"2026-10-15\",\"endDate\":\"2026-10-14\"}";
+        mvc.perform(post("/agent/question-records/search").contentType("application/json").content(body)
+                .requestAttr(AgentUserContext.class.getName(),user)).andExpect(status().isForbidden());
+        mvc.perform(post("/agent/question-records/search").contentType("application/json").content(body)
+                .requestAttr(AgentUserContext.class.getName(),admin)).andExpect(status().isBadRequest());
+        verifyNoInteractions(jdbc);
+    }
 }

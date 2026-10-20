@@ -16,6 +16,38 @@ import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Flux;
 import static org.assertj.core.api.Assertions.*;
 class CompanyOperatingChatTest {
+    @Test void allDatesSelectionRemovesModelDatesAndPreservesCompanyAndMetric() {
+        var repository=new ChatControllerIT.InMemoryConversationRepository();var conversations=new ConversationService(repository);
+        var contexts=new ConversationContextService(new ChatControllerIT.InMemoryConversationContextRepository());
+        var pending=new ChatControllerIT.InMemoryPendingClarificationRepository();var mapper=new ObjectMapper();
+        var clarifications=new com.smart.agent.clarification.PendingClarificationService(pending,mapper);
+        var runs=new AgentRunService(new ChatControllerIT.InMemoryAgentRunRepository(),repository,new ChatControllerIT.InMemoryAgentRunStepRepository());
+        var queries=new ArrayList<CompanyOperatingQueryInput>();
+        var tools=new ToolRegistry(List.of(new CompanyOperatingQueryTool((context,q)->{
+            queries.add(q);return ProjectQueryResult.empty(1,20);
+        },new ProjectReferenceResolver(new LocalProjectBusinessClient())),new CompanyOperatingClarifyDateTool()));
+        var resolver=new QueryIntentResolver(new BusinessDomainRegistry(List.of(new CompanyOperatingDomainContributor(),new ProjectDomainContributor())));
+        try(var executor=new ToolExecutor(tools,runs)) {
+            var chat=new ChatOrchestrator(conversations,runs,request->{
+                if(request.redactedConversationMessages().stream().anyMatch(ModelRequest.ToolResultMessage.class::isInstance))return Flux.just(new ModelEvent.Completed("查询完成",1,1));
+                if(request.redactedConversationMessages().toString().contains("用户确认不限定日期"))return Flux.just(new ModelEvent.ToolRequested("q","companyOperating.query",
+                        "{\"companyId\":\"c1\",\"metric\":\"projects\",\"dateField\":\"projectCreateDate\",\"startDate\":\"2025-01-01\",\"endDate\":\"2025-01-31\"}"));
+                return Flux.just(new ModelEvent.ToolRequested("d","companyOperating.clarifyDate","{}"));
+            },tools,executor,mapper,null,Duration.ofSeconds(10),null,null,contexts,resolver,clarifications);
+            var user=new AgentUserContext("t","u","i",Set.of("menu:project"),Set.of("p"));String id=conversations.create("t","u","日期").id();
+            chat.stream(new ChatCommand(id,"2026年按公司统计项目数量",null),user,"a").collectList().block();
+            assertThat(queries).isEmpty();
+            var question=pending.findActive("t","u",id).orElseThrow();
+            var events=chat.stream(new ChatCommand(id,"不限定日期",List.of(),null,new ChatCommand.ClarificationSelection(question.id(),"date:allProjectDates")),user,"b").collectList().block();
+            assertThat(events).noneMatch(e->"error".equals(e.type()));
+            assertThat(queries).hasSize(1);
+            assertThat(queries.getFirst().companyId()).isEqualTo("c1");
+            assertThat(queries.getFirst().metric()).isEqualTo("projects");
+            assertThat(queries.getFirst().dateField()).isNull();
+            assertThat(queries.getFirst().startDate()).isNull();
+            assertThat(queries.getFirst().endDate()).isNull();
+        }
+    }
     @Test void unclearDatePausesAndConfirmedProjectDateResumes() {
         var repository=new ChatControllerIT.InMemoryConversationRepository();var conversations=new ConversationService(repository);
         var contexts=new ConversationContextService(new ChatControllerIT.InMemoryConversationContextRepository());
