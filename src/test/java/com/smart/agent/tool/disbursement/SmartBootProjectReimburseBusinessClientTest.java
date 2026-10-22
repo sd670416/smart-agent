@@ -16,6 +16,14 @@ import reactor.core.publisher.Mono;
 import static org.assertj.core.api.Assertions.*;
 
 class SmartBootProjectReimburseBusinessClientTest {
+    @Test void unauthorizedBaselineNeverMakesAnHttpRequest() {
+        WebClient client = WebClient.builder().exchangeFunction(request -> { throw new AssertionError("must not call"); }).build();
+        var business = new SmartBootProjectReimburseBusinessClient(client,new ObjectMapper(),"test-secret");
+        var current = new ProjectReimburseQueryInput("p1",null,null,"summary","reimburseDate","2026-01-01","2026-01-31",1,20);
+        var baseline = new ProjectReimburseQueryInput("denied",null,null,"summary","reimburseDate","2025-01-01","2025-01-31",1,20);
+        assertThatThrownBy(()->business.compare(new ToolContext("tenant","user","identity",Set.of("p1")),
+                new ProjectReimburseCompareInput("CUSTOM",null,current,baseline))).isInstanceOf(SecurityException.class);
+    }
     @Test void forbiddenResponseKeepsTheFinancialPermissionError() {
         WebClient client = WebClient.builder().exchangeFunction(request -> Mono.just(
                 org.springframework.web.reactive.function.client.ClientResponse
@@ -27,7 +35,9 @@ class SmartBootProjectReimburseBusinessClientTest {
                 .extracting("code").isEqualTo("AGENT_TOOL_FORBIDDEN");
     }
 
-    @Test void queriesSignedEndpointWithTrustedScopeAndReturnsPreciseAmounts() throws Exception {
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings={"QUERY","YOY","CUSTOM"})
+    void queriesSignedEndpointWithTrustedScopeAndReturnsPreciseAmounts(String mode) throws Exception {
         AtomicReference<String> body = new AtomicReference<>();
         AtomicReference<String> signature = new AtomicReference<>();
         AtomicReference<String> timestamp = new AtomicReference<>();
@@ -50,14 +60,21 @@ class SmartBootProjectReimburseBusinessClientTest {
             var context = new ToolContext("tenant", "user", "identity", Set.of("role"), Set.of("p2", "p1"), Set.of("menu:finance:project-reimburse"));
             var input = new ProjectReimburseQueryInput("p1", "测试项目", null, "summary", "createDate",
                     "2026-01-01", "2026-01-31", 1, 20);
-            var result = client.query(context, input);
-            assertThat(uri.get()).isEqualTo("/internal/ai/tools/project-reimburse-query");
-            assertThat(new ObjectMapper().readTree(body.get()).path("projectIds").get(0).asText()).isEqualTo("p1");
-            assertThat(new ObjectMapper().readTree(body.get()).path("dateField").asText()).isEqualTo("createDate");
+            var baseline = new ProjectReimburseQueryInput("p2",null,null,"summary","createDate","2025-01-01","2025-01-31",1,20);
+            var result = "QUERY".equals(mode) ? client.query(context,input) : client.compare(context,
+                    new ProjectReimburseCompareInput(mode,"MONTH",input,"CUSTOM".equals(mode)?baseline:null));
+            String path="/internal/ai/tools/project-reimburse-"+("QUERY".equals(mode)?"query":"compare");
+            assertThat(uri.get()).isEqualTo(path);
+            var payload=new ObjectMapper().readTree(body.get());
+            var group="QUERY".equals(mode)?payload:payload.path("current");
+            assertThat(group.path("projectIds").get(0).asText()).isEqualTo("p1");
+            assertThat(group.path("dateField").asText()).isEqualTo("createDate");
+            if("CUSTOM".equals(mode)) assertThat(payload.path("baseline").path("projectIds").get(0).asText()).isEqualTo("p2");
+            if("YOY".equals(mode)) assertThat(payload.has("baseline")).isFalse();
             assertThat(result.rows().getFirst().get("reimburseAmount").toString()).isEqualTo("123456789012345.67");
             Mac mac = Mac.getInstance("HmacSHA256");
             mac.init(new SecretKeySpec("test-secret".getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
-            String canonical = timestamp.get() + "\nPOST\n/internal/ai/tools/project-reimburse-query\ntenant\nuser\nidentity\nrole\nmenu:finance:project-reimburse\np1,p2";
+            String canonical = timestamp.get() + "\nPOST\n"+path+"\ntenant\nuser\nidentity\nrole\nmenu:finance:project-reimburse\np1,p2";
             assertThat(signature.get()).isEqualTo(Base64.getUrlEncoder().withoutPadding().encodeToString(
                     mac.doFinal(canonical.getBytes(StandardCharsets.UTF_8))));
         } finally { server.disposeNow(); }

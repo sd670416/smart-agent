@@ -47,6 +47,8 @@ public class SmartBootConstructionContractBusinessClient implements Construction
         body.put("projectIds", input.projectId() == null ? context.projectIds() : List.of(input.projectId()));
         body.put("projectName", input.projectName());
         body.put("contractName", input.contractName());
+        body.put("contractId", input.contractId());
+        body.put("recordType", input.recordType());
         body.put("mode", input.mode());
         body.put("groupBy", input.groupBy());
         body.put("projectType", input.projectType());

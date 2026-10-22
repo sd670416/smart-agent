@@ -34,6 +34,7 @@ public class SmartBootPaymentRegistrationBusinessClient implements PaymentRegist
         body.put("projectIds", input.projectId() == null ? context.projectIds() : List.of(input.projectId()));
         body.put("projectName", input.projectName());
         body.put("registrationCode", input.registrationCode());
+        body.put("registrationId", input.registrationId());
         body.put("mode", input.mode());
         body.put("dateField", input.dateField());
         body.put("startDate", input.startDate());

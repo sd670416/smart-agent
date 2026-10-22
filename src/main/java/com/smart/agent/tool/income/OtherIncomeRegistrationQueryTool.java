@@ -22,7 +22,8 @@ public class OtherIncomeRegistrationQueryTool implements AgentTool<OtherIncomeRe
     // Scope is checked against the canonical ID after resolving legacy code/name inputs, below.
     @Override public Optional<String> projectId(OtherIncomeRegistrationQueryInput input) { return Optional.empty(); }
     @Override public String description() {
-        return "查询当前用户可见项目中审批完成的其他收入登记：分页列表、登记数量及到账金额合计。"
+        return "查询当前用户可见项目中审批完成的其他收入登记：分页列表、主单详情、指定主单的收入明细、登记数量及到账金额合计。"
+                + "收入明细使用items并传真实主单registrationId，按序号及明细ID分页；日期筛选仍作用于主单，不能求和当前页当整单金额。"
                 + "其他回款对应其他收入登记，不含回款登记或付款申请，不能称为全部已收项目款。金额合计使用summary，不能汇总当前页或累计回款字段。"
                 + "支持到账日期receivedDate、登记创建日期createDate、项目创建日期projectCreateDate；日期不明确先调用otherIncomeRegistration.clarifyDate。待办或流程使用approval工具。";
     }
@@ -34,7 +35,8 @@ public class OtherIncomeRegistrationQueryTool implements AgentTool<OtherIncomeRe
                   "projectName":{"type":"string","description":"默认精确项目名称筛选，同名多项时追问确认，不得默认包含匹配扩大范围"},
                   "projectNameMatch":{"type":"string","description":"仅允许exact或contains，默认exact。只有用户明确要求名称包含或模糊匹配时用contains，不能作为失败后的降级重试"},
                   "registrationCode":{"type":"string","description":"其他收入登记编号包含筛选"},
-                  "mode":{"type":"string","description":"detail分页列表；summary登记数量及到账金额精确合计"},
+                  "registrationId":{"type":"string","description":"真实登记主单id，用于detail或items；items必须提供。不能使用明细itemId、序号、项目ID或登记编号；不能用于summary"},
+                  "mode":{"type":"string","description":"detail分页列表，带registrationId查主单详情且页码自动归一为1；items分页查询指定登记主单的收入明细，下一页保留registrationId；summary登记数量及到账金额精确合计"},
                   "dateField":{"type":"string","description":"receivedDate到账日期、createDate登记创建日期、projectCreateDate项目创建日期。日期不明确先追问"},
                   "startDate":{"type":"string","description":"开始日期 yyyy-MM-dd，含当天"},
                   "endDate":{"type":"string","description":"结束日期 yyyy-MM-dd，含当天"},

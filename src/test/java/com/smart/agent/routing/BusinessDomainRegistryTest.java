@@ -8,6 +8,28 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class BusinessDomainRegistryTest {
+    @Test void refundComparisonBelongsToRefundDomain() {
+        BusinessDomainRegistry registry=new BusinessDomainRegistry(List.of(new MaterialRefundDomainContributor()));
+        assertTrue(registry.findByTool("materialRefund.compare").isPresent());
+        assertEquals("MATERIAL_REFUND",registry.findByTool("materialRefund.compare").orElseThrow().code());
+    }
+    @Test void reimburseComparisonBelongsToReimburseDomain() {
+        BusinessDomainRegistry registry = new BusinessDomainRegistry(List.of(new ProjectReimburseDomainContributor(),new OtherPaymentRequestDomainContributor()));
+        assertTrue(registry.findByTool("projectReimburse.compare").isPresent());
+        assertEquals("PROJECT_REIMBURSE",registry.findByTool("projectReimburse.compare").orElseThrow().code());
+    }
+    @Test
+    void otherPaymentComparisonBelongsToItsOwnDomain() {
+        BusinessDomainRegistry registry = new BusinessDomainRegistry(List.of(new OtherPaymentRequestDomainContributor(), new PaymentRequestDomainContributor()));
+        assertTrue(registry.findByTool("otherPaymentRequest.compare").isPresent());
+        assertEquals("OTHER_PAYMENT_REQUEST", registry.findByTool("otherPaymentRequest.compare").orElseThrow().code());
+        assertEquals("PAYMENT_REQUEST", registry.findByTool("paymentRequest.compare").orElseThrow().code());
+    }
+    @Test
+    void paymentComparisonBelongsToPaymentDomain() {
+        BusinessDomainRegistry registry = new BusinessDomainRegistry(List.of(new PaymentRequestDomainContributor()));
+        assertEquals("PAYMENT_REQUEST", registry.findByTool("paymentRequest.compare").orElseThrow().code());
+    }
     @Test
     void findsDomainByCodeAndToolWithoutFixedEnum() {
         BusinessDomainContributor custom = () -> new BusinessDomainDescriptor(

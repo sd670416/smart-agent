@@ -2,7 +2,13 @@ package com.smart.agent.tool.payment;
 
 public record PaymentRegistrationQueryInput(String projectId, String projectName, String registrationCode,
         String mode, String dateField, String startDate, String endDate, Integer page, Integer pageSize,
-        String projectCode, String projectNameMatch) {
+        String projectCode, String projectNameMatch, String registrationId) {
+    public PaymentRegistrationQueryInput(String projectId, String projectName, String registrationCode,
+            String mode, String dateField, String startDate, String endDate, Integer page, Integer pageSize,
+            String projectCode, String projectNameMatch) {
+        this(projectId, projectName, registrationCode, mode, dateField, startDate, endDate, page, pageSize,
+                projectCode, projectNameMatch, null);
+    }
     public PaymentRegistrationQueryInput(String projectId, String projectName, String registrationCode,
             String mode, String dateField, String startDate, String endDate, Integer page, Integer pageSize) {
         this(projectId, projectName, registrationCode, mode, dateField, startDate, endDate, page, pageSize, null, null);
@@ -18,10 +24,14 @@ public record PaymentRegistrationQueryInput(String projectId, String projectName
         if ("contains".equals(projectNameMatch) && (projectName == null || projectId != null || projectCode != null))
             throw new IllegalArgumentException("Contains matching cannot replace an exact project reference");
         mode = mode == null ? "detail" : mode;
+        registrationId = clean(registrationId);
+        if (registrationId != null && !"detail".equals(mode))
+            throw new IllegalArgumentException("A registration ID is supported only in detail mode");
         page = page == null ? 1 : page;
         pageSize = pageSize == null ? 20 : pageSize;
         if (!java.util.List.of("detail", "summary").contains(mode)) throw new IllegalArgumentException("Unsupported mode");
         if (page < 1 || pageSize < 1 || pageSize > 100) throw new IllegalArgumentException("Invalid pagination");
+        if (registrationId != null) page = 1;
         if (dateField != null && !java.util.List.of("projectCreateDate", "createDate", "receivedDate").contains(dateField))
             throw new IllegalArgumentException("Unsupported date field");
         if (startDate != null || endDate != null) {
@@ -34,7 +44,7 @@ public record PaymentRegistrationQueryInput(String projectId, String projectName
 
     public PaymentRegistrationQueryInput withProjectId(String id) {
         return new PaymentRegistrationQueryInput(id, null, registrationCode, mode, dateField, startDate, endDate,
-                page, pageSize, null, "exact");
+                page, pageSize, null, "exact", registrationId);
     }
 
     private static String clean(String value) { return value == null || value.isBlank() ? null : value.trim(); }

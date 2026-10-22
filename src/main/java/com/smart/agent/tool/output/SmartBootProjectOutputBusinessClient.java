@@ -47,6 +47,7 @@ public class SmartBootProjectOutputBusinessClient implements ProjectOutputBusine
         body.put("projectIds", input.projectId() == null ? context.projectIds() : List.of(input.projectId()));
         body.put("projectName", input.projectName());
         body.put("outputReportNo", input.outputReportNo());
+        body.put("outputReportId", input.outputReportId());
         body.put("mode", input.mode());
         body.put("dateField", input.dateField());
         body.put("startDate", input.startDate());

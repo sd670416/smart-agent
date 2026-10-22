@@ -19,6 +19,26 @@ import reactor.core.publisher.Flux;
 import static org.assertj.core.api.Assertions.*;
 
 class ProjectOutputChatTest {
+    @Test void ordinalReportAndItemFollowUpsUseLiveOutputQueries() {
+        ChatOrchestrator chat = orchestrator(request -> {
+            if (hasCurrentResult(request)) return Flux.just(new ModelEvent.Completed("实时单据结果", 1, 1));
+            if (queries.size() == 1) {
+                assertThat(request.redactedConversationMessages().toString()).contains("trusted-project-output-references", "output-1", "pagePosition");
+            }
+            String args = queries.isEmpty() ? "{\"mode\":\"detail\"}"
+                    : "{\"projectId\":\"p1\",\"outputReportId\":\"output-1\",\"mode\":\""
+                    + (queries.size() == 1 ? "detail" : "items") + "\"}";
+            return Flux.just(new ModelEvent.ToolRequested("output", "projectOutput.query", args));
+        });
+        for (String question : List.of("查询工程产值列表", "查看第1条产值单", "查看这单的工程量明细", "再查一次")) {
+            assertThat(chat.stream(new ChatCommand(conversationId, question, null), user, "trace").collectList().block().toString())
+                    .contains("实时单据结果");
+        }
+        assertThat(queries).hasSize(4);
+        assertThat(queries.get(1).outputReportId()).isEqualTo("output-1");
+        assertThat(queries.get(2).mode()).isEqualTo("items");
+        assertThat(queries.get(3).outputReportId()).isEqualTo("output-1");
+    }
     @Test void comparisonReturnsToModelAndRefreshesEveryTurn() {
         ChatOrchestrator chat = orchestrator(request -> hasCurrentResult(request)
                 ? Flux.just(new ModelEvent.Completed("实时产值比较完成", 1, 1))
@@ -161,6 +181,9 @@ class ProjectOutputChatTest {
             }
             @Override public ProjectQueryResult query(ToolContext context, ProjectOutputQueryInput input) {
             queries.add(input);
+            if (!"summary".equals(input.mode())) return new ProjectQueryResult("detail", input.page(), input.pageSize(), 1L, false, List.of(),
+                    List.of(Map.of("id", "output-1", "projectId", "p1", "outputReportNo", "CZ-001",
+                            "currentPeriodOutputValue", 123.45)), List.of());
             return new ProjectQueryResult("aggregate", 1, 20, 1L, false, List.of(),
                     List.of(Map.of("outputCount", queries.size(), "currentPeriodOutputValue", 123.45)), List.of());
             }

@@ -2,7 +2,13 @@ package com.smart.agent.tool.output;
 
 public record ProjectOutputQueryInput(String projectId, String projectName, String outputReportNo,
         String mode, String dateField, String startDate, String endDate, Integer page, Integer pageSize,
-        String projectCode, String projectNameMatch) {
+        String projectCode, String projectNameMatch, String outputReportId) {
+    public ProjectOutputQueryInput(String projectId, String projectName, String outputReportNo,
+            String mode, String dateField, String startDate, String endDate, Integer page, Integer pageSize,
+            String projectCode, String projectNameMatch) {
+        this(projectId, projectName, outputReportNo, mode, dateField, startDate, endDate, page, pageSize,
+                projectCode, projectNameMatch, null);
+    }
     public ProjectOutputQueryInput(String projectId, String projectName, String outputReportNo,
             String mode, String dateField, String startDate, String endDate, Integer page, Integer pageSize) {
         this(projectId, projectName, outputReportNo, mode, dateField, startDate, endDate, page, pageSize, null, null);
@@ -10,6 +16,7 @@ public record ProjectOutputQueryInput(String projectId, String projectName, Stri
 
     public ProjectOutputQueryInput {
         projectId = clean(projectId);
+        outputReportId = clean(outputReportId);
         projectCode = clean(projectCode);
         projectName = clean(projectName);
         projectNameMatch = projectNameMatch == null ? "exact" : projectNameMatch;
@@ -20,7 +27,8 @@ public record ProjectOutputQueryInput(String projectId, String projectName, Stri
         mode = mode == null ? "detail" : mode;
         page = page == null ? 1 : page;
         pageSize = pageSize == null ? 20 : pageSize;
-        if (!java.util.List.of("detail", "summary").contains(mode)) throw new IllegalArgumentException("Unsupported mode");
+        if (!java.util.List.of("detail", "summary", "items").contains(mode)) throw new IllegalArgumentException("Unsupported mode");
+        if ("items".equals(mode) && outputReportId == null) throw new IllegalArgumentException("Select an output report first");
         if (page < 1 || pageSize < 1 || pageSize > 100) throw new IllegalArgumentException("Invalid pagination");
         if (dateField != null && !java.util.List.of("projectCreateDate", "createDate").contains(dateField))
             throw new IllegalArgumentException("Unsupported date field");
@@ -34,7 +42,7 @@ public record ProjectOutputQueryInput(String projectId, String projectName, Stri
 
     public ProjectOutputQueryInput withProjectId(String id) {
         return new ProjectOutputQueryInput(id, null, outputReportNo, mode, dateField, startDate, endDate,
-                page, pageSize, null, "exact");
+                page, pageSize, null, "exact", outputReportId);
     }
 
     private static String clean(String value) { return value == null || value.isBlank() ? null : value.trim(); }

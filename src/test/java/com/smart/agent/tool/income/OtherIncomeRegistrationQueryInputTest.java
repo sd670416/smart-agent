@@ -5,6 +5,22 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
 
 class OtherIncomeRegistrationQueryInputTest {
+    @Test void itemsKeepParentIdFiltersAndRequestedPageThroughProjectResolution() throws Exception {
+        var input = new ObjectMapper().readValue("{\"registrationId\":\" r1 \",\"mode\":\"items\",\"page\":2,\"pageSize\":1,\"dateField\":\"receivedDate\",\"startDate\":\"2026-01-01\",\"endDate\":\"2026-01-31\"}",
+                OtherIncomeRegistrationQueryInput.class).withProjectId("p1");
+        assertThat(input.registrationId()).isEqualTo("r1");
+        assertThat(input.mode()).isEqualTo("items");
+        assertThat(input.page()).isEqualTo(2);
+        assertThat(input.projectId()).isEqualTo("p1");
+        assertThat(input.dateField()).isEqualTo("receivedDate");
+        assertThat(input.startDate()).isEqualTo("2026-01-01");
+    }
+
+    @Test void itemsWithoutRealParentIdCannotQueryEveryRegistration() {
+        assertThatThrownBy(() -> new OtherIncomeRegistrationQueryInput(null, null, null, "items", null, null, null, 1, 20))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
     @Test void omittedOptionsHaveBoundedDefaults() throws Exception {
         OtherIncomeRegistrationQueryInput input = new ObjectMapper().readValue("{}", OtherIncomeRegistrationQueryInput.class);
         assertThat(input.mode()).isEqualTo("detail");

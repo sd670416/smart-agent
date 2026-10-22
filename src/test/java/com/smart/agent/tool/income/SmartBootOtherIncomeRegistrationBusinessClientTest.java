@@ -60,6 +60,15 @@ class SmartBootOtherIncomeRegistrationBusinessClientTest {
             String canonical = timestamp.get() + "\nPOST\n/internal/ai/tools/other-income-registration-query\ntenant\nuser\nidentity\nrole\nmenu:finance:other-income-registration\np1,p2";
             assertThat(signature.get()).isEqualTo(Base64.getUrlEncoder().withoutPadding().encodeToString(
                     mac.doFinal(canonical.getBytes(StandardCharsets.UTF_8))));
+            var detail = new ObjectMapper().readValue("{\"projectId\":\"p1\",\"registrationId\":\"r1\",\"mode\":\"detail\"}", OtherIncomeRegistrationQueryInput.class);
+            client.query(context, detail);
+            assertThat(new ObjectMapper().readTree(body.get()).path("registrationId").asText()).isEqualTo("r1");
+            assertThat(new ObjectMapper().readTree(body.get()).path("mode").asText()).isEqualTo("detail");
+            var items = new ObjectMapper().readValue("{\"projectId\":\"p1\",\"registrationId\":\"r1\",\"mode\":\"items\",\"page\":2,\"pageSize\":1}", OtherIncomeRegistrationQueryInput.class);
+            client.query(context, items);
+            assertThat(new ObjectMapper().readTree(body.get()).path("registrationId").asText()).isEqualTo("r1");
+            assertThat(new ObjectMapper().readTree(body.get()).path("mode").asText()).isEqualTo("items");
+            assertThat(new ObjectMapper().readTree(body.get()).path("page").asInt()).isEqualTo(2);
         } finally { server.disposeNow(); }
     }
 

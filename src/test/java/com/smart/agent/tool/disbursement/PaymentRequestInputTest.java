@@ -7,6 +7,24 @@ import static org.assertj.core.api.Assertions.*;
 class PaymentRequestInputTest {
     private final ObjectMapper mapper = new ObjectMapper();
 
+    @Test void singleDocumentResetsListPageButItemsKeepTheirPageAndParent() throws Exception {
+        var detail = mapper.readValue("""
+                {"requestId":" r1 ","mode":"detail","page":3,"pageSize":1,
+                 "dateField":"createDate","startDate":"2026-01-01","endDate":"2026-01-31"}
+                """, PaymentRequestQueryInput.class).withProjectId("p1");
+        assertThat(detail.page()).isEqualTo(1);
+        assertThat(detail.requestId()).isEqualTo("r1");
+        assertThat(detail.endDate()).isEqualTo("2026-01-31");
+        var items = mapper.readValue("{\"requestId\":\"r1\",\"mode\":\"items\",\"page\":3}", PaymentRequestQueryInput.class);
+        assertThat(items.page()).isEqualTo(3);
+        assertThat(items.requestId()).isEqualTo("r1");
+    }
+
+    @Test void summaryCannotSilentlyInheritASingleDocumentId() {
+        assertThatThrownBy(() -> mapper.readValue("{\"requestId\":\"r1\",\"mode\":\"summary\"}",
+                PaymentRequestQueryInput.class)).isInstanceOf(Exception.class);
+    }
+
     @Test void itemQueryPreservesRequestAndDatesWhenProjectIsResolved() throws Exception {
         var input = mapper.readValue("""
                 {"projectCode":"001","requestId":"r1","mode":"items","page":2,"pageSize":3,

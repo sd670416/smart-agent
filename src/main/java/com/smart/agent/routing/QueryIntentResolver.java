@@ -277,7 +277,7 @@ public class QueryIntentResolver {
     }
 
     private boolean isContextualFollowUp(String question) {
-        return question.matches(".*(查|看|多少|数量|金额|总额|合计|总计|签订|创建|日期|第|上一页|下一页|明细|详情|筛选|状态|比较|对比|继续|项目|审批|看板).*" );
+        return question.matches(".*(查|看|多少|数量|金额|总额|合计|总计|签订|创建|日期|第|上一页|下一页|明细|详情|筛选|状态|比较|对比|继续|项目|审批|看板|这[份张笔单]|该合同).*" );
     }
 
     private String reason(BusinessDomainDescriptor domain, int score) {

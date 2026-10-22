@@ -28,6 +28,18 @@ public class SmartBootOtherPaymentRequestBusinessClient implements OtherPaymentR
     }
 
     @Override public ProjectQueryResult query(ToolContext context, OtherPaymentRequestQueryInput input) {
+        return post(context, PATH, body(context, input));
+    }
+
+    @Override public ProjectQueryResult compare(ToolContext context, OtherPaymentRequestCompareInput input) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("comparisonType", input.comparisonType()); body.put("periodUnit", input.periodUnit());
+        body.put("current", body(context, input.current()));
+        if (input.baseline() != null) body.put("baseline", body(context, input.baseline()));
+        return post(context, "/internal/ai/tools/other-payment-request-compare", body);
+    }
+
+    private Map<String, Object> body(ToolContext context, OtherPaymentRequestQueryInput input) {
         if (input.projectId() != null && !context.canAccessProject(input.projectId()))
             throw new SecurityException("Project is outside trusted scope");
         Map<String, Object> body = new LinkedHashMap<>();
@@ -41,11 +53,15 @@ public class SmartBootOtherPaymentRequestBusinessClient implements OtherPaymentR
         body.put("endDate", input.endDate());
         body.put("page", input.page());
         body.put("pageSize", input.pageSize());
+        return body;
+    }
+
+    private ProjectQueryResult post(ToolContext context, String path, Map<String, Object> body) {
         org.slf4j.LoggerFactory.getLogger(getClass()).info(
-                "调用其他付款申请查询工具: userId={}, trustedProjectCount={}, mode={}, page={}, pageSize={}",
-                context.userId(), context.projectIds().size(), input.mode(), input.page(), input.pageSize());
+                "调用其他付款申请查询工具: userId={}, trustedProjectCount={}, path={}",
+                context.userId(), context.projectIds().size(), path);
         try {
-            String raw = client.post().uri(PATH).headers(headers -> sign(headers, context))
+            String raw = client.post().uri(path).headers(headers -> sign(headers, context, path))
                     .bodyValue(body).retrieve().bodyToMono(String.class).block();
             if (raw == null || raw.isBlank()) throw new AgentException("AGENT_TOOL_EXECUTION_FAILED",
                     HttpStatus.BAD_GATEWAY, "其他付款申请查询响应为空");
@@ -62,7 +78,7 @@ public class SmartBootOtherPaymentRequestBusinessClient implements OtherPaymentR
         }
     }
 
-    private void sign(HttpHeaders headers, ToolContext context) {
+    private void sign(HttpHeaders headers, ToolContext context, String path) {
         String timestamp = String.valueOf(Instant.now().getEpochSecond());
         String roles = String.join(",", new TreeSet<>(context.roleIds()));
         String permissions = String.join(",", new TreeSet<>(context.permissions()));
@@ -77,7 +93,7 @@ public class SmartBootOtherPaymentRequestBusinessClient implements OtherPaymentR
         try {
             Mac mac = Mac.getInstance("HmacSHA256");
             mac.init(new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
-            String canonical = timestamp + "\nPOST\n" + PATH + "\n" + context.tenantId() + "\n" + context.userId()
+            String canonical = timestamp + "\nPOST\n" + path + "\n" + context.tenantId() + "\n" + context.userId()
                     + "\n" + context.identityId() + "\n" + roles + "\n" + permissions + "\n" + projects;
             headers.set("X-Agent-Internal-Signature", Base64.getUrlEncoder().withoutPadding().encodeToString(
                     mac.doFinal(canonical.getBytes(StandardCharsets.UTF_8))));

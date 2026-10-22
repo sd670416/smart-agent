@@ -19,6 +19,41 @@ import reactor.core.publisher.Flux;
 import static org.assertj.core.api.Assertions.*;
 
 class ConstructionContractChatTest {
+    @Test void changeRecordsAndSupplementPagesKeepParentContractAndRefresh() {
+        ChatOrchestrator chat = orchestrator(request -> {
+            if (hasCurrentResult(request)) return Flux.just(new ModelEvent.Completed("实时合同记录", 1, 1));
+            if (queries.size() >= 2) assertThat(request.redactedConversationMessages().toString())
+                    .contains("trusted-construction-contract-records", "contract-1");
+            String args = switch (queries.size()) {
+                case 0 -> "{\"mode\":\"detail\"}";
+                case 1 -> "{\"mode\":\"records\",\"contractId\":\"contract-1\"}";
+                case 2 -> "{\"mode\":\"records\",\"contractId\":\"contract-1\",\"recordType\":\"supplement\",\"pageSize\":1}";
+                case 3 -> "{\"mode\":\"records\",\"contractId\":\"contract-1\",\"recordType\":\"supplement\",\"pageSize\":1,\"page\":2}";
+                default -> "{\"mode\":\"detail\",\"contractId\":\"contract-1\"}";
+            };
+            return Flux.just(new ModelEvent.ToolRequested("contract", "constructionContract.query", args));
+        });
+        for (String question : List.of("查询施工合同列表", "第1份合同有哪些变更记录", "只看这份合同的补充协议，每页1条", "下一页", "回到这份主合同详情"))
+            assertThat(chat.stream(new ChatCommand(conversationId, question, null), user, "trace").collectList().block().toString()).contains("实时合同记录");
+        assertThat(queries).hasSize(5);
+        assertThat(queries.get(3).recordType()).isEqualTo("supplement"); assertThat(queries.get(3).page()).isEqualTo(2);
+        assertThat(queries.get(4).contractId()).isEqualTo("contract-1"); assertThat(queries.get(4).mode()).isEqualTo("detail");
+    }
+    @Test void ordinalContractDetailRefreshesEveryTurnWithoutWorkflowFallback() {
+        ChatOrchestrator chat = orchestrator(request -> {
+            if (hasCurrentResult(request)) return Flux.just(new ModelEvent.Completed("实时合同信息", 1, 1));
+            if (!queries.isEmpty()) assertThat(request.redactedConversationMessages().toString())
+                    .contains("trusted-construction-contract-references", "contract-1", "pagePosition");
+            return Flux.just(new ModelEvent.ToolRequested("contract", "constructionContract.query", queries.isEmpty()
+                    ? "{\"mode\":\"detail\"}"
+                    : "{\"mode\":\"detail\",\"projectId\":\"p1\",\"contractId\":\"contract-1\"}"));
+        });
+        for (String question : List.of("查询施工合同列表", "查看第1份合同", "这份合同的付款条件呢", "再查一次"))
+            assertThat(chat.stream(new ChatCommand(conversationId, question, null), user, "trace").collectList().block().toString())
+                    .contains("实时合同信息");
+        assertThat(queries).hasSize(4);
+        assertThat(queries.subList(1, 4)).allSatisfy(input -> assertThat(input.contractId()).isEqualTo("contract-1"));
+    }
     private final ObjectMapper mapper = new ObjectMapper();
     private final ChatControllerIT.InMemoryConversationRepository conversations = new ChatControllerIT.InMemoryConversationRepository();
     private final ConversationService conversationService = new ConversationService(conversations);
@@ -53,6 +88,11 @@ class ConstructionContractChatTest {
             }
             @Override public ProjectQueryResult query(ToolContext context, ConstructionContractQueryInput input) {
             queries.add(input);
+            if ("records".equals(input.mode())) return new ProjectQueryResult("detail", input.page(), input.pageSize(), 2L, input.page() == 1,
+                    List.of(), List.of(Map.of("recordId", "change-1", "parentContractId", "contract-1", "projectId", "p1",
+                            "contractName", "补充协议一", "recordTypeName", "补充协议")), List.of());
+            if ("detail".equals(input.mode())) return new ProjectQueryResult("detail", input.page(), input.pageSize(), 1L, false, List.of(),
+                    List.of(Map.of("id", "contract-1", "projectId", "p1", "contractName", "施工合同一", "contractNo", "HT001")), List.of());
             return new ProjectQueryResult("aggregate", 1, 20, 1L, false, List.of(),
                     List.of(Map.of("contractCount", queries.size(), "finalContractAmount", 123.45)), List.of());
             }

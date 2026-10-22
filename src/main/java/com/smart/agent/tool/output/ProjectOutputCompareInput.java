@@ -5,6 +5,9 @@ import java.util.List;
 public record ProjectOutputCompareInput(String comparisonType, String periodUnit,
         ProjectOutputQueryInput current, ProjectOutputQueryInput baseline) {
     public ProjectOutputCompareInput {
+        if (current != null && (current.outputReportId() != null || "items".equals(current.mode()))
+                || baseline != null && (baseline.outputReportId() != null || "items".equals(baseline.mode())))
+            throw new IllegalArgumentException("Report drilldown cannot be used as a comparison group");
         if (!List.of("YOY", "MOM", "CUSTOM").contains(comparisonType == null ? "" : comparisonType) || current == null)
             throw new IllegalArgumentException("Comparison type and current group required");
         if ("CUSTOM".equals(comparisonType)) {

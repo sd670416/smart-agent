@@ -19,6 +19,48 @@ import reactor.core.publisher.Flux;
 import static org.assertj.core.api.Assertions.*;
 
 class OtherIncomeRegistrationChatTest {
+    @Test void incomeItemsNextPageAndReturnToMainKeepTheRealParentAndRefresh() {
+        ChatOrchestrator chat = orchestrator(request -> {
+            if (hasCurrentResult(request)) return Flux.just(new ModelEvent.Completed("本轮查询完成", 1, 1));
+            if (queries.isEmpty()) return Flux.just(new ModelEvent.ToolRequested("list", "otherIncomeRegistration.query", "{}"));
+            String messages = request.redactedConversationMessages().toString();
+            if (queries.size() == 1) assertThat(messages).contains("trusted-receipt-registration-references", "r1");
+            else assertThat(messages).contains("trusted-other-income-items", "r1").doesNotContain("trusted-receipt-registration-references");
+            return Flux.just(new ModelEvent.ToolRequested("items", "otherIncomeRegistration.query",
+                    "{\"registrationId\":\"r1\",\"projectId\":\"p1\",\"mode\":\"" + (queries.size() == 3 ? "detail" : "items")
+                    + "\",\"page\":" + (queries.size() == 2 ? 2 : 1) + ",\"pageSize\":1}"));
+        });
+        for (String question : List.of("查询其他收入登记列表", "查看第1笔的收入明细", "下一页", "回到这笔登记详情")) {
+            var events = chat.stream(new ChatCommand(conversationId, question, null), user, "trace").collectList().block();
+            assertThat(events).noneMatch(event -> "error".equals(event.type()));
+        }
+        assertThat(queries).hasSize(4);
+        assertThat(queries).extracting(OtherIncomeRegistrationQueryInput::mode).containsExactly("detail", "items", "items", "detail");
+        assertThat(queries.get(2).page()).isEqualTo(2);
+        assertThat(queries.subList(1, 4)).extracting(OtherIncomeRegistrationQueryInput::registrationId).containsOnly("r1");
+    }
+
+    @Test void listOrdinalUsesRealDocumentIdAndRefreshesEveryTurn() {
+        ChatOrchestrator chat = orchestrator(request -> {
+            if (hasCurrentResult(request)) return Flux.just(new ModelEvent.Completed("本轮单据查询完成", 1, 1));
+            if (!queries.isEmpty()) {
+                assertThat(request.redactedConversationMessages().toString())
+                        .contains("trusted-receipt-registration-references", "registrationId", "r1", "p1", "otherIncomeRegistration.query");
+            }
+            return Flux.just(new ModelEvent.ToolRequested("receipt", "otherIncomeRegistration.query", queries.isEmpty()
+                    ? "{}" : "{\"registrationId\":\"r1\",\"projectId\":\"p1\",\"mode\":\"detail\"}"));
+        });
+        chat.stream(new ChatCommand(conversationId, "查询其他收入登记列表", null), user, "trace1").collectList().block();
+        var second = chat.stream(new ChatCommand(conversationId, "查看第1笔详情", null), user, "trace2").collectList().block();
+        var third = chat.stream(new ChatCommand(conversationId, "再查这笔详情", null), user, "trace3").collectList().block();
+        assertThat(second).noneMatch(event -> "error".equals(event.type()));
+        assertThat(third).noneMatch(event -> "error".equals(event.type()));
+        assertThat(queries).hasSize(3);
+        assertThat(mapper.valueToTree(queries.get(1)).path("registrationId").asText()).isEqualTo("r1");
+        assertThat(mapper.valueToTree(queries.get(2)).path("registrationId").asText()).isEqualTo("r1");
+        assertThat(queries.get(1).projectId()).isEqualTo("p1");
+    }
+
     @Test void incomeTotalAndNextPageFollowUpsRefreshWithinTheActiveDomain() {
         ChatOrchestrator chat = orchestrator(request -> hasCurrentResult(request)
                 ? Flux.just(new ModelEvent.Completed("实时其他收入登记结果", 1, 1))
@@ -73,6 +115,11 @@ class OtherIncomeRegistrationChatTest {
             com.smart.agent.tool.approval.ApprovalBusinessClient approvalClient) {
         OtherIncomeRegistrationBusinessClient client = (context, input) -> {
             queries.add(input);
+            if ("items".equals(input.mode())) return new ProjectQueryResult("detail", input.page(), input.pageSize(), 2L,
+                    input.page() == 1, List.of(), List.of(Map.of("registrationId", "r1", "projectId", "p1",
+                    "registrationCode", "NO1", "itemId", "i" + input.page(), "receivedAmount", 1.11)), List.of());
+            if ("detail".equals(input.mode())) return new ProjectQueryResult("detail", input.page(), input.pageSize(), 1L, false,
+                    List.of(), List.of(Map.of("id", "r1", "projectId", "p1", "registrationCode", "NO1", "receivedAmount", 123.45)), List.of());
             return new ProjectQueryResult("aggregate", 1, 20, 1L, false, List.of(),
                     List.of(Map.of("registrationCount", queries.size(), "receivedAmount", 123.45)), List.of());
         };

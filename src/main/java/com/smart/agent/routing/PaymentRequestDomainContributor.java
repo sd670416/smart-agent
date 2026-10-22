@@ -10,7 +10,7 @@ public class PaymentRequestDomainContributor implements BusinessDomainContributo
     public static final String PERMISSION = "menu:finance:payment-request";
     private static final List<String> TERMS = List.of("付款申请");
     private static final BusinessDomainDescriptor DESCRIPTOR = new BusinessDomainDescriptor(
-            CODE, "付款申请", List.of("paymentRequest.query", "paymentRequest.clarifyDate"),
+            CODE, "付款申请", List.of("paymentRequest.query", "paymentRequest.clarifyDate", "paymentRequest.compare"),
             List.of(new DataScopeDescriptor("FINANCE_MENU", "付款申请菜单及可见项目范围", List.of("MENU", "PROJECT_MEMBER"))),
             "REALTIME", TERMS);
     public static boolean matches(String question) {

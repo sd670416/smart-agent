@@ -10,7 +10,7 @@ public class ProjectReimburseDomainContributor implements BusinessDomainContribu
     public static final String PERMISSION = "menu:finance:project-reimburse";
     private static final List<String> TERMS = List.of("项目报销", "工程报销");
     private static final BusinessDomainDescriptor DESCRIPTOR = new BusinessDomainDescriptor(
-            CODE, "项目报销", List.of("projectReimburse.query", "projectReimburse.clarifyDate"),
+            CODE, "项目报销", List.of("projectReimburse.query", "projectReimburse.clarifyDate", "projectReimburse.compare"),
             List.of(new DataScopeDescriptor("FINANCE_MENU", "项目报销菜单及可见项目范围", List.of("MENU", "PROJECT_MEMBER"))),
             "REALTIME", TERMS);
     public static boolean matches(String question) {

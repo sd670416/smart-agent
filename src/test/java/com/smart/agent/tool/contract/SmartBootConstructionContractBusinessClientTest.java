@@ -52,6 +52,14 @@ class SmartBootConstructionContractBusinessClientTest {
             String canonical = timestamp.get() + "\nPOST\n/internal/ai/tools/construction-contract-query\ntenant\nuser\nidentity\nrole\nmenu:project\np1,p2";
             assertThat(signature.get()).isEqualTo(Base64.getUrlEncoder().withoutPadding().encodeToString(
                     mac.doFinal(canonical.getBytes(StandardCharsets.UTF_8))));
+            client.query(context, new ObjectMapper().readValue("{\"projectId\":\"p1\",\"contractId\":\"c1\"}", ConstructionContractQueryInput.class));
+            assertThat(new ObjectMapper().readTree(body.get()).path("contractId").asText()).isEqualTo("c1");
+            assertThat(new ObjectMapper().readTree(body.get()).path("mode").asText()).isEqualTo("detail");
+            client.query(context, new ObjectMapper().readValue("{\"projectId\":\"p1\",\"contractId\":\"c1\",\"mode\":\"records\",\"recordType\":\"change\",\"page\":2}", ConstructionContractQueryInput.class));
+            var recordRequest = new ObjectMapper().readTree(body.get());
+            assertThat(recordRequest.path("contractId").asText()).isEqualTo("c1");
+            assertThat(recordRequest.path("recordType").asText()).isEqualTo("change");
+            assertThat(recordRequest.path("page").asInt()).isEqualTo(2);
         } finally { server.disposeNow(); }
     }
 

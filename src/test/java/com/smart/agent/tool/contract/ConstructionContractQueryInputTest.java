@@ -5,6 +5,25 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
 
 class ConstructionContractQueryInputTest {
+    @Test void recordsRequireParentIdAndPreserveTypeWhenResolvingProject() throws Exception {
+        var mapper = new ObjectMapper();
+        assertThatCode(() -> mapper.readValue("{\"mode\":\"records\",\"contractId\":\"c1\",\"recordType\":\"supplement\"}", ConstructionContractQueryInput.class)).doesNotThrowAnyException();
+        var input = mapper.readValue("{\"mode\":\"records\",\"contractId\":\"c1\",\"recordType\":\"supplement\"}", ConstructionContractQueryInput.class);
+        assertThat(mapper.valueToTree(input.withProjectId("p1")).path("recordType").asText()).isEqualTo("supplement");
+        assertThatThrownBy(() -> mapper.readValue("{\"mode\":\"records\"}", ConstructionContractQueryInput.class)).hasRootCauseInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> mapper.readValue("{\"recordType\":\"supplement\"}", ConstructionContractQueryInput.class)).hasRootCauseInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> mapper.readValue("{\"mode\":\"records\",\"contractId\":\"c1\",\"recordType\":\"other\"}", ConstructionContractQueryInput.class)).hasRootCauseInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new ConstructionContractCompareInput("CUSTOM", null, input, input)).isInstanceOf(IllegalArgumentException.class);
+    }
+    @Test void exactContractReferenceSurvivesProjectResolutionAndCannotBeCompared() throws Exception {
+        var mapper = new ObjectMapper();
+        assertThatCode(() -> mapper.readValue("{\"contractId\":\"c1\"}", ConstructionContractQueryInput.class))
+                .doesNotThrowAnyException();
+        var input = mapper.readValue("{\"contractId\":\"c1\"}", ConstructionContractQueryInput.class);
+        assertThat(mapper.valueToTree(input.withProjectId("p1")).path("contractId").asText()).isEqualTo("c1");
+        assertThatThrownBy(() -> new ConstructionContractCompareInput("CUSTOM", null, input, input))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
     @Test void projectTypeGroupingSurvivesCanonicalProjectResolution() throws Exception {
         var input = new ObjectMapper().readValue("{\"mode\":\"summary\",\"groupBy\":\"projectType\",\"projectTypeName\":\"土建\"}", ConstructionContractQueryInput.class);
         var resolved = new ObjectMapper().valueToTree(input.withProjectId("p1"));

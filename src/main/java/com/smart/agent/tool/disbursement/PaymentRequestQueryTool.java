@@ -22,9 +22,11 @@ public class PaymentRequestQueryTool implements AgentTool<PaymentRequestQueryInp
     // Scope is checked against the canonical ID after resolving legacy code/name inputs, below.
     @Override public Optional<String> projectId(PaymentRequestQueryInput input) { return Optional.empty(); }
     @Override public String description() {
-        return "查询当前用户可见项目中审批完成的付款申请。detail为申请单列表，items为单据付款明细，summary为申请单数、明细条数、本次付款金额精确合计。"
+        return "查询当前用户可见项目中审批完成的付款申请。detail无requestId为列表，带真实requestId为单据自身详情；items为付款明细，summary为全量精确合计。"
                 + "金额汇总子表本次付款金额，不得累加累计付款金额或分页明细；不含其他付款申请、报销及退款，不代表实际总付款。"
-                + "支持申请单号registrationCode和单据真实ID requestId；日期仅支持createDate申请创建日期、projectCreateDate项目创建日期。"
+                + "支持申请单号registrationCode和主单真实ID requestId，不能用明细itemId替代。明细翻页保留主单及筛选；返回主单用detail和同一requestId。"
+                + "主单详情含所属组织、项目经理、项目性质和联营单位；明细含当前合同金额及登记时保存的累计值，银行账户和附件未接入。"
+                + "日期仅支持createDate申请创建日期、projectCreateDate项目创建日期。"
                 + "日期不明确调用paymentRequest.clarifyDate，相对日期先取时间。待办、已办、流程仍使用approval工具。";
     }
     @Override public String argumentsSchemaJson() {
@@ -35,8 +37,8 @@ public class PaymentRequestQueryTool implements AgentTool<PaymentRequestQueryInp
                   "projectName":{"type":"string","description":"默认精确项目名称筛选，同名多项时追问确认，不得默认包含匹配扩大范围"},
                   "projectNameMatch":{"type":"string","description":"仅允许exact或contains，默认exact。只有用户明确要求名称包含或模糊匹配时用contains，不能作为失败后的降级重试"},
                   "registrationCode":{"type":"string","description":"付款申请单号包含筛选"},
-                  "requestId":{"type":"string","description":"付款申请列表返回的真实申请单ID；看某一单的付款明细时传入"},
-                  "mode":{"type":"string","description":"detail申请单列表，items付款明细，summary申请单数、明细条数及本次付款金额全量合计"},
+                  "requestId":{"type":"string","description":"列表返回的真实主单ID，非itemId；查单据详情或该单明细传入。翻页、返回主单保留；改查全列表或summary须清除"},
+                  "mode":{"type":"string","description":"detail无requestId为列表、有requestId为自身详情；items付款明细；summary全量合计不能携带requestId"},
                   "dateField":{"type":"string","description":"createDate申请创建日期、projectCreateDate项目创建日期。日期不明确先追问，付款申请没有独立的到账日期"},
                   "startDate":{"type":"string","description":"开始日期 yyyy-MM-dd，含当天"},
                   "endDate":{"type":"string","description":"结束日期 yyyy-MM-dd，含当天"},

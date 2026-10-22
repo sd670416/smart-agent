@@ -19,6 +19,91 @@ import reactor.core.publisher.Flux;
 import static org.assertj.core.api.Assertions.*;
 
 class MaterialRefundChatTest {
+    @Test void comparisonSelectionCannotReuseAProjectAfterPermissionIsRemoved() {
+        projectRows=List.of(Map.of("projectId","p1","projectName","示例","projectCode","001"),
+                Map.of("projectId","p2","projectName","示例","projectCode","002"));
+        var both=new AgentUserContext("tenant","user","identity",Set.of("menu:material:refund"),Set.of("p1","p2"));
+        ChatOrchestrator chat=orchestrator(request->Flux.just(new ModelEvent.ToolRequested("cmp","materialRefund.compare",
+                "{\"comparisonType\":\"YOY\",\"periodUnit\":\"MONTH\",\"current\":{\"projectName\":\"示例\",\"dateField\":\"returnDate\",\"startDate\":\"2026-09-01\",\"endDate\":\"2026-09-30\"}}")));
+        chat.stream(new ChatCommand(conversationId,"比较示例项目材料退货退款同比",null),both,"a").collectList().block();
+        var question=pending.findActive("tenant","user",conversationId).orElseThrow();
+        var events=chat.stream(new ChatCommand(conversationId,"选第二个",List.of(),null,
+                new ChatCommand.ClarificationSelection(question.id(),"current:project:p2")),user,"b").collectList().block();
+        assertThat(events).anyMatch(e->"AGENT_TOOL_PROJECT_FORBIDDEN".equals(e.code()));
+        assertThat(comparisons).isEmpty();
+    }
+    @Test void returnDateSelectionResumesComparisonInOtherPaymentDomain() {
+        ChatOrchestrator chat=orchestrator(request->{
+            if(hasCurrentResult(request)) return Flux.just(new ModelEvent.Completed("比较完成",1,1));
+            if(request.redactedConversationMessages().toString().contains("用户确认的日期字段=returnDate"))
+                return Flux.just(new ModelEvent.ToolRequested("cmp","materialRefund.compare",
+                        "{\"comparisonType\":\"YOY\",\"periodUnit\":\"MONTH\",\"current\":{\"dateField\":\"returnDate\",\"startDate\":\"2026-09-01\",\"endDate\":\"2026-09-30\"}}"));
+            return Flux.just(new ModelEvent.ToolRequested("date","materialRefund.clarifyDate","{}"));
+        });
+        chat.stream(new ChatCommand(conversationId,"比较2026年9月材料退货退款同比",null),user,"a").collectList().block();
+        var question=pending.findActive("tenant","user",conversationId).orElseThrow();
+        var events=chat.stream(new ChatCommand(conversationId,"明细退货时间",List.of(),null,
+                new ChatCommand.ClarificationSelection(question.id(),"date:returnDate")),user,"b").collectList().block();
+        assertThat(events).noneMatch(e->"error".equals(e.type())); assertThat(comparisons).hasSize(1);
+        assertThat(comparisons.getFirst().current().dateField()).isEqualTo("returnDate");
+    }
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans={false,true})
+    void comparisonProjectSelectionPreservesBothGroupsEvenWhenModelOmitsThem(boolean bothAmbiguous) {
+        projectRows=List.of(Map.of("projectId","p1","projectName","示例","projectCode","001"),
+                Map.of("projectId","p2","projectName","示例","projectCode","002"));
+        var expanded=new AgentUserContext("tenant","user","identity",Set.of("menu:material:refund"),Set.of("p1","p2"));
+        ChatOrchestrator chat=orchestrator(request->{
+            if(hasCurrentResult(request))return Flux.just(new ModelEvent.Completed("比较完成",1,1));
+            boolean confirmed=request.redactedConversationMessages().toString().contains("用户已确认比较条件=");
+            String arguments="{\"comparisonType\":\"CUSTOM\",\"current\":{\"projectId\":\"p1\",\"dateField\":\"createDate\",\"startDate\":\"2026-09-01\",\"endDate\":\"2026-09-30\"},\"baseline\":{\"projectName\":\"示例\",\"dateField\":\"createDate\",\"startDate\":\"2026-08-01\",\"endDate\":\"2026-08-31\"}}";
+            if(bothAmbiguous) arguments=arguments.replace("\"projectId\":\"p1\"","\"projectName\":\"示例\"");
+            return Flux.just(new ModelEvent.ToolRequested("cmp","materialRefund.compare",confirmed ? "{}" : arguments));
+        });
+        var first=chat.stream(new ChatCommand(conversationId,"比较两个项目的材料退货退款",null),expanded,"a").collectList().block();
+        assertThat(first.toString()).contains("COMPARISON_PROJECT_REFERENCE");assertThat(comparisons).isEmpty();
+        if(bothAmbiguous) {
+            var currentQuestion=pending.findActive("tenant","user",conversationId).orElseThrow();
+            var next=chat.stream(new ChatCommand(conversationId,"第一个",List.of(),null,
+                    new ChatCommand.ClarificationSelection(currentQuestion.id(),"current:project:p1")),expanded,"a2").collectList().block();
+            assertThat(next.toString()).contains("COMPARISON_PROJECT_REFERENCE");assertThat(comparisons).isEmpty();
+        }
+        var question=pending.findActive("tenant","user",conversationId).orElseThrow();
+        var second=chat.stream(new ChatCommand(conversationId,"第二个",List.of(),null,
+                new ChatCommand.ClarificationSelection(question.id(),"baseline:project:p2")),expanded,"b").collectList().block();
+        assertThat(second).noneMatch(e->"error".equals(e.type()));assertThat(comparisons).hasSize(1);
+        assertThat(comparisons.getFirst().current().projectId()).isEqualTo("p1");
+        assertThat(comparisons.getFirst().baseline().projectId()).isEqualTo("p2");
+        assertThat(comparisons.getFirst().current().startDate()).isEqualTo("2026-09-01");
+        assertThat(comparisons.getFirst().baseline().startDate()).isEqualTo("2026-08-01");
+    }
+    @Test void comparisonFollowupRefreshesAndSendsBackendResultToModel() {
+        ChatOrchestrator chat=orchestrator(request->hasCurrentResult(request)
+                ? Flux.just(new ModelEvent.Completed("材料退货退款比较完成",1,1))
+                : Flux.just(new ModelEvent.ToolRequested("cmp","materialRefund.compare",
+                        "{\"comparisonType\":\"YOY\",\"periodUnit\":\"MONTH\",\"current\":{\"dateField\":\"createDate\",\"startDate\":\"2026-09-01\",\"endDate\":\"2026-09-30\"}}")));
+        var first=chat.stream(new ChatCommand(conversationId,"按申请创建日期比较2026年9月材料退货退款同比",null),user,"a").collectList().block();
+        var second=chat.stream(new ChatCommand(conversationId,"再查一次同比",null),user,"b").collectList().block();
+        assertThat(first.toString()).contains("材料退货退款比较完成");assertThat(second.toString()).contains("材料退货退款比较完成");
+        assertThat(comparisons).hasSize(2);
+        assertThat(requests.get(2).redactedConversationMessages().toString()).contains("trusted-query-context","2026-09-01");
+        assertThat(requests.get(1).redactedConversationMessages().toString()).contains("difference");
+    }
+    @Test void missingComparisonPeriodPausesThenResumesWithinPaymentDomain() {
+        ChatOrchestrator chat=orchestrator(request->{
+            if(hasCurrentResult(request)) return Flux.just(new ModelEvent.Completed("比较完成",1,1));
+            if(request.redactedConversationMessages().toString().contains("用户确认比较期间="))
+                return Flux.just(new ModelEvent.ToolRequested("cmp","materialRefund.compare",
+                        "{\"comparisonType\":\"YOY\",\"periodUnit\":\"MONTH\",\"current\":{\"dateField\":\"createDate\",\"startDate\":\"2026-10-01\",\"endDate\":\"2026-10-12\"}}"));
+            return Flux.just(new ModelEvent.ToolRequested("date","materialRefund.clarifyDate","{\"ambiguity\":\"PERIOD\"}"));
+        });
+        chat.stream(new ChatCommand(conversationId,"按申请创建日期查材料退货退款同比",null),user,"a").collectList().block();
+        assertThat(comparisons).isEmpty();
+        var question=pending.findActive("tenant","user",conversationId).orElseThrow();
+        var events=chat.stream(new ChatCommand(conversationId,"本月",List.of(),null,
+                new ChatCommand.ClarificationSelection(question.id(),"period:MONTH")),user,"b").collectList().block();
+        assertThat(events).noneMatch(e->"error".equals(e.type())); assertThat(comparisons).hasSize(1);
+    }
     @Test void refundTotalAndNextPageFollowUpsRefreshWithinTheActiveDomain() {
         ChatOrchestrator chat = orchestrator(request -> hasCurrentResult(request)
                 ? Flux.just(new ModelEvent.Completed("实时材料退货退款结果", 1, 1))
@@ -31,7 +116,7 @@ class MaterialRefundChatTest {
         assertThat(queries.get(1).mode()).isEqualTo("summary");
         assertThat(queries.get(2).page()).isEqualTo(2);
         assertThat(requests.get(4).allowedToolSpecifications()).extracting(ModelRequest.AllowedToolSpecification::key)
-                .containsExactlyInAnyOrder("materialRefund.query", "materialRefund.clarifyDate");
+                .containsExactlyInAnyOrder("materialRefund.query", "materialRefund.clarifyDate", "materialRefund.compare");
         assertThat(requests.get(4).redactedConversationMessages().toString()).contains("trusted-query-context");
     }
 
@@ -59,6 +144,7 @@ class MaterialRefundChatTest {
     private final AgentUserContext user = new AgentUserContext("tenant", "user", "identity", Set.of("menu:project", "menu:material:refund"), Set.of("p1"));
     private final List<ModelRequest> requests = new CopyOnWriteArrayList<>();
     private final List<MaterialRefundQueryInput> queries = new CopyOnWriteArrayList<>();
+    private final List<MaterialRefundCompareInput> comparisons = new CopyOnWriteArrayList<>();
     private final String conversationId = conversationService.create("tenant", "user", "材料退货退款查询").id();
     private ToolExecutor executor;
     private List<Map<String, Object>> projectRows = List.of(Map.of("projectId", "p1", "projectName", "示例",
@@ -72,7 +158,12 @@ class MaterialRefundChatTest {
 
     private ChatOrchestrator orchestrator(ModelGateway model,
             com.smart.agent.tool.approval.ApprovalBusinessClient approvalClient) {
-        MaterialRefundBusinessClient client = (context, input) -> {
+        MaterialRefundBusinessClient client = new MaterialRefundBusinessClient() {
+            public ProjectQueryResult compare(ToolContext context, MaterialRefundCompareInput input) {
+                comparisons.add(input);
+                return new ProjectQueryResult("aggregate",1,3,3L,false,List.of(),List.of(Map.of("difference",comparisons.size())),List.of());
+            }
+            public ProjectQueryResult query(ToolContext context, MaterialRefundQueryInput input) {
             queries.add(input);
             if ("detail".equals(input.mode())) return new ProjectQueryResult("detail", input.page(), input.pageSize(),
                     2L, false, List.of(), List.of(Map.of("requestId", "r1", "projectId", "p1", "registrationCode", "FK-001"),
@@ -80,6 +171,7 @@ class MaterialRefundChatTest {
             return new ProjectQueryResult("aggregate", 1, 20, 1L, false, List.of(),
                     List.of(Map.of("requestCount", queries.size(), "itemCount", queries.size(),
                             "refundAmount", new java.math.BigDecimal("123.45"))), List.of());
+        };
         };
         var projects = new com.smart.agent.tool.project.LocalProjectBusinessClient() {
             @Override public ProjectQueryResult query(ToolContext context, com.smart.agent.tool.project.ProjectQueryInput input) {
@@ -90,6 +182,7 @@ class MaterialRefundChatTest {
         };
         ToolRegistry tools = new ToolRegistry(List.of(new MaterialRefundQueryTool(client,
                 new com.smart.agent.tool.project.ProjectReferenceResolver(projects)),
+                new MaterialRefundCompareTool(client,new com.smart.agent.tool.project.ProjectReferenceResolver(projects)),
                 new com.smart.agent.tool.approval.ApprovalQueryTool(approvalClient),
                 new com.smart.agent.tool.project.ProjectQueryTool(projects),
                 new MaterialRefundClarifyDateTool(), new com.smart.agent.tool.system.CurrentTimeTool(
@@ -142,7 +235,7 @@ class MaterialRefundChatTest {
         assertThat(first.toString()).contains("模型根据本轮材料退货退款结果回答");
         assertThat(second.toString()).contains("模型根据本轮材料退货退款结果回答");
         assertThat(requests.get(0).allowedToolSpecifications()).extracting(ModelRequest.AllowedToolSpecification::key)
-                .containsExactlyInAnyOrder("materialRefund.query", "materialRefund.clarifyDate");
+                .containsExactlyInAnyOrder("materialRefund.query", "materialRefund.clarifyDate", "materialRefund.compare");
         assertThat(requests.get(0).toolUseMode()).isEqualTo(ModelRequest.ToolUseMode.REQUIRED);
         assertThat(requests.get(1).toolUseMode()).isEqualTo(ModelRequest.ToolUseMode.AUTO);
         assertThat(contexts.find("tenant", "user", conversationId, ConversationContextService.ACTIVE_BUSINESS_DOMAIN)

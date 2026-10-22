@@ -19,6 +19,27 @@ import reactor.core.publisher.Flux;
 import static org.assertj.core.api.Assertions.*;
 
 class PaymentRegistrationChatTest {
+    @Test void listOrdinalUsesRealDocumentIdAndRefreshesEveryTurn() {
+        ChatOrchestrator chat = orchestrator(request -> {
+            if (hasCurrentResult(request)) return Flux.just(new ModelEvent.Completed("本轮单据查询完成", 1, 1));
+            if (!queries.isEmpty()) {
+                assertThat(request.redactedConversationMessages().toString())
+                        .contains("trusted-receipt-registration-references", "registrationId", "r1", "p1", "paymentRegistration.query");
+            }
+            return Flux.just(new ModelEvent.ToolRequested("receipt", "paymentRegistration.query", queries.isEmpty()
+                    ? "{}" : "{\"registrationId\":\"r1\",\"projectId\":\"p1\",\"mode\":\"detail\"}"));
+        });
+        chat.stream(new ChatCommand(conversationId, "查询回款登记列表", null), user, "trace1").collectList().block();
+        var second = chat.stream(new ChatCommand(conversationId, "查看第1笔详情", null), user, "trace2").collectList().block();
+        var third = chat.stream(new ChatCommand(conversationId, "再查这笔详情", null), user, "trace3").collectList().block();
+        assertThat(second).noneMatch(event -> "error".equals(event.type()));
+        assertThat(third).noneMatch(event -> "error".equals(event.type()));
+        assertThat(queries).hasSize(3);
+        assertThat(mapper.valueToTree(queries.get(1)).path("registrationId").asText()).isEqualTo("r1");
+        assertThat(mapper.valueToTree(queries.get(2)).path("registrationId").asText()).isEqualTo("r1");
+        assertThat(queries.get(1).projectId()).isEqualTo("p1");
+    }
+
     @Test void outputTotalAndNextPageFollowUpsRefreshWithinTheActiveDomain() {
         ChatOrchestrator chat = orchestrator(request -> hasCurrentResult(request)
                 ? Flux.just(new ModelEvent.Completed("实时回款登记结果", 1, 1))
@@ -73,6 +94,8 @@ class PaymentRegistrationChatTest {
             com.smart.agent.tool.approval.ApprovalBusinessClient approvalClient) {
         PaymentRegistrationBusinessClient client = (context, input) -> {
             queries.add(input);
+            if ("detail".equals(input.mode())) return new ProjectQueryResult("detail", input.page(), input.pageSize(), 1L, false,
+                    List.of(), List.of(Map.of("id", "r1", "projectId", "p1", "registrationCode", "NO1", "receivedAmount", 123.45)), List.of());
             return new ProjectQueryResult("aggregate", 1, 20, 1L, false, List.of(),
                     List.of(Map.of("registrationCount", queries.size(), "receivedAmount", 123.45)), List.of());
         };

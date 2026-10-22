@@ -19,6 +19,63 @@ import reactor.core.publisher.Flux;
 import static org.assertj.core.api.Assertions.*;
 
 class PaymentRequestChatTest {
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans={false,true})
+    void comparisonProjectSelectionPreservesBothGroupsEvenWhenModelOmitsThem(boolean bothAmbiguous) {
+        projectRows=List.of(Map.of("projectId","p1","projectName","示例","projectCode","001"),
+                Map.of("projectId","p2","projectName","示例","projectCode","002"));
+        var expanded=new AgentUserContext("tenant","user","identity",Set.of("menu:finance:payment-request"),Set.of("p1","p2"));
+        ChatOrchestrator chat=orchestrator(request->{
+            if(hasCurrentResult(request))return Flux.just(new ModelEvent.Completed("比较完成",1,1));
+            boolean confirmed=request.redactedConversationMessages().toString().contains("用户已确认比较条件=");
+            String arguments="{\"comparisonType\":\"CUSTOM\",\"current\":{\"projectId\":\"p1\",\"dateField\":\"createDate\",\"startDate\":\"2026-09-01\",\"endDate\":\"2026-09-30\"},\"baseline\":{\"projectName\":\"示例\",\"dateField\":\"createDate\",\"startDate\":\"2026-08-01\",\"endDate\":\"2026-08-31\"}}";
+            if(bothAmbiguous) arguments=arguments.replace("\"projectId\":\"p1\"","\"projectName\":\"示例\"");
+            return Flux.just(new ModelEvent.ToolRequested("cmp","paymentRequest.compare",confirmed ? "{}" : arguments));
+        });
+        var first=chat.stream(new ChatCommand(conversationId,"比较两个项目的付款申请",null),expanded,"a").collectList().block();
+        assertThat(first.toString()).contains("COMPARISON_PROJECT_REFERENCE");assertThat(comparisons).isEmpty();
+        if(bothAmbiguous) {
+            var currentQuestion=pending.findActive("tenant","user",conversationId).orElseThrow();
+            var next=chat.stream(new ChatCommand(conversationId,"第一个",List.of(),null,
+                    new ChatCommand.ClarificationSelection(currentQuestion.id(),"current:project:p1")),expanded,"a2").collectList().block();
+            assertThat(next.toString()).contains("COMPARISON_PROJECT_REFERENCE");assertThat(comparisons).isEmpty();
+        }
+        var question=pending.findActive("tenant","user",conversationId).orElseThrow();
+        var second=chat.stream(new ChatCommand(conversationId,"第二个",List.of(),null,
+                new ChatCommand.ClarificationSelection(question.id(),"baseline:project:p2")),expanded,"b").collectList().block();
+        assertThat(second).noneMatch(e->"error".equals(e.type()));assertThat(comparisons).hasSize(1);
+        assertThat(comparisons.getFirst().current().projectId()).isEqualTo("p1");
+        assertThat(comparisons.getFirst().baseline().projectId()).isEqualTo("p2");
+        assertThat(comparisons.getFirst().current().startDate()).isEqualTo("2026-09-01");
+        assertThat(comparisons.getFirst().baseline().startDate()).isEqualTo("2026-08-01");
+    }
+    @Test void comparisonFollowupRefreshesAndSendsBackendResultToModel() {
+        ChatOrchestrator chat=orchestrator(request->hasCurrentResult(request)
+                ? Flux.just(new ModelEvent.Completed("付款申请比较完成",1,1))
+                : Flux.just(new ModelEvent.ToolRequested("cmp","paymentRequest.compare",
+                        "{\"comparisonType\":\"YOY\",\"periodUnit\":\"MONTH\",\"current\":{\"dateField\":\"createDate\",\"startDate\":\"2026-09-01\",\"endDate\":\"2026-09-30\"}}")));
+        var first=chat.stream(new ChatCommand(conversationId,"按申请创建日期比较2026年9月付款申请同比",null),user,"a").collectList().block();
+        var second=chat.stream(new ChatCommand(conversationId,"再查一次同比",null),user,"b").collectList().block();
+        assertThat(first.toString()).contains("付款申请比较完成");assertThat(second.toString()).contains("付款申请比较完成");
+        assertThat(comparisons).hasSize(2);
+        assertThat(requests.get(2).redactedConversationMessages().toString()).contains("trusted-query-context","2026-09-01");
+        assertThat(requests.get(1).redactedConversationMessages().toString()).contains("difference");
+    }
+    @Test void missingComparisonPeriodPausesThenResumesWithinPaymentDomain() {
+        ChatOrchestrator chat=orchestrator(request->{
+            if(hasCurrentResult(request)) return Flux.just(new ModelEvent.Completed("比较完成",1,1));
+            if(request.redactedConversationMessages().toString().contains("用户确认比较期间="))
+                return Flux.just(new ModelEvent.ToolRequested("cmp","paymentRequest.compare",
+                        "{\"comparisonType\":\"YOY\",\"periodUnit\":\"MONTH\",\"current\":{\"dateField\":\"createDate\",\"startDate\":\"2026-10-01\",\"endDate\":\"2026-10-12\"}}"));
+            return Flux.just(new ModelEvent.ToolRequested("date","paymentRequest.clarifyDate","{\"ambiguity\":\"PERIOD\"}"));
+        });
+        chat.stream(new ChatCommand(conversationId,"按申请创建日期查付款申请同比",null),user,"a").collectList().block();
+        assertThat(comparisons).isEmpty();
+        var question=pending.findActive("tenant","user",conversationId).orElseThrow();
+        var events=chat.stream(new ChatCommand(conversationId,"本月",List.of(),null,
+                new ChatCommand.ClarificationSelection(question.id(),"period:MONTH")),user,"b").collectList().block();
+        assertThat(events).noneMatch(e->"error".equals(e.type())); assertThat(comparisons).hasSize(1);
+    }
     @Test void incomeTotalAndNextPageFollowUpsRefreshWithinTheActiveDomain() {
         ChatOrchestrator chat = orchestrator(request -> hasCurrentResult(request)
                 ? Flux.just(new ModelEvent.Completed("实时付款申请结果", 1, 1))
@@ -31,7 +88,7 @@ class PaymentRequestChatTest {
         assertThat(queries.get(1).mode()).isEqualTo("summary");
         assertThat(queries.get(2).page()).isEqualTo(2);
         assertThat(requests.get(4).allowedToolSpecifications()).extracting(ModelRequest.AllowedToolSpecification::key)
-                .containsExactlyInAnyOrder("paymentRequest.query", "paymentRequest.clarifyDate");
+                .containsExactlyInAnyOrder("paymentRequest.query", "paymentRequest.clarifyDate", "paymentRequest.compare");
         assertThat(requests.get(4).redactedConversationMessages().toString()).contains("trusted-query-context");
     }
 
@@ -58,6 +115,7 @@ class PaymentRequestChatTest {
     private final AgentUserContext user = new AgentUserContext("tenant", "user", "identity", Set.of("menu:project", "menu:finance:payment-request"), Set.of("p1"));
     private final List<ModelRequest> requests = new CopyOnWriteArrayList<>();
     private final List<PaymentRequestQueryInput> queries = new CopyOnWriteArrayList<>();
+    private final List<PaymentRequestCompareInput> comparisons = new CopyOnWriteArrayList<>();
     private final String conversationId = conversationService.create("tenant", "user", "付款申请查询").id();
     private ToolExecutor executor;
     private List<Map<String, Object>> projectRows = List.of(Map.of("projectId", "p1", "projectName", "示例",
@@ -71,14 +129,25 @@ class PaymentRequestChatTest {
 
     private ChatOrchestrator orchestrator(ModelGateway model,
             com.smart.agent.tool.approval.ApprovalBusinessClient approvalClient) {
-        PaymentRequestBusinessClient client = (context, input) -> {
+        PaymentRequestBusinessClient client = new PaymentRequestBusinessClient() {
+            public ProjectQueryResult compare(ToolContext context, PaymentRequestCompareInput input) {
+                comparisons.add(input);
+                return new ProjectQueryResult("aggregate",1,3,3L,false,List.of(),List.of(Map.of("difference",comparisons.size())),List.of());
+            }
+            public ProjectQueryResult query(ToolContext context, PaymentRequestQueryInput input) {
             queries.add(input);
+            if ("items".equals(input.mode())) return new ProjectQueryResult("detail",input.page(),input.pageSize(),2L,input.page()==1,
+                    List.of(),List.of(Map.of("requestId","r1","itemId",input.page()==1?"d1":"d2","projectId","p1",
+                            "registrationCode","FK-001","paymentAmount",new java.math.BigDecimal("12.34"))),List.of());
+            if ("detail".equals(input.mode()) && input.requestId()!=null) return new ProjectQueryResult("detail",input.page(),input.pageSize(),1L,false,
+                    List.of(),List.of(Map.of("requestId",input.requestId(),"projectId","p1","registrationCode","FK-001")),List.of());
             if ("detail".equals(input.mode())) return new ProjectQueryResult("detail", input.page(), input.pageSize(),
                     2L, false, List.of(), List.of(Map.of("requestId", "r1", "projectId", "p1", "registrationCode", "FK-001"),
                     Map.of("requestId", "r2", "projectId", "p1", "registrationCode", "FK-002")), List.of());
             return new ProjectQueryResult("aggregate", 1, 20, 1L, false, List.of(),
                     List.of(Map.of("requestCount", queries.size(), "itemCount", queries.size(),
                             "paymentAmount", new java.math.BigDecimal("123.45"))), List.of());
+            }
         };
         var projects = new com.smart.agent.tool.project.LocalProjectBusinessClient() {
             @Override public ProjectQueryResult query(ToolContext context, com.smart.agent.tool.project.ProjectQueryInput input) {
@@ -89,6 +158,7 @@ class PaymentRequestChatTest {
         };
         ToolRegistry tools = new ToolRegistry(List.of(new PaymentRequestQueryTool(client,
                 new com.smart.agent.tool.project.ProjectReferenceResolver(projects)),
+                new PaymentRequestCompareTool(client,new com.smart.agent.tool.project.ProjectReferenceResolver(projects)),
                 new com.smart.agent.tool.approval.ApprovalQueryTool(approvalClient),
                 new com.smart.agent.tool.project.ProjectQueryTool(projects),
                 new PaymentRequestClarifyDateTool(), new com.smart.agent.tool.system.CurrentTimeTool(
@@ -123,6 +193,37 @@ class PaymentRequestChatTest {
         assertThat(queries.get(1).mode()).isEqualTo("items");
     }
 
+    @Test void documentItemsNextPageAndReturnKeepTheParentReferenceAndExecuteEveryTurn() {
+        ChatOrchestrator chat=orchestrator(request -> {
+            if(hasCurrentResult(request))return Flux.just(new ModelEvent.Completed("本轮查询完成",1,1));
+            int turn=queries.size();
+            if(turn==1)assertThat(request.redactedConversationMessages().toString()).contains("trusted-payment-request-references","FK-001");
+            if(turn==3 || turn==4) {
+                assertThat(request.redactedConversationMessages().toString()).contains("trusted-payment-request-items","requestId=r1")
+                        .doesNotContain("trusted-payment-request-references:");
+            }
+            String arguments=switch(turn) {
+                case 0 -> "{\"mode\":\"detail\",\"page\":2}";
+                case 1 -> "{\"mode\":\"detail\",\"requestId\":\"r1\",\"page\":2}";
+                case 2 -> "{\"mode\":\"items\",\"requestId\":\"r1\",\"pageSize\":1}";
+                case 3 -> "{\"mode\":\"items\",\"requestId\":\"r1\",\"page\":2,\"pageSize\":1}";
+                default -> "{\"mode\":\"detail\",\"requestId\":\"r1\",\"page\":2}";
+            };
+            return Flux.just(new ModelEvent.ToolRequested("q","paymentRequest.query",arguments));
+        });
+        for(String question:List.of("查询付款申请列表第2页","查看第一笔的详情","看这笔付款明细，每页1条","下一页","回到这笔申请单详情")) {
+            var events=chat.stream(new ChatCommand(conversationId,question,null),user,"trace").collectList().block();
+            assertThat(events).noneMatch(e -> "error".equals(e.type()));
+        }
+        assertThat(queries).hasSize(5);
+        assertThat(queries.get(0).page()).isEqualTo(2);
+        assertThat(queries.subList(1,5)).extracting(PaymentRequestQueryInput::requestId).containsOnly("r1");
+        assertThat(queries.get(1).page()).isEqualTo(1);
+        assertThat(queries.get(3).page()).isEqualTo(2);
+        assertThat(queries.get(4).page()).isEqualTo(1);
+        assertThat(queries.get(4).mode()).isEqualTo("detail");
+    }
+
     private boolean matchesProjectFilter(Map<String, Object> row, com.smart.agent.tool.project.ProjectQueryFilter filter) {
         var checks = new ArrayList<Boolean>();
         filter.conditions().forEach(condition -> checks.add(Objects.equals(row.get(condition.field()), condition.value())));
@@ -141,7 +242,7 @@ class PaymentRequestChatTest {
         assertThat(first.toString()).contains("模型根据本轮付款申请结果回答");
         assertThat(second.toString()).contains("模型根据本轮付款申请结果回答");
         assertThat(requests.get(0).allowedToolSpecifications()).extracting(ModelRequest.AllowedToolSpecification::key)
-                .containsExactlyInAnyOrder("paymentRequest.query", "paymentRequest.clarifyDate");
+                .containsExactlyInAnyOrder("paymentRequest.query", "paymentRequest.clarifyDate", "paymentRequest.compare");
         assertThat(requests.get(0).toolUseMode()).isEqualTo(ModelRequest.ToolUseMode.REQUIRED);
         assertThat(requests.get(1).toolUseMode()).isEqualTo(ModelRequest.ToolUseMode.AUTO);
         assertThat(contexts.find("tenant", "user", conversationId, ConversationContextService.ACTIVE_BUSINESS_DOMAIN)

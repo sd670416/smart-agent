@@ -27,7 +27,9 @@ class SmartBootPaymentRequestBusinessClientTest {
                 .extracting("code").isEqualTo("AGENT_TOOL_FORBIDDEN");
     }
 
-    @Test void queriesSignedEndpointWithTrustedScopeAndReturnsPreciseAmounts() throws Exception {
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+    void queriesSignedEndpointWithTrustedScopeAndReturnsPreciseAmounts(boolean comparison) throws Exception {
         AtomicReference<String> body = new AtomicReference<>();
         AtomicReference<String> signature = new AtomicReference<>();
         AtomicReference<String> timestamp = new AtomicReference<>();
@@ -50,14 +52,18 @@ class SmartBootPaymentRequestBusinessClientTest {
             var context = new ToolContext("tenant", "user", "identity", Set.of("role"), Set.of("p2", "p1"), Set.of("menu:finance:payment-request"));
             var input = new PaymentRequestQueryInput("p1", "测试项目", null, "summary", "createDate",
                     "2026-01-01", "2026-01-31", 1, 20);
-            var result = client.query(context, input);
-            assertThat(uri.get()).isEqualTo("/internal/ai/tools/payment-request-query");
-            assertThat(new ObjectMapper().readTree(body.get()).path("projectIds").get(0).asText()).isEqualTo("p1");
-            assertThat(new ObjectMapper().readTree(body.get()).path("dateField").asText()).isEqualTo("createDate");
+            var result = comparison ? client.compare(context,new PaymentRequestCompareInput("YOY","MONTH",input,null)) : client.query(context, input);
+            String path=comparison ? "/internal/ai/tools/payment-request-compare" : "/internal/ai/tools/payment-request-query";
+            assertThat(uri.get()).isEqualTo(path);
+            var payload=new ObjectMapper().readTree(body.get());
+            var group=comparison ? payload.path("current") : payload;
+            assertThat(group.path("projectIds").get(0).asText()).isEqualTo("p1");
+            assertThat(group.path("dateField").asText()).isEqualTo("createDate");
+            if(comparison) { assertThat(payload.path("comparisonType").asText()).isEqualTo("YOY");assertThat(payload.has("baseline")).isFalse(); }
             assertThat(result.rows().getFirst().get("paymentAmount").toString()).isEqualTo("123456789012345.67");
             Mac mac = Mac.getInstance("HmacSHA256");
             mac.init(new SecretKeySpec("test-secret".getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
-            String canonical = timestamp.get() + "\nPOST\n/internal/ai/tools/payment-request-query\ntenant\nuser\nidentity\nrole\nmenu:finance:payment-request\np1,p2";
+            String canonical = timestamp.get() + "\nPOST\n"+path+"\ntenant\nuser\nidentity\nrole\nmenu:finance:payment-request\np1,p2";
             assertThat(signature.get()).isEqualTo(Base64.getUrlEncoder().withoutPadding().encodeToString(
                     mac.doFinal(canonical.getBytes(StandardCharsets.UTF_8))));
         } finally { server.disposeNow(); }

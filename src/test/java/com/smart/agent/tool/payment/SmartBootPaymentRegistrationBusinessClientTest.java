@@ -60,6 +60,10 @@ class SmartBootPaymentRegistrationBusinessClientTest {
             String canonical = timestamp.get() + "\nPOST\n/internal/ai/tools/payment-registration-query\ntenant\nuser\nidentity\nrole\nmenu:finance:payment-registration\np1,p2";
             assertThat(signature.get()).isEqualTo(Base64.getUrlEncoder().withoutPadding().encodeToString(
                     mac.doFinal(canonical.getBytes(StandardCharsets.UTF_8))));
+            var detail = new ObjectMapper().readValue("{\"projectId\":\"p1\",\"registrationId\":\"r1\",\"mode\":\"detail\"}", PaymentRegistrationQueryInput.class);
+            client.query(context, detail);
+            assertThat(new ObjectMapper().readTree(body.get()).path("registrationId").asText()).isEqualTo("r1");
+            assertThat(new ObjectMapper().readTree(body.get()).path("mode").asText()).isEqualTo("detail");
         } finally { server.disposeNow(); }
     }
 

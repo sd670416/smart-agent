@@ -49,6 +49,12 @@ class SmartBootProjectOutputBusinessClientTest {
             String canonical = timestamp.get() + "\nPOST\n/internal/ai/tools/project-output-query\ntenant\nuser\nidentity\nrole\nmenu:project\np1,p2";
             assertThat(signature.get()).isEqualTo(Base64.getUrlEncoder().withoutPadding().encodeToString(
                     mac.doFinal(canonical.getBytes(StandardCharsets.UTF_8))));
+            client.query(context, new ObjectMapper().readValue(
+                    "{\"projectId\":\"p1\",\"mode\":\"items\",\"outputReportId\":\"output-1\",\"page\":2}", ProjectOutputQueryInput.class));
+            var drilldown = new ObjectMapper().readTree(body.get());
+            assertThat(drilldown.path("outputReportId").asText()).isEqualTo("output-1");
+            assertThat(drilldown.path("mode").asText()).isEqualTo("items");
+            assertThat(drilldown.path("page").asInt()).isEqualTo(2);
         } finally { server.disposeNow(); }
     }
 

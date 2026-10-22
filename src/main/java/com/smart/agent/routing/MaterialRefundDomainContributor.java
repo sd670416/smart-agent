@@ -10,7 +10,7 @@ public class MaterialRefundDomainContributor implements BusinessDomainContributo
     public static final String PERMISSION = "menu:material:refund";
     private static final List<String> TERMS = List.of("材料退货退款", "材料退款", "退货退款");
     private static final BusinessDomainDescriptor DESCRIPTOR = new BusinessDomainDescriptor(
-            CODE, "材料退货退款", List.of("materialRefund.query", "materialRefund.clarifyDate"),
+            CODE, "材料退货退款", List.of("materialRefund.query", "materialRefund.clarifyDate", "materialRefund.compare"),
             List.of(new DataScopeDescriptor("MATERIAL_MENU", "材料退货菜单及可见项目范围", List.of("MENU", "PROJECT_MEMBER"))),
             "REALTIME", TERMS);
     public static boolean matches(String question) {

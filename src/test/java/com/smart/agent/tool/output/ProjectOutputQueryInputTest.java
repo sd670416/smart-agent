@@ -5,6 +5,19 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
 
 class ProjectOutputQueryInputTest {
+    @Test void itemsRequireRealReportAndRetainItDuringProjectResolution() throws Exception {
+        var mapper = new ObjectMapper();
+        var input = mapper.readValue("{\"mode\":\"items\",\"outputReportId\":\"o1\"}", ProjectOutputQueryInput.class);
+        assertThat(mapper.valueToTree(input.withProjectId("p1")).path("outputReportId").asText()).isEqualTo("o1");
+        assertThatThrownBy(() -> mapper.readValue("{\"mode\":\"items\"}", ProjectOutputQueryInput.class))
+                .hasRootCauseInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test void comparisonCannotSilentlyDropReportSelection() throws Exception {
+        var input = new ObjectMapper().readValue("{\"outputReportId\":\"o1\"}", ProjectOutputQueryInput.class);
+        assertThatThrownBy(() -> new ProjectOutputCompareInput("CUSTOM", null, input, input))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
     @Test void omittedOptionsHaveBoundedDefaults() throws Exception {
         ProjectOutputQueryInput input = new ObjectMapper().readValue("{}", ProjectOutputQueryInput.class);
         assertThat(input.mode()).isEqualTo("detail");

@@ -442,7 +442,7 @@ public class ChatOrchestrator {
                 }
                 effectiveQuestion = originalQuestion;
                 if ("COMPARISON_PERIOD".equals(intent.path("ambiguityType").asText())) {
-                    if (!java.util.Set.of("PROJECT_RECEIPTS", "CONSTRUCTION_CONTRACT", "PROJECT_OUTPUT").contains(domainCode)) throw clarificationFailure();
+                    if (!java.util.Set.of("PROJECT_RECEIPTS", "CONSTRUCTION_CONTRACT", "PROJECT_OUTPUT", "PAYMENT_REQUEST", "OTHER_PAYMENT_REQUEST", "PROJECT_REIMBURSE", "MATERIAL_REFUND").contains(domainCode)) throw clarificationFailure();
                     String period = switch (selection.optionId()) {
                         case "period:MONTH" -> "本月截至今天";
                         case "period:QUARTER" -> "本季度截至今天";
@@ -461,7 +461,9 @@ public class ChatOrchestrator {
                             || "MATERIAL_REFUND".equals(domainCode)
                             && java.util.Set.of("date:projectCreateDate", "date:returnDate", "date:createDate").contains(selection.optionId())
                             || "PROJECT_REIMBURSE".equals(domainCode)
+                            && java.util.Set.of("date:projectCreateDate", "date:createDate", "date:reimburseDate").contains(selection.optionId())
                             || "OTHER_PAYMENT_REQUEST".equals(domainCode)
+                            && java.util.Set.of("date:projectCreateDate", "date:createDate", "date:paymentDate").contains(selection.optionId())
                             || "PAYMENT_REQUEST".equals(domainCode)
                             && java.util.Set.of("date:projectCreateDate", "date:createDate").contains(selection.optionId())
                             || "PROJECT_OUTPUT".equals(domainCode)
@@ -504,7 +506,7 @@ public class ChatOrchestrator {
                             + queryIntentResolver.domain(domainCode).orElseThrow().name() + "]";
                 }
                 if ("COMPARISON_PROJECT_REFERENCE".equals(intent.path("ambiguityType").asText())) {
-                    if (!java.util.Set.of("PROJECT_RECEIPTS", "CONSTRUCTION_CONTRACT", "PROJECT_OUTPUT").contains(domainCode) || !intent.path("queryArguments").isObject())
+                    if (!java.util.Set.of("PROJECT_RECEIPTS", "CONSTRUCTION_CONTRACT", "PROJECT_OUTPUT", "PAYMENT_REQUEST", "OTHER_PAYMENT_REQUEST", "PROJECT_REIMBURSE", "MATERIAL_REFUND").contains(domainCode) || !intent.path("queryArguments").isObject())
                         throw clarificationFailure();
                     String[] parts = selection.optionId().split(":", 3);
                     if (parts.length != 3 || !java.util.Set.of("current", "baseline").contains(parts[0])
@@ -1090,6 +1092,65 @@ public class ChatOrchestrator {
                                 + savedQuery.path("result").path("page").asInt(1) + "页项目定位信息=" + references
                                 + "。仅用于序号指代，不能作为当前金额；必须按真实projectId重新查询。指代不明确先追问。]"));
                     }
+                    if (java.util.Set.of("PAYMENT_REGISTRATION", "OTHER_INCOME_REGISTRATION").contains(additionalQueryDomain.code())
+                            && "detail".equals(arguments.path("mode").asText("detail"))) {
+                        var references = objectMapper.createArrayNode();
+                        int position = 0;
+                        for (JsonNode row : savedQuery.path("result").path("rows")) {
+                            position++;
+                            if (position > 100) break;
+                            if (context.projectIds().contains(row.path("projectId").asText()) && !row.path("id").asText().isBlank())
+                                references.addObject().put("pagePosition", position).put("registrationId", row.path("id").asText())
+                                        .put("projectId", row.path("projectId").asText()).put("registrationCode", row.path("registrationCode").asText());
+                        }
+                        messages.add(new ModelRequest.ConversationMessage("user", "[trusted-receipt-registration-references: 上次"
+                                + additionalQueryDomain.name() + "列表第" + savedQuery.path("result").path("page").asInt(1)
+                                + "页定位信息=" + references + "。仅用于序号定位，不是当前事实；使用"
+                                + ("PAYMENT_REGISTRATION".equals(additionalQueryDomain.code()) ? "paymentRegistration.query" : "otherIncomeRegistration.query")
+                                + "、真实registrationId和detail重新查询单据自身详情。"
+                                + "不同来源单据不可混用ID；指代不明确先追问，查询无结果不许移除ID扩大范围。]"));
+                    }
+                    if ("OTHER_INCOME_REGISTRATION".equals(additionalQueryDomain.code()) && "items".equals(arguments.path("mode").asText())) {
+                        messages.add(new ModelRequest.ConversationMessage("user", "[trusted-other-income-items: 当前收入明细所属登记主单registrationId="
+                                + arguments.path("registrationId").asText() + "。明细行itemId不是登记主单ID。"
+                                + "继续查收入明细使用otherIncomeRegistration.query、items和同一registrationId，仅分页时调整页码并保留已确认筛选；"
+                                + "返回这笔登记详情用detail和同一registrationId。每轮重新查询；指代不清先追问，不从一页明细计算整单合计。]"));
+                    }
+                    if ("CONSTRUCTION_CONTRACT".equals(additionalQueryDomain.code()) && "detail".equals(arguments.path("mode").asText("detail"))) {
+                        var references = objectMapper.createArrayNode();
+                        int position = 0;
+                        for (JsonNode row : savedQuery.path("result").path("rows")) {
+                            position++;
+                            if (position > 100) break;
+                            if (context.projectIds().contains(row.path("projectId").asText()) && !row.path("id").asText().isBlank())
+                                references.addObject().put("pagePosition", position).put("contractId", row.path("id").asText())
+                                        .put("projectId", row.path("projectId").asText()).put("contractName", row.path("contractName").asText())
+                                        .put("contractNo", row.path("contractNo").asText());
+                        }
+                        messages.add(new ModelRequest.ConversationMessage("user", "[trusted-construction-contract-references: 上次施工合同列表第"
+                                + savedQuery.path("result").path("page").asInt(1) + "页定位信息=" + references
+                                + "。仅用于序号定位，不是当前事实；使用真实contractId和detail重新查询合同自身详情。指代不明确先追问。]"));
+                    }
+                    if ("CONSTRUCTION_CONTRACT".equals(additionalQueryDomain.code()) && "records".equals(arguments.path("mode").asText())) {
+                        messages.add(new ModelRequest.ConversationMessage("user", "[trusted-construction-contract-records: 上次查询的主合同ID="
+                                + arguments.path("contractId").asText() + "，记录类型=" + arguments.path("recordType").asText("all")
+                                + "。记录中的recordId不是主合同ID；继续查记录沿用contractId并实时重查，仅分页时调整页码。"
+                                + "返回主合同详情用detail和同一contractId。指定某条变更记录的进一步详情尚未接入，不得将recordId冒充主合同ID。]"));
+                    }
+                    if ("PROJECT_OUTPUT".equals(additionalQueryDomain.code()) && "detail".equals(arguments.path("mode").asText("detail"))) {
+                        var references = objectMapper.createArrayNode();
+                        int position = 0;
+                        for (JsonNode row : savedQuery.path("result").path("rows")) {
+                            position++;
+                            if (position > 100) break;
+                            if (context.projectIds().contains(row.path("projectId").asText()) && !row.path("id").asText().isBlank())
+                                references.addObject().put("pagePosition", position).put("outputReportId", row.path("id").asText())
+                                        .put("projectId", row.path("projectId").asText()).put("outputReportNo", row.path("outputReportNo").asText());
+                        }
+                        messages.add(new ModelRequest.ConversationMessage("user", "[trusted-project-output-references: 上次产值单列表第"
+                                + savedQuery.path("result").path("page").asInt(1) + "页定位信息=" + references
+                                + "。仅用于序号定位，必须按真实outputReportId重新查询；主信息用detail，工程量明细用items。指代不明确先追问。]"));
+                    }
                     if ("COST_CONTRACT".equals(additionalQueryDomain.code()) && "detail".equals(arguments.path("mode").asText())) {
                         var references = objectMapper.createArrayNode();
                         int position = 0;
@@ -1133,6 +1194,13 @@ public class ChatOrchestrator {
                                 "[" + ("INVOICE_APPLICATION".equals(additionalQueryDomain.code()) ? "trusted-invoice-application-references" : "MATERIAL_REFUND".equals(additionalQueryDomain.code()) ? "trusted-material-refund-references" : "PROJECT_REIMBURSE".equals(additionalQueryDomain.code()) ? "trusted-project-reimburse-references" : "OTHER_PAYMENT_REQUEST".equals(additionalQueryDomain.code()) ? "trusted-other-payment-request-references" : "trusted-payment-request-references") + ": 上次" + additionalQueryDomain.name() + "列表第"
                                         + previousResult.path("page").asInt(1) + "页的单据定位信息=" + references
                                         + "。仅帮助理解第几单或单号，不能视为当前事实；必须按requestId重新查询明细。指代不明确先确认。]"));
+                    }
+                    if ("PAYMENT_REQUEST".equals(additionalQueryDomain.code()) && "items".equals(arguments.path("mode").asText())) {
+                        messages.add(new ModelRequest.ConversationMessage("user", "[trusted-payment-request-items: 当前付款明细所属申请主单requestId="
+                                + arguments.path("requestId").asText() + "。明细行itemId不是申请主单ID。"
+                                + "继续查看或翻页使用paymentRequest.query、items，保留已确认的requestId及项目、日期、单号筛选；"
+                                + "返回这笔申请单详情用detail和同一requestId。未限定主单时不能凭明细序号猜测主单，指代不清先追问。"
+                                + "每轮实时查询，不从一页明细计算全部金额；改查全列表或全量合计应清除单笔requestId。]"));
                     }
                 } catch (java.io.IOException exception) {
                     throw new IllegalStateException("Invalid query context", exception);
@@ -1693,7 +1761,7 @@ public class ChatOrchestrator {
                         confirmed.remove(java.util.List.of("dateField", "startDate", "endDate"));
                     else confirmed.put("dateField", "projectCreateDate");
                 }
-                if (java.util.Set.of("projectReceipts.compare", "constructionContract.compare", "projectOutput.compare").contains(request.toolKey()) && comparisonClarificationArguments != null)
+                if (java.util.Set.of("projectReceipts.compare", "constructionContract.compare", "projectOutput.compare", "paymentRequest.compare", "otherPaymentRequest.compare", "projectReimburse.compare", "materialRefund.compare").contains(request.toolKey()) && comparisonClarificationArguments != null)
                     input = comparisonClarificationArguments.deepCopy();
                 final JsonNode executionInput = input;
                 String normalizedArguments = objectMapper.writeValueAsString(input);
@@ -1796,7 +1864,7 @@ public class ChatOrchestrator {
                             }
                         }
                     }
-                    if (java.util.Set.of("projectReceipts.compare", "constructionContract.compare", "projectOutput.compare").contains(request.toolKey())
+                    if (java.util.Set.of("projectReceipts.compare", "constructionContract.compare", "projectOutput.compare", "paymentRequest.compare", "otherPaymentRequest.compare", "projectReimburse.compare", "materialRefund.compare").contains(request.toolKey())
                             && result instanceof com.smart.agent.tool.project.ProjectQueryResult queryResult) {
                         for (var filter : queryResult.appliedFilters()) {
                             String groupName = String.valueOf(filter.get("comparisonGroup"));
