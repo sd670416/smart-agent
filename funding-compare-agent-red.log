@@ -1,0 +1,27 @@
+[ERROR] COMPILATION ERROR : 
+[ERROR] /F:/project/gongcheng/agent/src/test/java/com/smart/agent/tool/funding/ProjectFundingCompareTest.java:[12,13] �Ҳ�������
+  ����:   �� ProjectFundingCompareInput
+  λ��: �� com.smart.agent.tool.funding.ProjectFundingCompareTest
+[ERROR] /F:/project/gongcheng/agent/src/test/java/com/smart/agent/tool/funding/ProjectFundingCompareTest.java:[13,50] �Ҳ�������
+  ����:   �� ProjectFundingCompareInput
+  λ��: �� com.smart.agent.tool.funding.ProjectFundingCompareTest
+[ERROR] /F:/project/gongcheng/agent/src/test/java/com/smart/agent/tool/funding/ProjectFundingCompareTest.java:[25,22] �Ҳ�������
+  ����:   �� ProjectFundingCompareTool
+  λ��: �� com.smart.agent.tool.funding.ProjectFundingCompareTest
+[ERROR] Failed to execute goal org.apache.maven.plugins:maven-compiler-plugin:3.14.1:testCompile (default-testCompile) on project smart-agent: Compilation failure: Compilation failure: 
+[ERROR] /F:/project/gongcheng/agent/src/test/java/com/smart/agent/tool/funding/ProjectFundingCompareTest.java:[12,13] �Ҳ�������
+[ERROR]   ����:   �� ProjectFundingCompareInput
+[ERROR]   λ��: �� com.smart.agent.tool.funding.ProjectFundingCompareTest
+[ERROR] /F:/project/gongcheng/agent/src/test/java/com/smart/agent/tool/funding/ProjectFundingCompareTest.java:[13,50] �Ҳ�������
+[ERROR]   ����:   �� ProjectFundingCompareInput
+[ERROR]   λ��: �� com.smart.agent.tool.funding.ProjectFundingCompareTest
+[ERROR] /F:/project/gongcheng/agent/src/test/java/com/smart/agent/tool/funding/ProjectFundingCompareTest.java:[25,22] �Ҳ�������
+[ERROR]   ����:   �� ProjectFundingCompareTool
+[ERROR]   λ��: �� com.smart.agent.tool.funding.ProjectFundingCompareTest
+[ERROR] -> [Help 1]
+[ERROR] 
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR] 
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException

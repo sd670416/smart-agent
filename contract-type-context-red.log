@@ -1,0 +1,65 @@
+Access is denied.
+13:55:31.077 [boundedElastic-1] INFO com.smart.agent.run.AgentRunService -- tool_execution_summary toolKey=constructionContract.compare risk=L1 outcome=SUCCEEDED durationMillis=98 resultSizeBytes=742
+[ERROR] Tests run: 1, Failures: 0, Errors: 1, Skipped: 0, Time elapsed: 1.091 s <<< FAILURE! -- in com.smart.agent.chat.ConstructionContractChatTest
+[ERROR] com.smart.agent.chat.ConstructionContractChatTest.groupedComparisonRefreshAndTypeDetailKeepTheSelectedPeriod -- Time elapsed: 0.755 s <<< ERROR!
+reactor.core.Exceptions$ReactiveException: 
+java.lang.AssertionError: 
+Expecting actual:
+  "[ConversationMessage[role=user, content=2026��9��ǩ����ʩ����ͬ����Ŀ����ͬ�ȱȽ�, attachments=[]], ConversationMessage[role=assistant, content=ʵʱ���ͱȽϽ��, attachments=[]], ConversationMessage[role=user, content=[trusted-query-context: ��һ��ʩ����ͬ��ѯ����={"comparisonType":"YOY","periodUnit":"MONTH","current":{"mode":"summary","groupBy":"projectType","dateField":"signingDate","startDate":"2026-09-01","endDate":"2026-09-30"}}��������׷��ʱ�̳��û�δ���ĵ�ɸѡ�����ͷ�ҳ����ǰ������ȷ�����������ȡ���ʷ���������Ϊ�������ݣ��������µ��ù��ߡ�], attachments=[]], ConversationMessage[role=user, content=[trusted-construction-contract-references: �ϴ�ʩ����ͬ�б���1ҳ��λ��Ϣ=[]����������Ŷ�λ�����ǵ�ǰ��ʵ��ʹ����ʵcontractId��detail���²�ѯ��ͬ�������顣ָ������ȷ��׷�ʡ�], attachments=[]], ConversationMessage[role=user, content=���²�һ��
+[trusted-routing: ������ʩ����ͬ��ѯ��ֻ�ܵ��� constructionContract.query��constructionContract.clarifyDate��constructionContract.compare����������ȵ��� system.current_time��ÿ����ʵ��ѯ��������ȡ������ʷ�����������������������ά�Ȳ���ȷʱ���ø�ҵ�����ȷ�Ϲ���׷�ʣ��������мٶ���], attachments=[]]]"
+to contain:
+  ["trusted-construction-contract-types", "����", "2025-09-30"]
+but could not find:
+  ["trusted-construction-contract-types", "����", "2025-09-30"]
+ 
+	at reactor.core.Exceptions.propagate(Exceptions.java:410)
+	at reactor.core.publisher.BlockingSingleSubscriber.blockingGet(BlockingSingleSubscriber.java:102)
+	at reactor.core.publisher.Mono.block(Mono.java:1779)
+	at com.smart.agent.chat.ConstructionContractChatTest.groupedComparisonRefreshAndTypeDetailKeepTheSelectedPeriod(ConstructionContractChatTest.java:192)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+	Suppressed: java.lang.Exception: #block terminated with an error
+		at reactor.core.publisher.BlockingSingleSubscriber.blockingGet(BlockingSingleSubscriber.java:104)
+		... 5 more
+Caused by: java.lang.AssertionError: 
+Expecting actual:
+  "[ConversationMessage[role=user, content=2026��9��ǩ����ʩ����ͬ����Ŀ����ͬ�ȱȽ�, attachments=[]], ConversationMessage[role=assistant, content=ʵʱ���ͱȽϽ��, attachments=[]], ConversationMessage[role=user, content=[trusted-query-context: ��һ��ʩ����ͬ��ѯ����={"comparisonType":"YOY","periodUnit":"MONTH","current":{"mode":"summary","groupBy":"projectType","dateField":"signingDate","startDate":"2026-09-01","endDate":"2026-09-30"}}��������׷��ʱ�̳��û�δ���ĵ�ɸѡ�����ͷ�ҳ����ǰ������ȷ�����������ȡ���ʷ���������Ϊ�������ݣ��������µ��ù��ߡ�], attachments=[]], ConversationMessage[role=user, content=[trusted-construction-contract-references: �ϴ�ʩ����ͬ�б���1ҳ��λ��Ϣ=[]����������Ŷ�λ�����ǵ�ǰ��ʵ��ʹ����ʵcontractId��detail���²�ѯ��ͬ�������顣ָ������ȷ��׷�ʡ�], attachments=[]], ConversationMessage[role=user, content=���²�һ��
+[trusted-routing: ������ʩ����ͬ��ѯ��ֻ�ܵ��� constructionContract.query��constructionContract.clarifyDate��constructionContract.compare����������ȵ��� system.current_time��ÿ����ʵ��ѯ��������ȡ������ʷ�����������������������ά�Ȳ���ȷʱ���ø�ҵ�����ȷ�Ϲ���׷�ʣ��������мٶ���], attachments=[]]]"
+to contain:
+  ["trusted-construction-contract-types", "����", "2025-09-30"]
+but could not find:
+  ["trusted-construction-contract-types", "����", "2025-09-30"]
+ 
+	at com.smart.agent.chat.ConstructionContractChatTest.lambda$groupedComparisonRefreshAndTypeDetailKeepTheSelectedPeriod$8(ConstructionContractChatTest.java:185)
+	at com.smart.agent.chat.ConstructionContractChatTest.lambda$orchestrator$3(ConstructionContractChatTest.java:128)
+	at com.smart.agent.chat.ChatOrchestrator$Session.callModel(ChatOrchestrator.java:1355)
+	at com.smart.agent.chat.ChatOrchestrator$Session.start(ChatOrchestrator.java:387)
+	at com.smart.agent.chat.ChatOrchestrator.lambda$stream$0(ChatOrchestrator.java:231)
+	at reactor.core.publisher.FluxCreate.subscribe(FluxCreate.java:97)
+	at reactor.core.publisher.Mono.subscribe(Mono.java:4576)
+	at reactor.core.publisher.Mono.block(Mono.java:1778)
+	... 4 more
+
+[ERROR] Errors: 
+[ERROR]   ConstructionContractChatTest.groupedComparisonRefreshAndTypeDetailKeepTheSelectedPeriod:192 ? Reactive java.lang.AssertionError: 
+Expecting actual:
+  "[ConversationMessage[role=user, content=2026��9��ǩ����ʩ����ͬ����Ŀ����ͬ�ȱȽ�, attachments=[]], ConversationMessage[role=assistant, content=ʵʱ���ͱȽϽ��, attachments=[]], ConversationMessage[role=user, content=[trusted-query-context: ��һ��ʩ����ͬ��ѯ����={"comparisonType":"YOY","periodUnit":"MONTH","current":{"mode":"summary","groupBy":"projectType","dateField":"signingDate","startDate":"2026-09-01","endDate":"2026-09-30"}}��������׷��ʱ�̳��û�δ���ĵ�ɸѡ�����ͷ�ҳ����ǰ������ȷ�����������ȡ���ʷ���������Ϊ�������ݣ��������µ��ù��ߡ�], attachments=[]], ConversationMessage[role=user, content=[trusted-construction-contract-references: �ϴ�ʩ����ͬ�б���1ҳ��λ��Ϣ=[]����������Ŷ�λ�����ǵ�ǰ��ʵ��ʹ����ʵcontractId��detail���²�ѯ��ͬ�������顣ָ������ȷ��׷�ʡ�], attachments=[]], ConversationMessage[role=user, content=���²�һ��
+[trusted-routing: ������ʩ����ͬ��ѯ��ֻ�ܵ��� constructionContract.query��constructionContract.clarifyDate��constructionContract.compare����������ȵ��� system.current_time��ÿ����ʵ��ѯ��������ȡ������ʷ�����������������������ά�Ȳ���ȷʱ���ø�ҵ�����ȷ�Ϲ���׷�ʣ��������мٶ���], attachments=[]]]"
+to contain:
+  ["trusted-construction-contract-types", "����", "2025-09-30"]
+but could not find:
+  ["trusted-construction-contract-types", "����", "2025-09-30"]
+ 
+[ERROR] Tests run: 1, Failures: 0, Errors: 1, Skipped: 0
+[ERROR] Failed to execute goal org.apache.maven.plugins:maven-surefire-plugin:3.5.6:test (default-test) on project smart-agent: 
+[ERROR] 
+[ERROR] See F:\project\gongcheng\agent\target\surefire-reports for the individual test results.
+[ERROR] See dump files (if any exist) [date].dump, [date]-jvmRun[N].dump and [date].dumpstream.
+[ERROR] -> [Help 1]
+[ERROR] 
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR] 
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException

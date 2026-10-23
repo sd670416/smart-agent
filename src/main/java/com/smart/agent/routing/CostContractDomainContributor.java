@@ -9,7 +9,7 @@ public class CostContractDomainContributor implements BusinessDomainContributor 
     private static final Map<String,String> TERMS=Map.of("材料合同","material","劳务合同","labor",
             "机械合同","machine","专业分包合同","major","其他支出合同","other","其他付款合同","other");
     public static boolean matches(String question) {
-        return question!=null && (question.contains("合同成本") || question.contains("合同费用占比")
+        return question!=null && (question.contains("合同成本") || question.contains("成本合同") || question.contains("五类合同") || question.contains("合同费用占比")
                 || TERMS.keySet().stream().anyMatch(question::contains));
     }
     public static String source(String question) {
@@ -25,7 +25,7 @@ public class CostContractDomainContributor implements BusinessDomainContributor 
         return sources.stream().map(s->"menu:cost-contract:"+s).toList();
     }
     @Override public BusinessDomainDescriptor descriptor() {
-        return new BusinessDomainDescriptor(CODE,"成本合同",List.of("costContract.query","costContract.clarifyDate"),
+        return new BusinessDomainDescriptor(CODE,"成本合同",List.of("costContract.query","costContract.compare","costContract.clarifyDate"),
                 List.of(new DataScopeDescriptor("SOURCE_MENU","各类合同菜单及可见项目",List.of("MENU","PROJECT_MEMBER"))),
                 "REALTIME",List.of("合同成本","合同费用占比","材料合同","劳务合同","机械合同","专业分包合同","其他支出合同"));
     }

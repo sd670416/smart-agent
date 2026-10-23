@@ -28,6 +28,14 @@ public class SmartBootBudgetCostBusinessClient implements BudgetCostBusinessClie
     }
 
     @Override public ProjectQueryResult query(ToolContext context, BudgetCostQueryInput input) {
+        return post(PATH,context,body(context,input));
+    }
+    @Override public ProjectQueryResult compare(ToolContext context,BudgetCostCompareInput input) {
+        Map<String,Object> request=new LinkedHashMap<>();request.put("comparisonType",input.comparisonType());
+        request.put("current",body(context,input.current()));request.put("baseline",body(context,input.baseline()));
+        return post("/internal/ai/tools/budget-cost-compare",context,request);
+    }
+    private Map<String,Object> body(ToolContext context,BudgetCostQueryInput input) {
         if (input.projectId() != null && !context.canAccessProject(input.projectId()))
             throw new SecurityException("Project is outside trusted scope");
         Map<String, Object> body = new LinkedHashMap<>();
@@ -39,17 +47,23 @@ public class SmartBootBudgetCostBusinessClient implements BudgetCostBusinessClie
         body.put("endDate", input.endDate());
         body.put("page", input.page());
         body.put("pageSize", input.pageSize());
+        return body;
+    }
+    private ProjectQueryResult post(String path,ToolContext context,Map<String,Object> body) {
         org.slf4j.LoggerFactory.getLogger(getClass()).info(
                 "调用预算成本查询工具: userId={}, trustedProjectCount={}, mode={}, page={}, pageSize={}",
-                context.userId(), context.projectIds().size(), input.mode(), input.page(), input.pageSize());
+                context.userId(), context.projectIds().size(), body.get("mode"), body.get("page"), body.get("pageSize"));
         try {
-            String raw = client.post().uri(PATH).headers(headers -> sign(headers, context))
+            String raw = client.post().uri(path).headers(headers -> sign(headers, context,path))
                     .bodyValue(body).retrieve().bodyToMono(String.class).block();
             if (raw == null || raw.isBlank()) throw new AgentException("AGENT_TOOL_EXECUTION_FAILED",
                     HttpStatus.BAD_GATEWAY, "预算成本查询响应为空");
             return mapper.readerFor(ProjectQueryResult.class).with(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS)
                     .readValue(raw);
         } catch (WebClientResponseException exception) {
+            if(exception.getStatusCode().value()==422)
+                throw new AgentException("AGENT_QUERY_VALUE_INVALID",HttpStatus.UNPROCESSABLE_ENTITY,
+                        "部分有效预算缺少金额，暂时无法准确计算预算合计或进行比较，请先核实预算金额");
             HttpStatus status = exception.getStatusCode().value() == 403 ? HttpStatus.FORBIDDEN
                     : exception.getStatusCode().is4xxClientError() ? HttpStatus.BAD_REQUEST : HttpStatus.BAD_GATEWAY;
             throw new AgentException(status == HttpStatus.FORBIDDEN ? "AGENT_TOOL_FORBIDDEN"
@@ -60,7 +74,7 @@ public class SmartBootBudgetCostBusinessClient implements BudgetCostBusinessClie
         }
     }
 
-    private void sign(HttpHeaders headers, ToolContext context) {
+    private void sign(HttpHeaders headers, ToolContext context,String path) {
         String timestamp = String.valueOf(Instant.now().getEpochSecond());
         String roles = String.join(",", new TreeSet<>(context.roleIds()));
         String permissions = String.join(",", new TreeSet<>(context.permissions()));
@@ -75,7 +89,7 @@ public class SmartBootBudgetCostBusinessClient implements BudgetCostBusinessClie
         try {
             Mac mac = Mac.getInstance("HmacSHA256");
             mac.init(new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
-            String canonical = timestamp + "\nPOST\n" + PATH + "\n" + context.tenantId() + "\n" + context.userId()
+            String canonical = timestamp + "\nPOST\n" + path + "\n" + context.tenantId() + "\n" + context.userId()
                     + "\n" + context.identityId() + "\n" + roles + "\n" + permissions + "\n" + projects;
             headers.set("X-Agent-Internal-Signature", Base64.getUrlEncoder().withoutPadding().encodeToString(
                     mac.doFinal(canonical.getBytes(StandardCharsets.UTF_8))));

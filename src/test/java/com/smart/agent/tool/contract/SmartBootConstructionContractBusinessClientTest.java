@@ -63,6 +63,40 @@ class SmartBootConstructionContractBusinessClientTest {
         } finally { server.disposeNow(); }
     }
 
+    @Test void groupedComparisonTransmitsBothGroupsAndPreciseValues() throws Exception {
+        AtomicReference<String> body = new AtomicReference<>();
+        AtomicReference<String> signature = new AtomicReference<>(), timestamp = new AtomicReference<>();
+        DisposableServer server = HttpServer.create().port(0).handle((request,response) -> {
+            assertThat(request.uri()).isEqualTo("/internal/ai/tools/construction-contract-compare");
+            signature.set(request.requestHeaders().get("X-Agent-Internal-Signature"));
+            timestamp.set(request.requestHeaders().get("X-Agent-Internal-Timestamp"));
+            return request.receive().aggregate().asString().flatMap(content -> {
+                body.set(content);
+                return response.header("Content-Type","application/json").sendString(Mono.just(
+                        "{\"mode\":\"aggregate\",\"rows\":[{\"projectType\":\"1\",\"metric\":\"建设合同总金额\",\"currentValue\":123456789012345.67,\"growthPercent\":null}],\"columns\":[],\"appliedFilters\":[]}")).then();
+            });
+        }).bindNow();
+        try {
+            var mapper = new ObjectMapper();
+            var client = new SmartBootConstructionContractBusinessClient(WebClient.builder().baseUrl("http://127.0.0.1:"+server.port()).build(),mapper,"secret");
+            var current = mapper.readValue("{\"mode\":\"summary\",\"groupBy\":\"projectType\",\"projectId\":\"p1\",\"projectTypeName\":\"土建\",\"dateField\":\"signingDate\",\"startDate\":\"2026-01-01\",\"endDate\":\"2026-01-31\"}",ConstructionContractQueryInput.class);
+            var baseline = mapper.readValue("{\"mode\":\"summary\",\"groupBy\":\"projectType\",\"projectId\":\"p2\",\"dateField\":\"signingDate\",\"startDate\":\"2025-01-01\",\"endDate\":\"2025-01-31\"}",ConstructionContractQueryInput.class);
+            var result = client.compare(new ToolContext("t","u","i",Set.of(),Set.of("p1","p2"),Set.of("menu:project")),
+                    new ConstructionContractCompareInput("CUSTOM",null,current,baseline));
+            var sent = mapper.readTree(body.get());
+            assertThat(sent.path("current").path("groupBy").asText()).isEqualTo("projectType");
+            assertThat(sent.path("baseline").path("groupBy").asText()).isEqualTo("projectType");
+            assertThat(sent.path("current").path("projectIds").get(0).asText()).isEqualTo("p1");
+            assertThat(sent.path("baseline").path("projectIds").get(0).asText()).isEqualTo("p2");
+            assertThat(sent.path("current").path("projectTypeName").asText()).isEqualTo("土建");
+            assertThat(sent.path("baseline").path("startDate").asText()).isEqualTo("2025-01-01");
+            assertThat(result.rows().getFirst().get("currentValue").toString()).isEqualTo("123456789012345.67");
+            assertThat(result.rows().getFirst().get("growthPercent")).isNull();
+            Mac mac=Mac.getInstance("HmacSHA256"); mac.init(new SecretKeySpec("secret".getBytes(StandardCharsets.UTF_8),"HmacSHA256"));
+            String canonical=timestamp.get()+"\nPOST\n/internal/ai/tools/construction-contract-compare\nt\nu\ni\n\nmenu:project\np1,p2";
+            assertThat(signature.get()).isEqualTo(Base64.getUrlEncoder().withoutPadding().encodeToString(mac.doFinal(canonical.getBytes(StandardCharsets.UTF_8))));
+        } finally {server.disposeNow();}
+    }
     @Test void comparisonSignsItsOwnPathAndRejectsUnauthorizedBaseline() throws Exception {
         AtomicReference<org.springframework.web.reactive.function.client.ClientRequest> captured = new AtomicReference<>();
         var client = new SmartBootConstructionContractBusinessClient(WebClient.builder().exchangeFunction(request -> {

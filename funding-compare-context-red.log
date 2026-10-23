@@ -1,0 +1,183 @@
+20:02:20.463 [boundedElastic-1] INFO com.smart.agent.run.AgentRunService -- tool_execution_summary toolKey=projectFunding.query risk=L1 outcome=SUCCEEDED durationMillis=63 resultSizeBytes=246
+20:02:20.540 [boundedElastic-2] INFO com.smart.agent.run.AgentRunService -- tool_execution_summary toolKey=projectFunding.query risk=L1 outcome=SUCCEEDED durationMillis=0 resultSizeBytes=246
+20:02:20.715 [main] ERROR com.smart.agent.chat.ChatOrchestrator -- AI�Ự׼��ʧ��: runId=adf02339-b7c1-42f6-88f1-930417763bfa, traceId=t, stage=prepareContext, exception=com.smart.agent.common.error.AgentException
+com.smart.agent.common.error.AgentException: Required funding source menus missing
+	at com.smart.agent.chat.ChatOrchestrator$Session.validateProjectMenuPermission(ChatOrchestrator.java:820)
+	at com.smart.agent.chat.ChatOrchestrator$Session.start(ChatOrchestrator.java:359)
+	at com.smart.agent.chat.ChatOrchestrator.lambda$stream$0(ChatOrchestrator.java:231)
+	at reactor.core.publisher.FluxCreate.subscribe(FluxCreate.java:97)
+	at reactor.core.publisher.Mono.subscribe(Mono.java:4576)
+	at reactor.core.publisher.Mono.block(Mono.java:1778)
+	at com.smart.agent.chat.ProjectFundingChatTest.missingOneSourcePermissionRefusesBeforeAnyModelOrQuery(ProjectFundingChatTest.java:216)
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at org.junit.platform.commons.util.ReflectionUtils.invokeMethod(ReflectionUtils.java:775)
+	at org.junit.platform.commons.support.ReflectionSupport.invokeMethod(ReflectionSupport.java:479)
+	at org.junit.jupiter.engine.execution.MethodInvocation.proceed(MethodInvocation.java:60)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain$ValidatingInvocation.proceed(InvocationInterceptorChain.java:131)
+	at org.junit.jupiter.engine.extension.TimeoutExtension.intercept(TimeoutExtension.java:161)
+	at org.junit.jupiter.engine.extension.TimeoutExtension.interceptTestableMethod(TimeoutExtension.java:152)
+	at org.junit.jupiter.engine.extension.TimeoutExtension.interceptTestMethod(TimeoutExtension.java:91)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker$ReflectiveInterceptorCall.lambda$ofVoidMethod$0(InterceptingExecutableInvoker.java:112)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker.lambda$invoke$0(InterceptingExecutableInvoker.java:94)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain$InterceptedInvocation.proceed(InvocationInterceptorChain.java:106)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain.proceed(InvocationInterceptorChain.java:64)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain.chainAndInvoke(InvocationInterceptorChain.java:45)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain.invoke(InvocationInterceptorChain.java:37)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker.invoke(InterceptingExecutableInvoker.java:93)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker.invoke(InterceptingExecutableInvoker.java:87)
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.lambda$invokeTestMethod$7(TestMethodTestDescriptor.java:216)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.invokeTestMethod(TestMethodTestDescriptor.java:212)
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.execute(TestMethodTestDescriptor.java:137)
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.execute(TestMethodTestDescriptor.java:69)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$6(NodeTestTask.java:156)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$8(NodeTestTask.java:146)
+	at org.junit.platform.engine.support.hierarchical.Node.around(Node.java:137)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$9(NodeTestTask.java:144)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.executeRecursively(NodeTestTask.java:143)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.execute(NodeTestTask.java:100)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+	at org.junit.platform.engine.support.hierarchical.SameThreadHierarchicalTestExecutorService.invokeAll(SameThreadHierarchicalTestExecutorService.java:41)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$6(NodeTestTask.java:160)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$8(NodeTestTask.java:146)
+	at org.junit.platform.engine.support.hierarchical.Node.around(Node.java:137)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$9(NodeTestTask.java:144)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.executeRecursively(NodeTestTask.java:143)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.execute(NodeTestTask.java:100)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+	at org.junit.platform.engine.support.hierarchical.SameThreadHierarchicalTestExecutorService.invokeAll(SameThreadHierarchicalTestExecutorService.java:41)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$6(NodeTestTask.java:160)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$8(NodeTestTask.java:146)
+	at org.junit.platform.engine.support.hierarchical.Node.around(Node.java:137)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$9(NodeTestTask.java:144)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.executeRecursively(NodeTestTask.java:143)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.execute(NodeTestTask.java:100)
+	at org.junit.platform.engine.support.hierarchical.SameThreadHierarchicalTestExecutorService.submit(SameThreadHierarchicalTestExecutorService.java:35)
+	at org.junit.platform.engine.support.hierarchical.HierarchicalTestExecutor.execute(HierarchicalTestExecutor.java:57)
+	at org.junit.platform.engine.support.hierarchical.HierarchicalTestEngine.execute(HierarchicalTestEngine.java:54)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:201)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:170)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:94)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.lambda$execute$0(EngineExecutionOrchestrator.java:59)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.withInterceptedStreams(EngineExecutionOrchestrator.java:142)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:58)
+	at org.junit.platform.launcher.core.DefaultLauncher.execute(DefaultLauncher.java:103)
+	at org.junit.platform.launcher.core.DefaultLauncher.execute(DefaultLauncher.java:85)
+	at org.junit.platform.launcher.core.DelegatingLauncher.execute(DelegatingLauncher.java:47)
+	at org.junit.platform.launcher.core.InterceptingLauncher.lambda$execute$1(InterceptingLauncher.java:39)
+	at org.junit.platform.launcher.core.ClasspathAlignmentCheckingLauncherInterceptor.intercept(ClasspathAlignmentCheckingLauncherInterceptor.java:25)
+	at org.junit.platform.launcher.core.InterceptingLauncher.execute(InterceptingLauncher.java:38)
+	at org.junit.platform.launcher.core.DelegatingLauncher.execute(DelegatingLauncher.java:47)
+	at org.apache.maven.surefire.junitplatform.LauncherAdapter.executeWithoutCancellationToken(LauncherAdapter.java:60)
+	at org.apache.maven.surefire.junitplatform.LauncherAdapter.execute(LauncherAdapter.java:52)
+	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.execute(JUnitPlatformProvider.java:203)
+	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.invokeAllTests(JUnitPlatformProvider.java:168)
+	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.invoke(JUnitPlatformProvider.java:136)
+	at org.apache.maven.surefire.booter.ForkedBooter.runSuitesInProcess(ForkedBooter.java:385)
+	at org.apache.maven.surefire.booter.ForkedBooter.execute(ForkedBooter.java:162)
+	at org.apache.maven.surefire.booter.ForkedBooter.run(ForkedBooter.java:507)
+	at org.apache.maven.surefire.booter.ForkedBooter.main(ForkedBooter.java:495)
+20:02:20.758 [boundedElastic-1] INFO com.smart.agent.run.AgentRunService -- tool_execution_summary toolKey=projectFunding.clarifyDate risk=L1 outcome=SUCCEEDED durationMillis=9 resultSizeBytes=412
+20:02:20.812 [boundedElastic-1] INFO com.smart.agent.run.AgentRunService -- tool_execution_summary toolKey=projectFunding.query risk=L1 outcome=SUCCEEDED durationMillis=23 resultSizeBytes=153
+20:02:20.877 [boundedElastic-2] INFO com.smart.agent.run.AgentRunService -- tool_execution_summary toolKey=projectFunding.query risk=L1 outcome=SUCCEEDED durationMillis=15 resultSizeBytes=153
+20:02:20.924 [boundedElastic-1] INFO com.smart.agent.run.AgentRunService -- tool_execution_summary toolKey=projectFunding.clarifyDate risk=L1 outcome=SUCCEEDED durationMillis=3 resultSizeBytes=412
+20:02:20.952 [boundedElastic-1] INFO com.smart.agent.run.AgentRunService -- tool_execution_summary toolKey=projectFunding.query risk=L1 outcome=SUCCEEDED durationMillis=9 resultSizeBytes=153
+20:02:20.980 [boundedElastic-2] INFO com.smart.agent.run.AgentRunService -- tool_execution_summary toolKey=projectFunding.clarifyDate risk=L1 outcome=SUCCEEDED durationMillis=4 resultSizeBytes=412
+20:02:21.046 [boundedElastic-2] INFO com.smart.agent.run.AgentRunService -- tool_execution_summary toolKey=projectFunding.query risk=L1 outcome=SUCCEEDED durationMillis=10 resultSizeBytes=246
+20:02:21.086 [boundedElastic-1] INFO com.smart.agent.run.AgentRunService -- tool_execution_summary toolKey=projectFunding.query risk=L1 outcome=SUCCEEDED durationMillis=4 resultSizeBytes=197
+20:02:21.107 [boundedElastic-2] INFO com.smart.agent.run.AgentRunService -- tool_execution_summary toolKey=projectFunding.clarifyDate risk=L1 outcome=SUCCEEDED durationMillis=2 resultSizeBytes=412
+[ERROR] Tests run: 10, Failures: 4, Errors: 0, Skipped: 0, Time elapsed: 1.359 s <<< FAILURE! -- in com.smart.agent.chat.ProjectFundingChatTest
+[ERROR] com.smart.agent.chat.ProjectFundingChatTest.eachFollowUpRequeriesAndModelReceivesTheResult -- Time elapsed: 0.625 s <<< FAILURE!
+java.lang.AssertionError: 
+
+Expecting actual:
+  ["projectFunding.clarifyDate", "projectFunding.query"]
+to contain exactly in any order:
+  ["projectFunding.query", "projectFunding.compare", "projectFunding.clarifyDate"]
+but could not find the following elements:
+  ["projectFunding.compare"]
+
+	at com.smart.agent.chat.ProjectFundingChatTest.eachFollowUpRequeriesAndModelReceivesTheResult(ProjectFundingChatTest.java:104)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+
+[ERROR] com.smart.agent.chat.ProjectFundingChatTest.comparisonAllDateConfirmationRemovesDatesFromBothGroups -- Time elapsed: 0.052 s <<< FAILURE!
+java.lang.AssertionError: 
+
+Expecting actual:
+  "[ChatEvent[type=message_start, runId=f7dfc180-bc63-4b80-bb2e-a400517fbd2c, sequence=1, traceId=b, messageId=3f8552d3-98d2-4e50-be73-2488ee06a3bc, code=null, text=null, toolKey=null, data={}], ChatEvent[type=status, runId=f7dfc180-bc63-4b80-bb2e-a400517fbd2c, sequence=2, traceId=b, messageId=null, code=ROUTING, text=null, toolKey=null, data={}], ChatEvent[type=status, runId=f7dfc180-bc63-4b80-bb2e-a400517fbd2c, sequence=3, traceId=b, messageId=null, code=PLANNING, text=null, toolKey=null, data={}], ChatEvent[type=status, runId=f7dfc180-bc63-4b80-bb2e-a400517fbd2c, sequence=4, traceId=b, messageId=null, code=GENERATING, text=null, toolKey=null, data={}], ChatEvent[type=ai_debug, runId=f7dfc180-bc63-4b80-bb2e-a400517fbd2c, sequence=5, traceId=b, messageId=null, code=MODEL_REQUEST, text=null, toolKey=null, data={turn=1, stage=MODEL_REQUEST, toolUseMode=REQUIRED, allowedTools=[projectFunding.clarifyDate, projectFunding.query], messageCount=3, evidenceCount=0}], ChatEvent[type=ai_debug, runId=f7dfc180-bc63-4b80-bb2e-a400517fbd2c, sequence=6, traceId=b, messageId=null, code=TOOL_REQUEST, text=null, toolKey=null, data={turn=1, stage=TOOL_REQUEST, toolKey=projectFunding.compare, toolCallIndex=1, arguments={"comparisonType":"CUSTOM","current":{"dateField":"projectCreateDate","startDate":"2026-01-01","endDate":"2026-01-31"},"baseline":{"dateField":"projectCreateDate","startDate":"2025-01-01","endDate":"2025-01-31"}}}], ChatEvent[type=ai_debug, runId=f7dfc180-bc63-4b80-bb2e-a400517fbd2c, sequence=7, traceId=b, messageId=null, code=TOOL_ERROR, text=null, toolKey=null, data={turn=1, stage=TOOL_ERROR, toolKey=projectFunding.compare, error=AGENT_QUERY_INVALID_REQUEST, message=Tool does not belong to the selected business domain}], ChatEvent[type=error, runId=f7dfc180-bc63-4b80-bb2e-a400517fbd2c, sequence=0, traceId=b, messageId=null, code=AGENT_QUERY_INVALID_REQUEST, text=����ʶ��������Ŀͳ�Ʋ�ѯ������ѯ������ʽ������������ȷͳ�Ʒ�ʽ�����硰����Ŀ״̬����ͳ�����������򲹳����ʱ�䷶Χ��, toolKey=null, data={}]]"
+to contain:
+  "��ǰ���ʱȽ����" 
+	at com.smart.agent.chat.ProjectFundingChatTest.comparisonAllDateConfirmationRemovesDatesFromBothGroups(ProjectFundingChatTest.java:175)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+
+[ERROR] com.smart.agent.chat.ProjectFundingChatTest.comparisonProjectConfirmationRestoresBothGroupsEvenWithEmptyModelArguments -- Time elapsed: 0.010 s <<< FAILURE!
+java.lang.AssertionError: 
+
+Expecting actual:
+  "[ChatEvent[type=message_start, runId=b9e06302-a1e3-43c2-8b9d-38898a9f01aa, sequence=1, traceId=a, messageId=4427e510-85ea-4b3b-a1f8-427791eb942f, code=null, text=null, toolKey=null, data={}], ChatEvent[type=status, runId=b9e06302-a1e3-43c2-8b9d-38898a9f01aa, sequence=2, traceId=a, messageId=null, code=ROUTING, text=null, toolKey=null, data={}], ChatEvent[type=status, runId=b9e06302-a1e3-43c2-8b9d-38898a9f01aa, sequence=3, traceId=a, messageId=null, code=PLANNING, text=null, toolKey=null, data={}], ChatEvent[type=status, runId=b9e06302-a1e3-43c2-8b9d-38898a9f01aa, sequence=4, traceId=a, messageId=null, code=GENERATING, text=null, toolKey=null, data={}], ChatEvent[type=ai_debug, runId=b9e06302-a1e3-43c2-8b9d-38898a9f01aa, sequence=5, traceId=a, messageId=null, code=MODEL_REQUEST, text=null, toolKey=null, data={turn=1, stage=MODEL_REQUEST, toolUseMode=REQUIRED, allowedTools=[projectFunding.clarifyDate, projectFunding.query], messageCount=1, evidenceCount=0}], ChatEvent[type=ai_debug, runId=b9e06302-a1e3-43c2-8b9d-38898a9f01aa, sequence=6, traceId=a, messageId=null, code=TOOL_REQUEST, text=null, toolKey=null, data={turn=1, stage=TOOL_REQUEST, toolKey=projectFunding.compare, toolCallIndex=1, arguments={"comparisonType":"CUSTOM","current":{"projectName":"ͬ��","metric":"net"},"baseline":{"projectId":"p1","metric":"net"}}}], ChatEvent[type=ai_debug, runId=b9e06302-a1e3-43c2-8b9d-38898a9f01aa, sequence=7, traceId=a, messageId=null, code=TOOL_ERROR, text=null, toolKey=null, data={turn=1, stage=TOOL_ERROR, toolKey=projectFunding.compare, error=AGENT_QUERY_INVALID_REQUEST, message=Tool does not belong to the selected business domain}], ChatEvent[type=error, runId=b9e06302-a1e3-43c2-8b9d-38898a9f01aa, sequence=0, traceId=a, messageId=null, code=AGENT_QUERY_INVALID_REQUEST, text=����ʶ��������Ŀͳ�Ʋ�ѯ������ѯ������ʽ������������ȷͳ�Ʒ�ʽ�����硰����Ŀ״̬����ͳ�����������򲹳����ʱ�䷶Χ��, toolKey=null, data={}]]"
+to contain:
+  "clarification" 
+	at com.smart.agent.chat.ProjectFundingChatTest.comparisonProjectConfirmationRestoresBothGroupsEvenWithEmptyModelArguments(ProjectFundingChatTest.java:158)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+
+[ERROR] com.smart.agent.chat.ProjectFundingChatTest.comparisonRefreshesAndGroupFollowUpKeepsCanonicalProjectMetricAndDates -- Time elapsed: 0.012 s <<< FAILURE!
+java.lang.AssertionError: 
+
+Expecting actual:
+  "[ChatEvent[type=message_start, runId=41a17d73-994a-41c2-92fb-42c3c4462675, sequence=1, traceId=�Ƚ�������Ŀ������, messageId=3065c0cf-d765-4e56-97ea-289c905e09e1, code=null, text=null, toolKey=null, data={}], ChatEvent[type=status, runId=41a17d73-994a-41c2-92fb-42c3c4462675, sequence=2, traceId=�Ƚ�������Ŀ������, messageId=null, code=ROUTING, text=null, toolKey=null, data={}], ChatEvent[type=status, runId=41a17d73-994a-41c2-92fb-42c3c4462675, sequence=3, traceId=�Ƚ�������Ŀ������, messageId=null, code=PLANNING, text=null, toolKey=null, data={}], ChatEvent[type=status, runId=41a17d73-994a-41c2-92fb-42c3c4462675, sequence=4, traceId=�Ƚ�������Ŀ������, messageId=null, code=GENERATING, text=null, toolKey=null, data={}], ChatEvent[type=ai_debug, runId=41a17d73-994a-41c2-92fb-42c3c4462675, sequence=5, traceId=�Ƚ�������Ŀ������, messageId=null, code=MODEL_REQUEST, text=null, toolKey=null, data={turn=1, stage=MODEL_REQUEST, toolUseMode=REQUIRED, allowedTools=[projectFunding.clarifyDate, projectFunding.query], messageCount=1, evidenceCount=0}], ChatEvent[type=ai_debug, runId=41a17d73-994a-41c2-92fb-42c3c4462675, sequence=6, traceId=�Ƚ�������Ŀ������, messageId=null, code=TOOL_REQUEST, text=null, toolKey=null, data={turn=1, stage=TOOL_REQUEST, toolKey=projectFunding.compare, toolCallIndex=1, arguments={"comparisonType":"CUSTOM","current":{"projectName":"ʾ��","metric":"net","dateField":"projectCreateDate","startDate":"2026-01-01","endDate":"2026-01-31"},"baseline":{"projectCode":"20260708001","metric":"net","dateField":"projectCreateDate","startDate":"2025-01-01","endDate":"2025-01-31"}}}], ChatEvent[type=ai_debug, runId=41a17d73-994a-41c2-92fb-42c3c4462675, sequence=7, traceId=�Ƚ�������Ŀ������, messageId=null, code=TOOL_ERROR, text=null, toolKey=null, data={turn=1, stage=TOOL_ERROR, toolKey=projectFunding.compare, error=AGENT_QUERY_INVALID_REQUEST, message=Tool does not belong to the selected business domain}], ChatEvent[type=error, runId=41a17d73-994a-41c2-92fb-42c3c4462675, sequence=0, traceId=�Ƚ�������Ŀ������, messageId=null, code=AGENT_QUERY_INVALID_REQUEST, text=����ʶ��������Ŀͳ�Ʋ�ѯ������ѯ������ʽ������������ȷͳ�Ʒ�ʽ�����硰����Ŀ״̬����ͳ�����������򲹳����ʱ�䷶Χ��, toolKey=null, data={}]]"
+to contain:
+  "�����ֽ���ش�" 
+	at com.smart.agent.chat.ProjectFundingChatTest.comparisonRefreshesAndGroupFollowUpKeepsCanonicalProjectMetricAndDates(ProjectFundingChatTest.java:140)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+
+[ERROR] Failures: 
+[ERROR]   ProjectFundingChatTest.comparisonAllDateConfirmationRemovesDatesFromBothGroups:175 
+Expecting actual:
+  "[ChatEvent[type=message_start, runId=f7dfc180-bc63-4b80-bb2e-a400517fbd2c, sequence=1, traceId=b, messageId=3f8552d3-98d2-4e50-be73-2488ee06a3bc, code=null, text=null, toolKey=null, data={}], ChatEvent[type=status, runId=f7dfc180-bc63-4b80-bb2e-a400517fbd2c, sequence=2, traceId=b, messageId=null, code=ROUTING, text=null, toolKey=null, data={}], ChatEvent[type=status, runId=f7dfc180-bc63-4b80-bb2e-a400517fbd2c, sequence=3, traceId=b, messageId=null, code=PLANNING, text=null, toolKey=null, data={}], ChatEvent[type=status, runId=f7dfc180-bc63-4b80-bb2e-a400517fbd2c, sequence=4, traceId=b, messageId=null, code=GENERATING, text=null, toolKey=null, data={}], ChatEvent[type=ai_debug, runId=f7dfc180-bc63-4b80-bb2e-a400517fbd2c, sequence=5, traceId=b, messageId=null, code=MODEL_REQUEST, text=null, toolKey=null, data={turn=1, stage=MODEL_REQUEST, toolUseMode=REQUIRED, allowedTools=[projectFunding.clarifyDate, projectFunding.query], messageCount=3, evidenceCount=0}], ChatEvent[type=ai_debug, runId=f7dfc180-bc63-4b80-bb2e-a400517fbd2c, sequence=6, traceId=b, messageId=null, code=TOOL_REQUEST, text=null, toolKey=null, data={turn=1, stage=TOOL_REQUEST, toolKey=projectFunding.compare, toolCallIndex=1, arguments={"comparisonType":"CUSTOM","current":{"dateField":"projectCreateDate","startDate":"2026-01-01","endDate":"2026-01-31"},"baseline":{"dateField":"projectCreateDate","startDate":"2025-01-01","endDate":"2025-01-31"}}}], ChatEvent[type=ai_debug, runId=f7dfc180-bc63-4b80-bb2e-a400517fbd2c, sequence=7, traceId=b, messageId=null, code=TOOL_ERROR, text=null, toolKey=null, data={turn=1, stage=TOOL_ERROR, toolKey=projectFunding.compare, error=AGENT_QUERY_INVALID_REQUEST, message=Tool does not belong to the selected business domain}], ChatEvent[type=error, runId=f7dfc180-bc63-4b80-bb2e-a400517fbd2c, sequence=0, traceId=b, messageId=null, code=AGENT_QUERY_INVALID_REQUEST, text=����ʶ��������Ŀͳ�Ʋ�ѯ������ѯ������ʽ������������ȷͳ�Ʒ�ʽ�����硰����Ŀ״̬����ͳ�����������򲹳����ʱ�䷶Χ��, toolKey=null, data={}]]"
+to contain:
+  "��ǰ���ʱȽ����" 
+[ERROR]   ProjectFundingChatTest.comparisonProjectConfirmationRestoresBothGroupsEvenWithEmptyModelArguments:158 
+Expecting actual:
+  "[ChatEvent[type=message_start, runId=b9e06302-a1e3-43c2-8b9d-38898a9f01aa, sequence=1, traceId=a, messageId=4427e510-85ea-4b3b-a1f8-427791eb942f, code=null, text=null, toolKey=null, data={}], ChatEvent[type=status, runId=b9e06302-a1e3-43c2-8b9d-38898a9f01aa, sequence=2, traceId=a, messageId=null, code=ROUTING, text=null, toolKey=null, data={}], ChatEvent[type=status, runId=b9e06302-a1e3-43c2-8b9d-38898a9f01aa, sequence=3, traceId=a, messageId=null, code=PLANNING, text=null, toolKey=null, data={}], ChatEvent[type=status, runId=b9e06302-a1e3-43c2-8b9d-38898a9f01aa, sequence=4, traceId=a, messageId=null, code=GENERATING, text=null, toolKey=null, data={}], ChatEvent[type=ai_debug, runId=b9e06302-a1e3-43c2-8b9d-38898a9f01aa, sequence=5, traceId=a, messageId=null, code=MODEL_REQUEST, text=null, toolKey=null, data={turn=1, stage=MODEL_REQUEST, toolUseMode=REQUIRED, allowedTools=[projectFunding.clarifyDate, projectFunding.query], messageCount=1, evidenceCount=0}], ChatEvent[type=ai_debug, runId=b9e06302-a1e3-43c2-8b9d-38898a9f01aa, sequence=6, traceId=a, messageId=null, code=TOOL_REQUEST, text=null, toolKey=null, data={turn=1, stage=TOOL_REQUEST, toolKey=projectFunding.compare, toolCallIndex=1, arguments={"comparisonType":"CUSTOM","current":{"projectName":"ͬ��","metric":"net"},"baseline":{"projectId":"p1","metric":"net"}}}], ChatEvent[type=ai_debug, runId=b9e06302-a1e3-43c2-8b9d-38898a9f01aa, sequence=7, traceId=a, messageId=null, code=TOOL_ERROR, text=null, toolKey=null, data={turn=1, stage=TOOL_ERROR, toolKey=projectFunding.compare, error=AGENT_QUERY_INVALID_REQUEST, message=Tool does not belong to the selected business domain}], ChatEvent[type=error, runId=b9e06302-a1e3-43c2-8b9d-38898a9f01aa, sequence=0, traceId=a, messageId=null, code=AGENT_QUERY_INVALID_REQUEST, text=����ʶ��������Ŀͳ�Ʋ�ѯ������ѯ������ʽ������������ȷͳ�Ʒ�ʽ�����硰����Ŀ״̬����ͳ�����������򲹳����ʱ�䷶Χ��, toolKey=null, data={}]]"
+to contain:
+  "clarification" 
+[ERROR]   ProjectFundingChatTest.comparisonRefreshesAndGroupFollowUpKeepsCanonicalProjectMetricAndDates:140 
+Expecting actual:
+  "[ChatEvent[type=message_start, runId=41a17d73-994a-41c2-92fb-42c3c4462675, sequence=1, traceId=�Ƚ�������Ŀ������, messageId=3065c0cf-d765-4e56-97ea-289c905e09e1, code=null, text=null, toolKey=null, data={}], ChatEvent[type=status, runId=41a17d73-994a-41c2-92fb-42c3c4462675, sequence=2, traceId=�Ƚ�������Ŀ������, messageId=null, code=ROUTING, text=null, toolKey=null, data={}], ChatEvent[type=status, runId=41a17d73-994a-41c2-92fb-42c3c4462675, sequence=3, traceId=�Ƚ�������Ŀ������, messageId=null, code=PLANNING, text=null, toolKey=null, data={}], ChatEvent[type=status, runId=41a17d73-994a-41c2-92fb-42c3c4462675, sequence=4, traceId=�Ƚ�������Ŀ������, messageId=null, code=GENERATING, text=null, toolKey=null, data={}], ChatEvent[type=ai_debug, runId=41a17d73-994a-41c2-92fb-42c3c4462675, sequence=5, traceId=�Ƚ�������Ŀ������, messageId=null, code=MODEL_REQUEST, text=null, toolKey=null, data={turn=1, stage=MODEL_REQUEST, toolUseMode=REQUIRED, allowedTools=[projectFunding.clarifyDate, projectFunding.query], messageCount=1, evidenceCount=0}], ChatEvent[type=ai_debug, runId=41a17d73-994a-41c2-92fb-42c3c4462675, sequence=6, traceId=�Ƚ�������Ŀ������, messageId=null, code=TOOL_REQUEST, text=null, toolKey=null, data={turn=1, stage=TOOL_REQUEST, toolKey=projectFunding.compare, toolCallIndex=1, arguments={"comparisonType":"CUSTOM","current":{"projectName":"ʾ��","metric":"net","dateField":"projectCreateDate","startDate":"2026-01-01","endDate":"2026-01-31"},"baseline":{"projectCode":"20260708001","metric":"net","dateField":"projectCreateDate","startDate":"2025-01-01","endDate":"2025-01-31"}}}], ChatEvent[type=ai_debug, runId=41a17d73-994a-41c2-92fb-42c3c4462675, sequence=7, traceId=�Ƚ�������Ŀ������, messageId=null, code=TOOL_ERROR, text=null, toolKey=null, data={turn=1, stage=TOOL_ERROR, toolKey=projectFunding.compare, error=AGENT_QUERY_INVALID_REQUEST, message=Tool does not belong to the selected business domain}], ChatEvent[type=error, runId=41a17d73-994a-41c2-92fb-42c3c4462675, sequence=0, traceId=�Ƚ�������Ŀ������, messageId=null, code=AGENT_QUERY_INVALID_REQUEST, text=����ʶ��������Ŀͳ�Ʋ�ѯ������ѯ������ʽ������������ȷͳ�Ʒ�ʽ�����硰����Ŀ״̬����ͳ�����������򲹳����ʱ�䷶Χ��, toolKey=null, data={}]]"
+to contain:
+  "�����ֽ���ش�" 
+[ERROR]   ProjectFundingChatTest.eachFollowUpRequeriesAndModelReceivesTheResult:104 
+Expecting actual:
+  ["projectFunding.clarifyDate", "projectFunding.query"]
+to contain exactly in any order:
+  ["projectFunding.query", "projectFunding.compare", "projectFunding.clarifyDate"]
+but could not find the following elements:
+  ["projectFunding.compare"]
+
+[ERROR] Tests run: 10, Failures: 4, Errors: 0, Skipped: 0
+[ERROR] Failed to execute goal org.apache.maven.plugins:maven-surefire-plugin:3.5.6:test (default-test) on project smart-agent: There are test failures.
+[ERROR] 
+[ERROR] See F:\project\gongcheng\agent\target\surefire-reports for the individual test results.
+[ERROR] See dump files (if any exist) [date].dump, [date]-jvmRun[N].dump and [date].dumpstream.
+[ERROR] -> [Help 1]
+[ERROR] 
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR] 
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException

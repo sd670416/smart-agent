@@ -31,6 +31,7 @@ class ProjectFundingChatTest {
     private final AgentUserContext user = new AgentUserContext("tenant", "user", "identity", com.smart.agent.routing.ProjectFundingDomainContributor.permissions("funding"), Set.of("p1"));
     private final List<ModelRequest> requests = new CopyOnWriteArrayList<>();
     private final List<ProjectFundingQueryInput> queries = new CopyOnWriteArrayList<>();
+    private final List<ProjectFundingCompareInput> comparisons = new CopyOnWriteArrayList<>();
     private final String conversationId = conversationService.create("tenant", "user", "项目垫资查询").id();
     private ToolExecutor executor;
     private List<Map<String, Object>> projectRows = List.of(Map.of("projectId", "p1", "projectName", "示例",
@@ -44,13 +45,20 @@ class ProjectFundingChatTest {
 
     private ChatOrchestrator orchestrator(ModelGateway model,
             com.smart.agent.tool.approval.ApprovalBusinessClient approvalClient) {
-        ProjectFundingBusinessClient client = (context, input) -> {
+        ProjectFundingBusinessClient client = new ProjectFundingBusinessClient() {
+            @Override public ProjectQueryResult compare(ToolContext context,ProjectFundingCompareInput input) {
+                comparisons.add(input);
+                return new ProjectQueryResult("aggregate",1,1,1L,false,List.of(),
+                        List.of(Map.of("metric","项目垫资（元）","currentValue",comparisons.size(),"baselineValue",1)),List.of());
+            }
+            @Override public ProjectQueryResult query(ToolContext context,ProjectFundingQueryInput input) {
             queries.add(input);
             if ("detail".equals(input.mode())) return new ProjectQueryResult("detail", input.page(), input.pageSize(),
                     2L, false, List.of(), List.of(Map.of("projectId", "p1", "projectName", "示例", "projectCode", "001"),
                     Map.of("projectId", "outside", "projectName", "不可见项目", "projectCode", "002")), List.of());
             return new ProjectQueryResult("aggregate", 1, 20, 1L, false, List.of(),
                     List.of(Map.of("projectCount", queries.size(), "fundingAmount", new java.math.BigDecimal("123.45"))), List.of());
+            }
         };
         var projects = new com.smart.agent.tool.project.LocalProjectBusinessClient() {
             @Override public ProjectQueryResult query(ToolContext context, com.smart.agent.tool.project.ProjectQueryInput input) {
@@ -61,6 +69,7 @@ class ProjectFundingChatTest {
         };
         ToolRegistry tools = new ToolRegistry(List.of(new ProjectFundingQueryTool(client,
                 new com.smart.agent.tool.project.ProjectReferenceResolver(projects)),
+                new ProjectFundingCompareTool(client,new com.smart.agent.tool.project.ProjectReferenceResolver(projects)),
                 new com.smart.agent.tool.approval.ApprovalQueryTool(approvalClient),
                 new com.smart.agent.tool.project.ProjectQueryTool(projects),
                 new ProjectFundingClarifyDateTool(),
@@ -92,7 +101,7 @@ class ProjectFundingChatTest {
         assertThat(queries).hasSize(2);
         assertThat(first.toString()).contains("根据本轮结果给出垫资金额");
         assertThat(requests.get(0).allowedToolSpecifications()).extracting(ModelRequest.AllowedToolSpecification::key)
-                .containsExactlyInAnyOrder("projectFunding.query", "projectFunding.clarifyDate");
+                .containsExactlyInAnyOrder("projectFunding.query", "projectFunding.compare", "projectFunding.clarifyDate");
         assertThat(requests.get(0).toolUseMode()).isEqualTo(ModelRequest.ToolUseMode.REQUIRED);
         assertThat(requests.get(2).redactedConversationMessages().toString()).contains("trusted-query-context");
     }
@@ -112,6 +121,61 @@ class ProjectFundingChatTest {
     }
     private boolean matchesProjectFilter(Map<String,Object> row,com.smart.agent.tool.project.ProjectQueryFilter filter) {
         return filter.conditions().stream().allMatch(c->Objects.equals(row.get(c.field()),c.value()));
+    }
+    @Test void comparisonRefreshesAndGroupFollowUpKeepsCanonicalProjectMetricAndDates() {
+        ChatOrchestrator chat=orchestrator(request->{
+            if(hasCurrentResult(request))return Flux.just(new ModelEvent.Completed("按本轮结果回答",1,1));
+            if(comparisons.size()<2) {
+                if(!comparisons.isEmpty())assertThat(request.redactedConversationMessages().toString()).contains("trusted-project-funding-comparison");
+                return Flux.just(new ModelEvent.ToolRequested("c","projectFunding.compare",
+                        "{\"comparisonType\":\"CUSTOM\",\"current\":{\"projectName\":\"示例\",\"metric\":\"net\",\"dateField\":\"projectCreateDate\",\"startDate\":\"2026-01-01\",\"endDate\":\"2026-01-31\"},\"baseline\":{\"projectCode\":\"20260708001\",\"metric\":\"net\",\"dateField\":\"projectCreateDate\",\"startDate\":\"2025-01-01\",\"endDate\":\"2025-01-31\"}}"));
+            }
+            String messages=request.redactedConversationMessages().toString();
+            if(queries.isEmpty())assertThat(messages).contains("trusted-project-funding-comparison","p1").doesNotContain("trusted-project-funding-references");
+            return Flux.just(new ModelEvent.ToolRequested("q","projectFunding.query",
+                    "{\"projectId\":\"p1\",\"metric\":\"net\",\"mode\":\"detail\",\"dateField\":\"projectCreateDate\",\"startDate\":\"2025-01-01\",\"endDate\":\"2025-01-31\",\"page\":"+(queries.size()+1)+"}"));
+        });
+        for(String question:List.of("比较两组项目净付款","再查一次","查看第二组项目净付款列表","下一页")) {
+            var events=chat.stream(new ChatCommand(conversationId,question,null),user,question).collectList().block();
+            assertThat(events.toString()).contains("按本轮结果回答");
+        }
+        assertThat(comparisons).hasSize(2);assertThat(queries).hasSize(2);
+        assertThat(comparisons.getFirst().current().projectId()).isEqualTo("p1");
+        assertThat(comparisons.getFirst().baseline().projectId()).isEqualTo("p1");
+        assertThat(queries.getLast().page()).isEqualTo(2);assertThat(queries.getLast().metric()).isEqualTo("net");
+        assertThat(queries.getLast().startDate()).isEqualTo("2025-01-01");
+    }
+    @Test void comparisonProjectConfirmationRestoresBothGroupsEvenWithEmptyModelArguments() {
+        projectRows=List.of(Map.of("projectId","p1","projectName","同名","projectCode","001"),Map.of("projectId","p2","projectName","同名","projectCode","002"));
+        var scoped=new AgentUserContext("tenant","user","identity",ProjectFundingDomainContributor.permissions("funding"),Set.of("p1","p2"));
+        ChatOrchestrator chat=orchestrator(request->{
+            if(hasCurrentResult(request))return Flux.just(new ModelEvent.Completed("比较完成",1,1));
+            if(request.redactedConversationMessages().toString().contains("用户已确认比较条件"))return Flux.just(new ModelEvent.ToolRequested("c","projectFunding.compare","{}"));
+            return Flux.just(new ModelEvent.ToolRequested("c","projectFunding.compare",
+                    "{\"comparisonType\":\"CUSTOM\",\"current\":{\"projectName\":\"同名\",\"metric\":\"net\"},\"baseline\":{\"projectId\":\"p1\",\"metric\":\"net\"}}"));
+        });
+        var first=chat.stream(new ChatCommand(conversationId,"比较同名项目与指定项目的净付款",null),scoped,"a").collectList().block();
+        assertThat(first.toString()).contains("clarification");assertThat(comparisons).isEmpty();
+        var confirmation=pending.findActive("tenant","user",conversationId).orElseThrow();
+        var events=chat.stream(new ChatCommand(conversationId,"第二个",List.of(),null,new ChatCommand.ClarificationSelection(confirmation.id(),"current:project:p2")),scoped,"b").collectList().block();
+        assertThat(events.toString()).contains("比较完成");assertThat(comparisons).hasSize(1);
+        assertThat(comparisons.getFirst().current().projectId()).isEqualTo("p2");assertThat(comparisons.getFirst().baseline().projectId()).isEqualTo("p1");
+        assertThat(comparisons.getFirst().current().metric()).isEqualTo("net");
+    }
+    @Test void comparisonAllDateConfirmationRemovesDatesFromBothGroups() {
+        ChatOrchestrator chat=orchestrator(request->{
+            if(hasCurrentResult(request))return Flux.just(new ModelEvent.Completed("当前垫资比较完成",1,1));
+            if(!request.redactedConversationMessages().toString().contains("用户确认不限定日期"))return Flux.just(new ModelEvent.ToolRequested("d","projectFunding.clarifyDate","{}"));
+            return Flux.just(new ModelEvent.ToolRequested("c","projectFunding.compare",
+                    "{\"comparisonType\":\"CUSTOM\",\"current\":{\"dateField\":\"projectCreateDate\",\"startDate\":\"2026-01-01\",\"endDate\":\"2026-01-31\"},\"baseline\":{\"dateField\":\"projectCreateDate\",\"startDate\":\"2025-01-01\",\"endDate\":\"2025-01-31\"}}"));
+        });
+        chat.stream(new ChatCommand(conversationId,"比较两组项目垫资",null),user,"a").collectList().block();
+        var confirmation=pending.findActive("tenant","user",conversationId).orElseThrow();
+        var events=chat.stream(new ChatCommand(conversationId,"不限定日期",List.of(),null,new ChatCommand.ClarificationSelection(confirmation.id(),"date:allProjectDates")),user,"b").collectList().block();
+        assertThat(events.toString()).contains("当前垫资比较完成");assertThat(comparisons).hasSize(1);
+        for(var group:List.of(comparisons.getFirst().current(),comparisons.getFirst().baseline())) {
+            assertThat(group.dateField()).isNull();assertThat(group.startDate()).isNull();assertThat(group.endDate()).isNull();
+        }
     }
     @Test void ambiguousDateAsksBeforeFetchingBusinessData() {
         ChatOrchestrator chat=orchestrator(request->Flux.just(new ModelEvent.ToolRequested("date","projectFunding.clarifyDate","{}")));

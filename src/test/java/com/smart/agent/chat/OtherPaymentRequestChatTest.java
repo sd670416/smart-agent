@@ -151,6 +151,11 @@ class OtherPaymentRequestChatTest {
             }
             public ProjectQueryResult query(ToolContext context, OtherPaymentRequestQueryInput input) {
             queries.add(input);
+            if ("items".equals(input.mode())) return new ProjectQueryResult("detail",input.page(),input.pageSize(),2L,input.page()==1,
+                    List.of(),List.of(Map.of("requestId","r1","itemId",input.page()==1?"d1":"d2","projectId","p1",
+                            "registrationCode","FK-001","paymentAmount",new java.math.BigDecimal("12.34"))),List.of());
+            if ("detail".equals(input.mode()) && input.requestId()!=null) return new ProjectQueryResult("detail",input.page(),input.pageSize(),1L,false,
+                    List.of(),List.of(Map.of("requestId",input.requestId(),"projectId","p1","registrationCode","FK-001","remarks","主单备注")),List.of());
             if ("detail".equals(input.mode())) return new ProjectQueryResult("detail", input.page(), input.pageSize(),
                     2L, false, List.of(), List.of(Map.of("requestId", "r1", "projectId", "p1", "registrationCode", "FK-001"),
                     Map.of("requestId", "r2", "projectId", "p1", "registrationCode", "FK-002")), List.of());
@@ -209,6 +214,36 @@ class OtherPaymentRequestChatTest {
         filter.groups().forEach(group -> checks.add(matchesProjectFilter(row, group)));
         return "OR".equals(filter.logic()) ? checks.stream().anyMatch(Boolean::booleanValue)
                 : checks.stream().allMatch(Boolean::booleanValue);
+    }
+
+    @Test void documentItemsPagingAndReturnPreserveParentAndPaymentPeriodWithLiveQueries() {
+        ChatOrchestrator chat=orchestrator(request -> {
+            if(hasCurrentResult(request))return Flux.just(new ModelEvent.Completed("本轮其他付款申请查询完成",1,1));
+            int turn=queries.size();
+            if(turn==1)assertThat(request.redactedConversationMessages().toString()).contains("trusted-other-payment-request-references","r1");
+            if(turn==3 || turn==4)assertThat(request.redactedConversationMessages().toString())
+                    .contains("trusted-other-payment-request-items","requestId=r1","paymentDate","2026-01-31")
+                    .doesNotContain("trusted-other-payment-request-references:");
+            String args=switch(turn) {
+                case 0 -> "{\"mode\":\"detail\",\"page\":2";
+                case 1 -> "{\"mode\":\"detail\",\"requestId\":\"r1\",\"page\":2";
+                case 2 -> "{\"mode\":\"items\",\"requestId\":\"r1\",\"pageSize\":1";
+                case 3 -> "{\"mode\":\"items\",\"requestId\":\"r1\",\"page\":2,\"pageSize\":1";
+                default -> "{\"mode\":\"detail\",\"requestId\":\"r1\",\"page\":2";
+            };
+            args+=",\"dateField\":\"paymentDate\",\"startDate\":\"2026-01-01\",\"endDate\":\"2026-01-31\"}";
+            return Flux.just(new ModelEvent.ToolRequested("q","otherPaymentRequest.query",args));
+        });
+        for(String question:List.of("按实际付款时间查询2026年1月其他付款申请第2页","查看第一笔详情","看这笔付款明细，每页1条","下一页","返回这笔申请单详情")) {
+            var events=chat.stream(new ChatCommand(conversationId,question,null),user,"trace").collectList().block();
+            assertThat(events).noneMatch(e -> "error".equals(e.type()));
+        }
+        assertThat(queries).hasSize(5);
+        assertThat(queries.subList(1,5)).extracting(OtherPaymentRequestQueryInput::requestId).containsOnly("r1");
+        assertThat(queries).extracting(OtherPaymentRequestQueryInput::dateField).containsOnly("paymentDate");
+        assertThat(queries).extracting(OtherPaymentRequestQueryInput::endDate).containsOnly("2026-01-31");
+        assertThat(queries.get(1).page()).isEqualTo(1);assertThat(queries.get(3).page()).isEqualTo(2);
+        assertThat(queries.get(4).page()).isEqualTo(1);assertThat(queries.get(4).mode()).isEqualTo("detail");
     }
 
     @Test void toolResultReturnsToModelAndEveryFollowUpRefreshes() {

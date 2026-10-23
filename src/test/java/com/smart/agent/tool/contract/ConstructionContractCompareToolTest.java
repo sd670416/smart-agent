@@ -7,10 +7,28 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
 
 class ConstructionContractCompareToolTest {
-    @Test void groupedComparisonCannotSilentlyReturnAnUngroupedTotal() throws Exception {
+    @Test void groupedComparisonRetainsGroupingThroughProjectResolution() throws Exception {
         var grouped = new com.fasterxml.jackson.databind.ObjectMapper().readValue(
                 "{\"mode\":\"summary\",\"groupBy\":\"projectType\",\"dateField\":\"signingDate\",\"startDate\":\"2026-01-01\",\"endDate\":\"2026-01-31\"}",ConstructionContractQueryInput.class);
-        assertThatThrownBy(() -> new ConstructionContractCompareInput("YOY","MONTH",grouped,null))
+        var captured = new java.util.concurrent.atomic.AtomicReference<ConstructionContractCompareInput>();
+        ConstructionContractBusinessClient client = new ConstructionContractBusinessClient() {
+            public ProjectQueryResult query(ToolContext c, ConstructionContractQueryInput i) { throw new AssertionError(); }
+            public ProjectQueryResult compare(ToolContext c, ConstructionContractCompareInput i) {
+                captured.set(i);
+                return new ProjectQueryResult("aggregate",1,0,0L,false,List.of(),List.of(),List.of());
+            }
+        };
+        var tool = new ConstructionContractCompareTool(client,new ProjectReferenceResolver(new LocalProjectBusinessClient()));
+        tool.execute(new ConstructionContractCompareInput("YOY","MONTH",grouped.withProjectId("p1"),null),
+                new ToolContext("t","u","i",Set.of(),Set.of("p1"),Set.of("menu:project")));
+        assertThat(captured.get().current().groupBy()).isEqualTo("projectType");
+        assertThat(captured.get().current().projectId()).isEqualTo("p1");
+        assertThat(captured.get().current().page()).isEqualTo(1);
+    }
+    @Test void customComparisonRequiresSameGroupingOnBothSides() throws Exception {
+        var grouped = new com.fasterxml.jackson.databind.ObjectMapper().readValue(
+                "{\"mode\":\"summary\",\"groupBy\":\"projectType\",\"dateField\":\"signingDate\"}",ConstructionContractQueryInput.class);
+        assertThatThrownBy(() -> new ConstructionContractCompareInput("CUSTOM",null,grouped,group()))
                 .isInstanceOf(IllegalArgumentException.class);
     }
     private ConstructionContractQueryInput group() {

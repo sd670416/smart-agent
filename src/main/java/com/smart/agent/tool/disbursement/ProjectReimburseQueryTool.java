@@ -22,9 +22,11 @@ public class ProjectReimburseQueryTool implements AgentTool<ProjectReimburseQuer
     // Scope is checked against the canonical ID after resolving legacy code/name inputs, below.
     @Override public Optional<String> projectId(ProjectReimburseQueryInput input) { return Optional.empty(); }
     @Override public String description() {
-        return "查询当前用户可见项目中审批完成的项目报销。detail为申请单列表，items为单据费用明细，summary为申请单数、明细条数、报销金额精确合计。"
+        return "查询当前用户可见项目中审批完成的项目报销。detail不传requestId为报销单列表，传真实requestId为该单自身详情（报销人、报销事由等），单笔详情页码归一为1。items为单据费用明细，summary为报销单数、明细条数、报销金额精确合计且不能携带单笔requestId。"
                 + "金额仅汇总可见项目的报销明细，不得读取整单金额或累加分页；同单可含多个项目，列表与统计都先按明细项目范围筛选。只查项目报销，不含个人报销、付款、退款或发票。"
                 + "支持申请单号registrationCode和单据真实ID requestId；日期仅支持createDate申请创建日期、projectCreateDate项目创建日期、reimburseDate报销日期。"
+                + "明细itemId不是报销主单ID；翻页保留requestId及已确认项目、单号和日期，返回主单用detail和同一requestId，不移除筛选扩大范围。"
+                + "不含个人累计、备用金抵扣、银行账户、发票或附件信息。主单报销事由与费用明细备注不同，金额不是实际付款。"
                 + "日期不明确调用projectReimburse.clarifyDate，相对日期先取时间。待办、已办、流程仍使用approval工具。";
     }
     @Override public String argumentsSchemaJson() {
@@ -35,12 +37,12 @@ public class ProjectReimburseQueryTool implements AgentTool<ProjectReimburseQuer
                   "projectName":{"type":"string","description":"默认精确项目名称筛选，同名多项时追问确认，不得默认包含匹配扩大范围"},
                   "projectNameMatch":{"type":"string","description":"仅允许exact或contains，默认exact。只有用户明确要求名称包含或模糊匹配时用contains，不能作为失败后的降级重试"},
                   "registrationCode":{"type":"string","description":"项目报销单号包含筛选"},
-                  "requestId":{"type":"string","description":"项目报销列表返回的真实申请单ID；看某一单的费用明细时传入"},
-                  "mode":{"type":"string","description":"detail申请单列表，items费用明细，summary申请单数、明细条数及报销金额全量合计"},
+                  "requestId":{"type":"string","description":"项目报销列表返回的真实主单ID；查看单据自身详情、费用明细及明细翻页时传入，不能使用itemId。summary须清除单笔ID"},
+                  "mode":{"type":"string","description":"detail不传requestId为报销单列表，传requestId为单笔自身详情（报销人、报销事由及当前范围费用小计）；items费用明细；summary当前筛选范围全量合计且不传requestId。返回主单仍保留项目、单号、日期条件"},
                   "dateField":{"type":"string","description":"createDate申请创建日期、projectCreateDate项目创建日期。日期不明确先追问，reimburseDate报销日期。单数按当前范围有费用明细的报销单去重，金额仅为当前范围内费用小计"},
                   "startDate":{"type":"string","description":"开始日期 yyyy-MM-dd，含当天"},
                   "endDate":{"type":"string","description":"结束日期 yyyy-MM-dd，含当天"},
-                  "page":{"type":"integer","description":"从1开始"},"pageSize":{"type":"integer","description":"1到100，默认20"}
+                  "page":{"type":"integer","description":"从1开始；列表与items可翻页，detail加requestId归一为1"},"pageSize":{"type":"integer","description":"1到100，默认20"}
                 },"additionalProperties":false}
                 """;
     }

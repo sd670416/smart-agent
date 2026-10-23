@@ -37,6 +37,48 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
 class ModelGatewayContractTest {
+    @Test void fundingQueryAndCompareSchemasReachProvider() {
+        var projects=new com.smart.agent.tool.project.ProjectReferenceResolver(new com.smart.agent.tool.project.LocalProjectBusinessClient());
+        var query=new com.smart.agent.tool.funding.ProjectFundingQueryTool((context,input)->null,projects);
+        var compare=new com.smart.agent.tool.funding.ProjectFundingCompareTool((context,input)->null,projects);
+        AtomicReference<ChatRequest> captured=new AtomicReference<>();
+        var gateway=capturingModel(captured,handler->handler.onCompleteResponse(response("done",0,0)));
+        var request=new ModelRequest("funding-schema","v1",List.of(new ModelRequest.ConversationMessage("user","项目垫资比较")),
+                List.of(new ModelRequest.AllowedToolSpecification(query.key(),query.description(),query.argumentsSchemaJson()),
+                        new ModelRequest.AllowedToolSpecification(compare.key(),compare.description(),compare.argumentsSchemaJson())),List.of(),ModelRequest.ToolUseMode.REQUIRED);
+        assertThat(eventsOf(gateway,request)).anyMatch(ModelEvent.Completed.class::isInstance);
+        assertThat(captured.get().toolSpecifications().getFirst().parameters().properties()).containsKeys("metric","dateField");
+        assertThat(captured.get().toolSpecifications().getLast().parameters().properties()).containsKeys("current","baseline");
+    }
+    @Test void budgetCostSchemaReachesTheProvider() {
+        var query=new com.smart.agent.tool.budget.BudgetCostQueryTool((context,input)->null,
+                new com.smart.agent.tool.project.ProjectReferenceResolver(new com.smart.agent.tool.project.LocalProjectBusinessClient()));
+        var compare=new com.smart.agent.tool.budget.BudgetCostCompareTool((context,input)->null,
+                new com.smart.agent.tool.project.ProjectReferenceResolver(new com.smart.agent.tool.project.LocalProjectBusinessClient()));
+        AtomicReference<ChatRequest> captured=new AtomicReference<>();
+        var gateway=capturingModel(captured,handler->handler.onCompleteResponse(response("done",0,0)));
+        var request=new ModelRequest("budget-schema","v1",List.of(new ModelRequest.ConversationMessage("user","预算成本")),
+                List.of(new ModelRequest.AllowedToolSpecification(query.key(),query.description(),query.argumentsSchemaJson()),
+                        new ModelRequest.AllowedToolSpecification(compare.key(),compare.description(),compare.argumentsSchemaJson())),List.of(),ModelRequest.ToolUseMode.REQUIRED);
+        assertThat(eventsOf(gateway,request)).anyMatch(ModelEvent.Completed.class::isInstance);
+        assertThat(captured.get().toolSpecifications().getFirst().parameters().properties()).containsKeys("projectNameMatch","dateField","mode");
+        assertThat(captured.get().toolSpecifications().getLast().parameters().properties()).containsKeys("current","baseline");
+    }
+    @Test void costContractQuerySchemaReachesTheProvider() {
+        var query = new com.smart.agent.tool.cost.CostContractQueryTool((context,input)->null,
+                new com.smart.agent.tool.project.ProjectReferenceResolver(new com.smart.agent.tool.project.LocalProjectBusinessClient()));
+        var compare = new com.smart.agent.tool.cost.CostContractCompareTool((context,input)->null,
+                new com.smart.agent.tool.project.ProjectReferenceResolver(new com.smart.agent.tool.project.LocalProjectBusinessClient()));
+        AtomicReference<ChatRequest> captured=new AtomicReference<>();
+        var gateway=capturingModel(captured,handler->handler.onCompleteResponse(response("done",0,0)));
+        var request=new ModelRequest("cost-schema","v1",List.of(new ModelRequest.ConversationMessage("user","合同成本")),
+                List.of(new ModelRequest.AllowedToolSpecification(query.key(),query.description(),query.argumentsSchemaJson()),
+                        new ModelRequest.AllowedToolSpecification(compare.key(),compare.description(),compare.argumentsSchemaJson())),
+                List.of(),ModelRequest.ToolUseMode.REQUIRED);
+        assertThat(eventsOf(gateway,request)).anyMatch(ModelEvent.Completed.class::isInstance);
+        assertThat(captured.get().toolSpecifications().getFirst().parameters().properties()).containsKeys("source","dateField");
+        assertThat(captured.get().toolSpecifications().getLast().parameters().properties()).containsKeys("current","baseline");
+    }
     @Test void invoiceApplicationToolsReachProviderAndKeepApplicationAmountSemantics() {
         var query = new com.smart.agent.tool.invoice.InvoiceApplicationQueryTool((context, input) -> null,
                 new com.smart.agent.tool.project.ProjectReferenceResolver(new com.smart.agent.tool.project.LocalProjectBusinessClient()));

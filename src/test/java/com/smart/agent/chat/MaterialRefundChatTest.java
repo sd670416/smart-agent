@@ -165,6 +165,12 @@ class MaterialRefundChatTest {
             }
             public ProjectQueryResult query(ToolContext context, MaterialRefundQueryInput input) {
             queries.add(input);
+            if ("items".equals(input.mode())) return new ProjectQueryResult("detail", input.page(), input.pageSize(),
+                    2L, input.page() == 1, List.of(), List.of(Map.of("requestId", input.requestId() == null ? "r1" : input.requestId(),
+                    "projectId", "p1", "itemId", "d" + input.page(), "refundAmount", new java.math.BigDecimal("20.02"))), List.of());
+            if ("detail".equals(input.mode()) && input.requestId() != null) return new ProjectQueryResult("detail", input.page(), input.pageSize(),
+                    1L, false, List.of(), List.of(Map.of("requestId", input.requestId(), "projectId", "p1", "registrationCode", "TH-001",
+                    "returnReason", "规格不符", "remarks", "主单备注", "refundAmount", new java.math.BigDecimal("100.01"))), List.of());
             if ("detail".equals(input.mode())) return new ProjectQueryResult("detail", input.page(), input.pageSize(),
                     2L, false, List.of(), List.of(Map.of("requestId", "r1", "projectId", "p1", "registrationCode", "FK-001"),
                     Map.of("requestId", "r2", "projectId", "p1", "registrationCode", "FK-002")), List.of());
@@ -200,6 +206,38 @@ class MaterialRefundChatTest {
 
     private boolean hasCurrentResult(ModelRequest request) {
         return request.redactedConversationMessages().stream().anyMatch(ModelRequest.ToolResultMessage.class::isInstance);
+    }
+
+    @Test void documentItemsPagingAndReturnPreserveRealParentAndReturnPeriodWithLiveQueries() {
+        ChatOrchestrator chat = orchestrator(request -> {
+            if (hasCurrentResult(request)) return Flux.just(new ModelEvent.Completed("本轮材料退货退款查询完成", 1, 1));
+            int turn = queries.size();
+            if (turn == 1) assertThat(request.redactedConversationMessages().toString()).contains("trusted-material-refund-references", "r1");
+            if (turn == 3 || turn == 4) assertThat(request.redactedConversationMessages().toString())
+                    .contains("trusted-material-refund-items", "requestId=r1", "returnDate", "2026-01-31")
+                    .doesNotContain("trusted-material-refund-references:");
+            String args = switch (turn) {
+                case 0 -> "{\"mode\":\"detail\",\"page\":2";
+                case 1 -> "{\"mode\":\"detail\",\"requestId\":\"r1\",\"page\":2";
+                case 2 -> "{\"mode\":\"items\",\"requestId\":\"r1\",\"pageSize\":1";
+                case 3 -> "{\"mode\":\"items\",\"requestId\":\"r1\",\"page\":2,\"pageSize\":1";
+                default -> "{\"mode\":\"detail\",\"requestId\":\"r1\",\"page\":2";
+            };
+            args += ",\"dateField\":\"returnDate\",\"startDate\":\"2026-01-01\",\"endDate\":\"2026-01-31\"}";
+            return Flux.just(new ModelEvent.ToolRequested("q", "materialRefund.query", args));
+        });
+        for (String question : List.of("按退货时间查询2026年1月材料退货退款第2页", "查看第一单详情", "看这单材料明细，每页1条", "下一页", "返回这张退货退款单详情")) {
+            var events = chat.stream(new ChatCommand(conversationId, question, null), user, "trace").collectList().block();
+            assertThat(events).noneMatch(e -> "error".equals(e.type()));
+            assertThat(events.toString()).contains("本轮材料退货退款查询完成");
+        }
+        assertThat(queries).hasSize(5);
+        assertThat(queries.subList(1, 5)).extracting(MaterialRefundQueryInput::requestId).containsOnly("r1");
+        assertThat(queries).extracting(MaterialRefundQueryInput::dateField).containsOnly("returnDate");
+        assertThat(queries).extracting(MaterialRefundQueryInput::endDate).containsOnly("2026-01-31");
+        assertThat(queries.get(1).page()).isEqualTo(1); assertThat(queries.get(3).page()).isEqualTo(2);
+        assertThat(queries.get(4).page()).isEqualTo(1); assertThat(queries.get(4).mode()).isEqualTo("detail");
+        assertThat(requests.getLast().redactedConversationMessages().toString()).contains("规格不符", "100.01");
     }
 
     @Test void listFollowUpProvidesScopedRequestReferencesAndRefreshesSelectedItems() {

@@ -1,0 +1,74 @@
+Access is denied.
+[ERROR] Tests run: 3, Failures: 3, Errors: 0, Skipped: 0, Time elapsed: 0.184 s <<< FAILURE! -- in com.smart.agent.tool.cost.CostContractCompareTest
+[ERROR] com.smart.agent.tool.cost.CostContractCompareTest.eachMissingSourcePermissionStopsBeforeProjectOrBusinessRead -- Time elapsed: 0.047 s <<< FAILURE!
+java.lang.AssertionError: Cost comparison tool missing
+	at com.smart.agent.tool.cost.CostContractCompareTest.tool(CostContractCompareTest.java:17)
+	at com.smart.agent.tool.cost.CostContractCompareTest.eachMissingSourcePermissionStopsBeforeProjectOrBusinessRead(CostContractCompareTest.java:20)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+Caused by: java.lang.ClassNotFoundException: com.smart.agent.tool.cost.CostContractCompareTool
+	at java.base/jdk.internal.loader.BuiltinClassLoader.loadClass(BuiltinClassLoader.java:641)
+	at java.base/jdk.internal.loader.ClassLoaders$AppClassLoader.loadClass(ClassLoaders.java:188)
+	at java.base/java.lang.ClassLoader.loadClass(ClassLoader.java:526)
+	at java.base/java.lang.Class.forName0(Native Method)
+	at java.base/java.lang.Class.forName(Class.java:421)
+	at java.base/java.lang.Class.forName(Class.java:412)
+	at com.smart.agent.tool.cost.CostContractCompareTest.tool(CostContractCompareTest.java:14)
+	... 4 more
+
+[ERROR] com.smart.agent.tool.cost.CostContractCompareTest.costDomainExposesComparisonAsSameBusinessModule -- Time elapsed: 0.098 s <<< FAILURE!
+java.lang.AssertionError: 
+
+Expecting List12:
+  ["costContract.query", "costContract.clarifyDate"]
+to contain:
+  ["costContract.compare"]
+but could not find the following element(s):
+  ["costContract.compare"]
+
+	at com.smart.agent.tool.cost.CostContractCompareTest.costDomainExposesComparisonAsSameBusinessModule(CostContractCompareTest.java:43)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+
+[ERROR] com.smart.agent.tool.cost.CostContractCompareTest.requiresTwoAllSourceCurrentGroupsAndRejectsHistoricalComparison -- Time elapsed: 0.003 s <<< FAILURE!
+java.lang.AssertionError: Current contract comparison input missing
+	at com.smart.agent.tool.cost.CostContractCompareTest.input(CostContractCompareTest.java:31)
+	at com.smart.agent.tool.cost.CostContractCompareTest.requiresTwoAllSourceCurrentGroupsAndRejectsHistoricalComparison(CostContractCompareTest.java:35)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+Caused by: java.lang.ClassNotFoundException: com.smart.agent.tool.cost.CostContractCompareInput
+	at java.base/jdk.internal.loader.BuiltinClassLoader.loadClass(BuiltinClassLoader.java:641)
+	at java.base/jdk.internal.loader.ClassLoaders$AppClassLoader.loadClass(ClassLoaders.java:188)
+	at java.base/java.lang.ClassLoader.loadClass(ClassLoader.java:526)
+	at java.base/java.lang.Class.forName0(Native Method)
+	at java.base/java.lang.Class.forName(Class.java:421)
+	at java.base/java.lang.Class.forName(Class.java:412)
+	at com.smart.agent.tool.cost.CostContractCompareTest.input(CostContractCompareTest.java:30)
+	... 4 more
+
+[ERROR] Failures: 
+[ERROR]   CostContractCompareTest.costDomainExposesComparisonAsSameBusinessModule:43 
+Expecting List12:
+  ["costContract.query", "costContract.clarifyDate"]
+to contain:
+  ["costContract.compare"]
+but could not find the following element(s):
+  ["costContract.compare"]
+
+[ERROR]   CostContractCompareTest.eachMissingSourcePermissionStopsBeforeProjectOrBusinessRead:20->tool:17 Cost comparison tool missing
+[ERROR]   CostContractCompareTest.requiresTwoAllSourceCurrentGroupsAndRejectsHistoricalComparison:35->input:31 Current contract comparison input missing
+[ERROR] Tests run: 3, Failures: 3, Errors: 0, Skipped: 0
+[ERROR] Failed to execute goal org.apache.maven.plugins:maven-surefire-plugin:3.5.6:test (default-test) on project smart-agent: There are test failures.
+[ERROR] 
+[ERROR] See F:\project\gongcheng\agent\target\surefire-reports for the individual test results.
+[ERROR] See dump files (if any exist) [date].dump, [date]-jvmRun[N].dump and [date].dumpstream.
+[ERROR] -> [Help 1]
+[ERROR] 
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR] 
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException

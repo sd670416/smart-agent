@@ -475,7 +475,7 @@ public class ChatOrchestrator {
                             || "PROJECT_RECEIPTS".equals(domainCode)
                             && java.util.Set.of("date:projectCreateDate", "date:createDate", "date:receivedDate").contains(selection.optionId());
                     if (!validDate) throw clarificationFailure();
-                    if (java.util.Set.of("PROJECT_PROGRESS", "COMPANY_OPERATING", "PROJECT_FUNDING",
+                    if (java.util.Set.of("PROJECT_PROGRESS", "COMPANY_OPERATING", "COST_CONTRACT", "PROJECT_FUNDING",
                             "BUDGET_COST", "PROJECT_PROFIT").contains(domainCode))
                         progressDateSelection = selection.optionId();
                     effectiveQuestion += ("PROJECT_PROGRESS".equals(domainCode) || "COMPANY_OPERATING".equals(domainCode) || "COST_CONTRACT".equals(domainCode) || "PROJECT_FUNDING".equals(domainCode) || "BUDGET_COST".equals(domainCode) || "PROJECT_PROFIT".equals(domainCode)) && "date:allProjectDates".equals(selection.optionId())
@@ -506,7 +506,7 @@ public class ChatOrchestrator {
                             + queryIntentResolver.domain(domainCode).orElseThrow().name() + "]";
                 }
                 if ("COMPARISON_PROJECT_REFERENCE".equals(intent.path("ambiguityType").asText())) {
-                    if (!java.util.Set.of("PROJECT_RECEIPTS", "CONSTRUCTION_CONTRACT", "PROJECT_OUTPUT", "PAYMENT_REQUEST", "OTHER_PAYMENT_REQUEST", "PROJECT_REIMBURSE", "MATERIAL_REFUND").contains(domainCode) || !intent.path("queryArguments").isObject())
+                    if (!java.util.Set.of("PROJECT_RECEIPTS", "CONSTRUCTION_CONTRACT", "PROJECT_OUTPUT", "PAYMENT_REQUEST", "OTHER_PAYMENT_REQUEST", "PROJECT_REIMBURSE", "MATERIAL_REFUND", "COST_CONTRACT", "BUDGET_COST", "PROJECT_FUNDING").contains(domainCode) || !intent.path("queryArguments").isObject())
                         throw clarificationFailure();
                     String[] parts = selection.optionId().split(":", 3);
                     if (parts.length != 3 || !java.util.Set.of("current", "baseline").contains(parts[0])
@@ -1004,7 +1004,7 @@ public class ChatOrchestrator {
                         .append("查询，只能调用 ").append(String.join("、", additionalQueryDomain.toolKeys()))
                         .append("；相对日期先调用 system.current_time。每轮事实查询必须重新取数，历史结果仅用于理解条件。"
                                 + "日期维度不明确时调用该业务域的确认工具追问，不得自行假定。]");
-                if (java.util.Set.of("COMPANY_OPERATING", "PROJECT_FUNDING", "BUDGET_COST", "PROJECT_PROFIT")
+                if (java.util.Set.of("COMPANY_OPERATING", "PROJECT_PROFIT")
                         .contains(additionalQueryDomain.code())) {
                     safe.append("\n[trusted-cumulative-date: 这些指标仅支持按项目创建期间选择项目后的当前累计值。"
                             + "用户说某年、某月、期间发生、截至历史日期、历史余额或同比环比时，不能默认为项目创建日期，"
@@ -1012,6 +1012,18 @@ public class ChatOrchestrator {
                             + "先调用本域clarifyDate说明能力限制，让用户确认是否改查所选项目的当前累计值。"
                             + "用户明确说这段时间创建的项目时才使用projectCreateDate；保留项目、公司和指标等其他条件。"
                             + "回复用业务语言说明是这些项目当前的累计数据，不输出技术字段名。]");
+                }
+                if ("BUDGET_COST".equals(additionalQueryDomain.code())) {
+                    safe.append("\n[trusted-current-budget-date: 预算仅支持按项目创建范围选择项目后的当前合并预算。"
+                            + "某年/月不得自动解释为项目创建日期，期间新增预算、历史快照、同比环比仍不支持；先clarifyDate说明并确认替代查询。"
+                            + "明确比较两组项目当前预算时可以直接调用budgetCost.compare；两组条件、日期含义或指代不明确先追问。"
+                            + "不把当前合并预算称为历史期间预算，最终回复使用中文业务名称。]");
+                }
+                if ("PROJECT_FUNDING".equals(additionalQueryDomain.code())) {
+                    safe.append("\n[trusted-current-funding-date: 付款与垫资仅支持按项目创建范围选择项目后的当前累计数据。"
+                            + "某年/月不得自动解释为项目创建日期，期间收支、历史余额、同比环比仍不支持；先clarifyDate说明并确认替代查询。"
+                            + "明确比较两组项目当前累计付款、净付款或垫资时使用projectFunding.compare，两组必须同一指标；组别、日期含义或指代不明确先追问。"
+                            + "垫资逐项目扣减收入并将负值归零后汇总，不允许跨项目盈余抵消；不把当前累计数据称为历史余额。]");
                 }
             } else if (requiresFreshBoardData) {
                 safe.append("\n[trusted-routing: 本轮是看板查询，只能调用 board.query、board.compare 或 board.detail；不得调用 project.query，也不要返回项目菜单权限提示]");
@@ -1063,6 +1075,19 @@ public class ChatOrchestrator {
                             "[trusted-query-context: 上一次" + additionalQueryDomain.name() + "查询条件=" + arguments
                                     + "。仅用于追问时继承用户未更改的筛选条件和分页；当前提问明确的新条件优先。"
                                     + "历史结果不可作为本轮数据，必须重新调用工具。]"));
+                    if ("COST_CONTRACT".equals(additionalQueryDomain.code()) && arguments.path("current").isObject()
+                            && arguments.path("baseline").isObject()) {
+                        var sources = objectMapper.createArrayNode();
+                        for (String source : java.util.List.of("material", "labor", "machine", "major", "other"))
+                            if (context.permissions().contains("menu:cost-contract:" + source)) sources.add(source);
+                        messages.add(new ModelRequest.ConversationMessage("user", "[trusted-cost-contract-comparison: 第一组条件="
+                                + arguments.path("current") + "，第二组条件=" + arguments.path("baseline")
+                                + "，当前可用合同类别=" + sources
+                                + "。这是所选项目当前合同结构，不是两个历史期间。查看类别明细必须先确定第一组或第二组，"
+                                + "组别不明确先追问；costContract.query使用detail及对应真实source，保留所选组真实项目、合同名称和项目创建日期条件。"
+                                + "清除comparisonType/current/baseline结构并重新查询，不能从历史数量或金额计算。"
+                                + "下一页继续保留所选组条件。重新比较必须调用costContract.compare取两组最新数据。]"));
+                    }
                     if ("COMPANY_OPERATING".equals(additionalQueryDomain.code())) {
                         var references = objectMapper.createArrayNode();
                         int position = 0;
@@ -1079,7 +1104,26 @@ public class ChatOrchestrator {
                                 + savedQuery.path("result").path("page").asInt(1) + "页，查询方式=" + arguments.path("mode").asText("summary")
                                 + "，定位信息=" + references + "。序号只用于定位，使用真实companyId或projectId重新查询；历史公司范围由接口按当前权限重新校验。指代不清先确认。]"));
                     }
-                    if (("PROJECT_PROGRESS".equals(additionalQueryDomain.code()) || "PROJECT_FUNDING".equals(additionalQueryDomain.code()) || "BUDGET_COST".equals(additionalQueryDomain.code()) || "PROJECT_PROFIT".equals(additionalQueryDomain.code())) && "detail".equals(arguments.path("mode").asText("detail"))) {
+                    if ("PROJECT_FUNDING".equals(additionalQueryDomain.code()) && arguments.path("current").isObject()
+                            && arguments.path("baseline").isObject()) {
+                        messages.add(new ModelRequest.ConversationMessage("user", "[trusted-project-funding-comparison: 第一组条件="
+                                + arguments.path("current") + "，第二组条件=" + arguments.path("baseline")
+                                + "。仅用于理解条件，不是当前金额；组别不明确先追问。查看某组项目列表用projectFunding.query detail，"
+                                + "保留所选组真实项目、名称包含条件、metric及项目创建日期，清除comparisonType/current/baseline后实时重查。"
+                                + "下一页继续保留条件；从可信列表按真实projectId查看项目分项。重新比较必须projectFunding.compare重新读取两组，不能复用历史金额。"
+                                + "日期只选择项目，不是期间收支或历史余额；比较行不是项目列表。]"));
+                    }
+                    if ("BUDGET_COST".equals(additionalQueryDomain.code()) && arguments.path("current").isObject()
+                            && arguments.path("baseline").isObject()) {
+                        messages.add(new ModelRequest.ConversationMessage("user", "[trusted-budget-cost-comparison: 第一组条件="
+                                + arguments.path("current") + "，第二组条件=" + arguments.path("baseline")
+                                + "。仅用于理解条件，不是当前金额；组别不明确先追问。查看所选组项目列表使用budgetCost.query detail，"
+                                + "保留该组真实项目、名称包含条件及项目创建日期，清除comparisonType/current/baseline结构后实时重查。"
+                                + "再从可信列表真实projectId定位单个项目，使用items查询预算成本行；名称或序号不是项目ID。"
+                                + "下一页继续保留条件；重新比较必须budgetCost.compare重新读取两组。日期只选项目，不是历史预算快照。]"));
+                    }
+                    if (("PROJECT_PROGRESS".equals(additionalQueryDomain.code()) || "PROJECT_FUNDING".equals(additionalQueryDomain.code()) || "BUDGET_COST".equals(additionalQueryDomain.code()) || "PROJECT_PROFIT".equals(additionalQueryDomain.code()))
+                            && !arguments.path("current").isObject() && "detail".equals(arguments.path("mode").asText("detail"))) {
                         var references = objectMapper.createArrayNode();
                         int position = 0;
                         for (JsonNode row : savedQuery.path("result").path("rows")) {
@@ -1116,7 +1160,25 @@ public class ChatOrchestrator {
                                 + "继续查收入明细使用otherIncomeRegistration.query、items和同一registrationId，仅分页时调整页码并保留已确认筛选；"
                                 + "返回这笔登记详情用detail和同一registrationId。每轮重新查询；指代不清先追问，不从一页明细计算整单合计。]"));
                     }
-                    if ("CONSTRUCTION_CONTRACT".equals(additionalQueryDomain.code()) && "detail".equals(arguments.path("mode").asText("detail"))) {
+                    if ("CONSTRUCTION_CONTRACT".equals(additionalQueryDomain.code())
+                            && "projectType".equals(arguments.path("current").path("groupBy").asText())) {
+                        var references = objectMapper.createArrayNode();
+                        var seenTypes = new java.util.HashSet<String>();
+                        for (JsonNode row : savedQuery.path("result").path("rows")) {
+                            String type = row.path("projectType").asText();
+                            if (!type.isBlank() && seenTypes.add(type) && references.size() < 100)
+                                references.addObject().put("projectType", type).put("projectTypeName", row.path("projectTypeName").asText());
+                        }
+                        JsonNode periods = savedQuery.path("result").path("appliedFilters").path(0);
+                        messages.add(new ModelRequest.ConversationMessage("user", "[trusted-construction-contract-types: 上次类型定位="
+                                + references + "，服务端实际本期条件=" + periods.path("current")
+                                + "，服务端实际对比期条件=" + periods.path("baseline")
+                                + "。仅用于理解指代，不是本轮数据或授权；查看类型明细须确认本期或对比期，指代不明确先追问。"
+                                + "用constructionContract.query、detail、真实projectType，清除groupBy，保留所选期项目、合同名称及日期后实时重查。"
+                                + "自动同比/环比的对比期按上述服务端实际日期，不沿用本期日期。未列出的类型不猜编码。]"));
+                    }
+                    if ("CONSTRUCTION_CONTRACT".equals(additionalQueryDomain.code()) && !arguments.has("current")
+                            && "detail".equals(arguments.path("mode").asText("detail"))) {
                         var references = objectMapper.createArrayNode();
                         int position = 0;
                         for (JsonNode row : savedQuery.path("result").path("rows")) {
@@ -1201,6 +1263,27 @@ public class ChatOrchestrator {
                                 + "继续查看或翻页使用paymentRequest.query、items，保留已确认的requestId及项目、日期、单号筛选；"
                                 + "返回这笔申请单详情用detail和同一requestId。未限定主单时不能凭明细序号猜测主单，指代不清先追问。"
                                 + "每轮实时查询，不从一页明细计算全部金额；改查全列表或全量合计应清除单笔requestId。]"));
+                    }
+                    if ("OTHER_PAYMENT_REQUEST".equals(additionalQueryDomain.code()) && "items".equals(arguments.path("mode").asText())) {
+                        messages.add(new ModelRequest.ConversationMessage("user", "[trusted-other-payment-request-items: 当前其他付款明细所属申请主单requestId="
+                                + arguments.path("requestId").asText() + "。明细itemId不是主单ID。继续明细或翻页用otherPaymentRequest.query、items，"
+                                + "保留已确认主单、项目、单号、日期条件，仅翻页时调整页码；返回这笔申请用detail和同一requestId，仍保留日期。"
+                                + "paymentDate实际付款时间筛选仅返回区间内明细及金额，主单详情也不是整单金额；不能自动移除日期扩大范围。"
+                                + "未限定主单时不能从明细序号猜测，指代不清先追问。每轮实时查询，不从单页算总额；改查全列表或summary须清除单笔requestId。]"));
+                    }
+                    if ("MATERIAL_REFUND".equals(additionalQueryDomain.code()) && "items".equals(arguments.path("mode").asText())) {
+                        messages.add(new ModelRequest.ConversationMessage("user", "[trusted-material-refund-items: 当前材料明细所属退货退款主单requestId="
+                                + arguments.path("requestId").asText() + "。itemId不是主单ID。继续明细或翻页用materialRefund.query、items，"
+                                + "保留已确认主单、项目、单号和日期，仅翻页调整页码；返回这张单据用detail和同一requestId，仍保留筛选。"
+                                + "returnDate退货时间先筛明细，主单详情也只含期间金额，不能自动移除日期扩大为整单；不使用主表历史累计金额，不代表实际到账。"
+                                + "未限定主单时不能从明细序号猜测，指代不明先追问。每轮实时查询，不从单页算总额；改查全列表或summary须清除单笔requestId。]"));
+                    }
+                    if ("PROJECT_REIMBURSE".equals(additionalQueryDomain.code()) && "items".equals(arguments.path("mode").asText())) {
+                        messages.add(new ModelRequest.ConversationMessage("user", "[trusted-project-reimburse-items: 当前费用明细所属报销主单requestId="
+                                + arguments.path("requestId").asText() + "。明细itemId不是报销主单ID。继续明细或翻页用projectReimburse.query、items，"
+                                + "保留已确认的主单、项目、单号及日期条件，仅翻页时调整页码；返回这张报销单用detail和同一requestId，仍保留筛选。"
+                                + "同单可能跨多个项目，金额仅为当前有权且符合条件的费用小计，不能扩大到隐藏项目或使用整单金额；报销金额不是实际付款。"
+                                + "未限定主单时不能从明细序号猜测，指代不清先追问。每轮实时查询，不从单页算总额；改查全列表或summary须清除单笔requestId。]"));
                     }
                 } catch (java.io.IOException exception) {
                     throw new IllegalStateException("Invalid query context", exception);
@@ -1754,15 +1837,24 @@ public class ChatOrchestrator {
                 }
                 if (isProjectScopedQueryTool(request.toolKey()) && projectClarificationArguments != null)
                     input = projectClarificationArguments.deepCopy();
-                if (java.util.Set.of("projectProgress.query", "companyOperating.query", "projectFunding.query",
+                if (java.util.Set.of("projectProgress.query", "companyOperating.query", "costContract.query", "projectFunding.query",
                         "budgetCost.query", "projectProfit.query").contains(request.toolKey()) && progressDateSelection != null) {
                     var confirmed = (com.fasterxml.jackson.databind.node.ObjectNode) input;
                     if ("date:allProjectDates".equals(progressDateSelection))
                         confirmed.remove(java.util.List.of("dateField", "startDate", "endDate"));
                     else confirmed.put("dateField", "projectCreateDate");
                 }
-                if (java.util.Set.of("projectReceipts.compare", "constructionContract.compare", "projectOutput.compare", "paymentRequest.compare", "otherPaymentRequest.compare", "projectReimburse.compare", "materialRefund.compare").contains(request.toolKey()) && comparisonClarificationArguments != null)
+                if (java.util.Set.of("projectReceipts.compare", "constructionContract.compare", "projectOutput.compare", "paymentRequest.compare", "otherPaymentRequest.compare", "projectReimburse.compare", "materialRefund.compare", "costContract.compare", "budgetCost.compare", "projectFunding.compare").contains(request.toolKey()) && comparisonClarificationArguments != null)
                     input = comparisonClarificationArguments.deepCopy();
+                if (java.util.Set.of("costContract.compare", "budgetCost.compare", "projectFunding.compare").contains(request.toolKey()) && progressDateSelection != null) {
+                    for (String groupName : java.util.List.of("current", "baseline")) {
+                        if (!input.path(groupName).isObject()) continue;
+                        var group = (com.fasterxml.jackson.databind.node.ObjectNode) input.path(groupName);
+                        if ("date:allProjectDates".equals(progressDateSelection))
+                            group.remove(java.util.List.of("dateField", "startDate", "endDate"));
+                        else group.put("dateField", "projectCreateDate");
+                    }
+                }
                 final JsonNode executionInput = input;
                 String normalizedArguments = objectMapper.writeValueAsString(input);
                 String toolSubject = permissionSubjectForTool(request.toolKey(), input);
@@ -1864,7 +1956,7 @@ public class ChatOrchestrator {
                             }
                         }
                     }
-                    if (java.util.Set.of("projectReceipts.compare", "constructionContract.compare", "projectOutput.compare", "paymentRequest.compare", "otherPaymentRequest.compare", "projectReimburse.compare", "materialRefund.compare").contains(request.toolKey())
+                    if (java.util.Set.of("projectReceipts.compare", "constructionContract.compare", "projectOutput.compare", "paymentRequest.compare", "otherPaymentRequest.compare", "projectReimburse.compare", "materialRefund.compare", "costContract.compare", "budgetCost.compare", "projectFunding.compare").contains(request.toolKey())
                             && result instanceof com.smart.agent.tool.project.ProjectQueryResult queryResult) {
                         for (var filter : queryResult.appliedFilters()) {
                             String groupName = String.valueOf(filter.get("comparisonGroup"));

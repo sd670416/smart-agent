@@ -22,6 +22,9 @@ public record MaterialRefundQueryInput(String projectId, String projectName, Str
         page = page == null ? 1 : page; pageSize = pageSize == null ? 20 : pageSize;
         if (!Set.of("detail", "items", "summary").contains(mode)) throw new IllegalArgumentException("Unsupported mode");
         if (page < 1 || pageSize < 1 || pageSize > 100) throw new IllegalArgumentException("Invalid pagination");
+        if (requestId != null && "summary".equals(mode))
+            throw new IllegalArgumentException("Summary cannot inherit a single request ID");
+        if (requestId != null && "detail".equals(mode)) page = 1;
         if (dateField != null && !Set.of("projectCreateDate", "createDate", "returnDate").contains(dateField))
             throw new IllegalArgumentException("Unsupported date field");
         if (startDate != null || endDate != null) {

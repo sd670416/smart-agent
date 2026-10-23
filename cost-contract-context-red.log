@@ -1,0 +1,64 @@
+Access is denied.
+16:27:02.634 [boundedElastic-1] INFO com.smart.agent.run.AgentRunService -- tool_execution_summary toolKey=costContract.compare risk=L1 outcome=SUCCEEDED durationMillis=177 resultSizeBytes=495
+[ERROR] Tests run: 1, Failures: 0, Errors: 1, Skipped: 0, Time elapsed: 0.992 s <<< FAILURE! -- in com.smart.agent.chat.CostContractChatTest
+[ERROR] com.smart.agent.chat.CostContractChatTest.comparisonContextKeepsBothRealGroupsAndRefreshesSelectedCategoryDetails -- Time elapsed: 0.963 s <<< ERROR!
+reactor.core.Exceptions$ReactiveException: 
+java.lang.AssertionError: 
+Expecting actual:
+  "[ConversationMessage[role=user, content=�Ƚ�������Ŀ��ǰ�����ͬ�ṹ, attachments=[]], ConversationMessage[role=assistant, content=��ǰ��ͬ�����Ѹ���, attachments=[]], ConversationMessage[role=user, content=[trusted-query-context: ��һ�γɱ���ͬ��ѯ����={"comparisonType":"CUSTOM","current":{"projectId":"p1","contractName":"��","dateField":"projectCreateDate"},"baseline":{"projectId":"p2","contractName":"ľ","dateField":"projectCreateDate","startDate":"2026-01-01","endDate":"2026-01-31"}}��������׷��ʱ�̳��û�δ���ĵ�ɸѡ�����ͷ�ҳ����ǰ������ȷ�����������ȡ���ʷ���������Ϊ�������ݣ��������µ��ù��ߡ�], attachments=[]], ConversationMessage[role=user, content=�鿴�ڶ�����Ϻ�ͬ��ϸ
+[trusted-routing: �����ǳɱ���ͬ��ѯ��ֻ�ܵ��� costContract.query��costContract.compare��costContract.clarifyDate����������ȵ��� system.current_time��ÿ����ʵ��ѯ��������ȡ������ʷ�����������������������ά�Ȳ���ȷʱ���ø�ҵ�����ȷ�Ϲ���׷�ʣ��������мٶ���], attachments=[]]]"
+to contain:
+  ["trusted-cost-contract-comparison", "p2", "2026-01-31", "ľ"]
+but could not find:
+  ["trusted-cost-contract-comparison"]
+ 
+	at reactor.core.Exceptions.propagate(Exceptions.java:410)
+	at reactor.core.publisher.BlockingSingleSubscriber.blockingGet(BlockingSingleSubscriber.java:102)
+	at reactor.core.publisher.Mono.block(Mono.java:1779)
+	at com.smart.agent.chat.CostContractChatTest.comparisonContextKeepsBothRealGroupsAndRefreshesSelectedCategoryDetails(CostContractChatTest.java:64)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+	Suppressed: java.lang.Exception: #block terminated with an error
+		at reactor.core.publisher.BlockingSingleSubscriber.blockingGet(BlockingSingleSubscriber.java:104)
+		... 5 more
+Caused by: java.lang.AssertionError: 
+Expecting actual:
+  "[ConversationMessage[role=user, content=�Ƚ�������Ŀ��ǰ�����ͬ�ṹ, attachments=[]], ConversationMessage[role=assistant, content=��ǰ��ͬ�����Ѹ���, attachments=[]], ConversationMessage[role=user, content=[trusted-query-context: ��һ�γɱ���ͬ��ѯ����={"comparisonType":"CUSTOM","current":{"projectId":"p1","contractName":"��","dateField":"projectCreateDate"},"baseline":{"projectId":"p2","contractName":"ľ","dateField":"projectCreateDate","startDate":"2026-01-01","endDate":"2026-01-31"}}��������׷��ʱ�̳��û�δ���ĵ�ɸѡ�����ͷ�ҳ����ǰ������ȷ�����������ȡ���ʷ���������Ϊ�������ݣ��������µ��ù��ߡ�], attachments=[]], ConversationMessage[role=user, content=�鿴�ڶ�����Ϻ�ͬ��ϸ
+[trusted-routing: �����ǳɱ���ͬ��ѯ��ֻ�ܵ��� costContract.query��costContract.compare��costContract.clarifyDate����������ȵ��� system.current_time��ÿ����ʵ��ѯ��������ȡ������ʷ�����������������������ά�Ȳ���ȷʱ���ø�ҵ�����ȷ�Ϲ���׷�ʣ��������мٶ���], attachments=[]]]"
+to contain:
+  ["trusted-cost-contract-comparison", "p2", "2026-01-31", "ľ"]
+but could not find:
+  ["trusted-cost-contract-comparison"]
+ 
+	at com.smart.agent.chat.CostContractChatTest.lambda$comparisonContextKeepsBothRealGroupsAndRefreshesSelectedCategoryDetails$0(CostContractChatTest.java:56)
+	at com.smart.agent.chat.ChatOrchestrator$Session.callModel(ChatOrchestrator.java:1373)
+	at com.smart.agent.chat.ChatOrchestrator$Session.start(ChatOrchestrator.java:387)
+	at com.smart.agent.chat.ChatOrchestrator.lambda$stream$0(ChatOrchestrator.java:231)
+	at reactor.core.publisher.FluxCreate.subscribe(FluxCreate.java:97)
+	at reactor.core.publisher.Mono.subscribe(Mono.java:4576)
+	at reactor.core.publisher.Mono.block(Mono.java:1778)
+	... 4 more
+
+[ERROR] Errors: 
+[ERROR]   CostContractChatTest.comparisonContextKeepsBothRealGroupsAndRefreshesSelectedCategoryDetails:64 ? Reactive java.lang.AssertionError: 
+Expecting actual:
+  "[ConversationMessage[role=user, content=�Ƚ�������Ŀ��ǰ�����ͬ�ṹ, attachments=[]], ConversationMessage[role=assistant, content=��ǰ��ͬ�����Ѹ���, attachments=[]], ConversationMessage[role=user, content=[trusted-query-context: ��һ�γɱ���ͬ��ѯ����={"comparisonType":"CUSTOM","current":{"projectId":"p1","contractName":"��","dateField":"projectCreateDate"},"baseline":{"projectId":"p2","contractName":"ľ","dateField":"projectCreateDate","startDate":"2026-01-01","endDate":"2026-01-31"}}��������׷��ʱ�̳��û�δ���ĵ�ɸѡ�����ͷ�ҳ����ǰ������ȷ�����������ȡ���ʷ���������Ϊ�������ݣ��������µ��ù��ߡ�], attachments=[]], ConversationMessage[role=user, content=�鿴�ڶ�����Ϻ�ͬ��ϸ
+[trusted-routing: �����ǳɱ���ͬ��ѯ��ֻ�ܵ��� costContract.query��costContract.compare��costContract.clarifyDate����������ȵ��� system.current_time��ÿ����ʵ��ѯ��������ȡ������ʷ�����������������������ά�Ȳ���ȷʱ���ø�ҵ�����ȷ�Ϲ���׷�ʣ��������мٶ���], attachments=[]]]"
+to contain:
+  ["trusted-cost-contract-comparison", "p2", "2026-01-31", "ľ"]
+but could not find:
+  ["trusted-cost-contract-comparison"]
+ 
+[ERROR] Tests run: 1, Failures: 0, Errors: 1, Skipped: 0
+[ERROR] Failed to execute goal org.apache.maven.plugins:maven-surefire-plugin:3.5.6:test (default-test) on project smart-agent: 
+[ERROR] 
+[ERROR] See F:\project\gongcheng\agent\target\surefire-reports for the individual test results.
+[ERROR] See dump files (if any exist) [date].dump, [date]-jvmRun[N].dump and [date].dumpstream.
+[ERROR] -> [Help 1]
+[ERROR] 
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR] 
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException

@@ -1,0 +1,9 @@
+16:35:46.535 [boundedElastic-1] INFO com.smart.agent.run.AgentRunService -- tool_execution_summary toolKey=costContract.compare risk=L1 outcome=SUCCEEDED durationMillis=66 resultSizeBytes=297
+16:35:46.701 [boundedElastic-1] INFO com.smart.agent.run.AgentRunService -- tool_execution_summary toolKey=costContract.compare risk=L1 outcome=SUCCEEDED durationMillis=8 resultSizeBytes=205
+16:35:46.753 [boundedElastic-2] INFO com.smart.agent.run.AgentRunService -- tool_execution_summary toolKey=costContract.compare risk=L1 outcome=SUCCEEDED durationMillis=7 resultSizeBytes=495
+16:35:46.791 [boundedElastic-1] INFO com.smart.agent.run.AgentRunService -- tool_execution_summary toolKey=costContract.query risk=L1 outcome=SUCCEEDED durationMillis=1 resultSizeBytes=207
+16:35:46.802 [boundedElastic-2] INFO com.smart.agent.run.AgentRunService -- tool_execution_summary toolKey=costContract.query risk=L1 outcome=SUCCEEDED durationMillis=0 resultSizeBytes=208
+16:35:46.821 [boundedElastic-1] INFO com.smart.agent.run.AgentRunService -- tool_execution_summary toolKey=costContract.query risk=L1 outcome=SUCCEEDED durationMillis=6 resultSizeBytes=132
+16:35:46.832 [boundedElastic-2] INFO com.smart.agent.run.AgentRunService -- tool_execution_summary toolKey=costContract.query risk=L1 outcome=SUCCEEDED durationMillis=0 resultSizeBytes=132
+16:35:46.847 [boundedElastic-1] INFO com.smart.agent.run.AgentRunService -- tool_execution_summary toolKey=costContract.clarifyDate risk=L1 outcome=SUCCEEDED durationMillis=3 resultSizeBytes=384
+16:35:46.859 [boundedElastic-1] INFO com.smart.agent.run.AgentRunService -- tool_execution_summary toolKey=costContract.query risk=L1 outcome=SUCCEEDED durationMillis=3 resultSizeBytes=112

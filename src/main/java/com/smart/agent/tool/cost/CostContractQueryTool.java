@@ -22,17 +22,17 @@ public class CostContractQueryTool implements AgentTool<CostContractQueryInput,O
             +"各来源分别校验菜单权限，all必须具备五类权限，缺失来源不得当零。任何类别的占比都必须source=all取完整分母；单类查询不返回全来源占比。金额是合同金额，不是实际付款。"
             +"仅支持项目创建日期范围，日期含义不明确先调用costContract.clarifyDate，不得猜测合同签订日期。项目名称精确匹配，同名先确认。"
             +"查看某一条时使用真实contractId及source组合，不得只用序号。每轮实时调用，不从历史结果计算。待办、已办、我发起使用approval。"
-            +"不支持期间比较；不支持的筛选或多来源部分组合先说明并确认，不能静默扩大查询。";}
+            +"两组当前合同结构比较使用costContract.compare，不支持同比环比或历史金额；不支持的筛选或多来源部分组合先说明并确认，不能静默扩大查询。";}
     @Override public String argumentsSchemaJson(){return """
         {"type":"object","properties":{
         "projectId":{"type":"string","description":"可信真实项目ID"},
         "projectCode":{"type":"string","description":"精确项目编号"},
         "projectName":{"type":"string","description":"精确项目名称，同名追问"},
-        "source":{"type":"string","enum":["all","material","labor","machine","major","other"],"description":"全部五类、材料、劳务、机械、专业分包、其他支出"},
-        "mode":{"type":"string","enum":["summary","detail"]},
+        "source":{"type":"string","description":"仅all全部五类、material材料、labor劳务、machine机械、major专业分包、other其他支出"},
+        "mode":{"type":"string","description":"仅summary全量汇总、detail分页明细"},
         "contractId":{"type":"string","description":"真实合同ID，需同时指定对应source"},
         "contractName":{"type":"string","description":"明确要求名称包含时筛选"},
-        "dateField":{"type":"string","enum":["projectCreateDate"],"description":"仅项目创建日期，含义不清先追问"},
+        "dateField":{"type":"string","description":"仅projectCreateDate项目创建日期，含义不清先追问"},
         "startDate":{"type":"string"},"endDate":{"type":"string"},
         "page":{"type":"integer"},"pageSize":{"type":"integer"}},"additionalProperties":false}
         """;}

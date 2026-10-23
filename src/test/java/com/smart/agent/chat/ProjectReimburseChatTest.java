@@ -152,6 +152,13 @@ class ProjectReimburseChatTest {
             }
             public ProjectQueryResult query(ToolContext context, ProjectReimburseQueryInput input) {
             queries.add(input);
+            if ("items".equals(input.mode())) return new ProjectQueryResult("detail", input.page(), input.pageSize(),
+                    2L, input.page() == 1, List.of(), List.of(Map.of("requestId", input.requestId() == null ? "r1" : input.requestId(),
+                    "projectId", "p1", "itemId", "d" + input.page(), "reimburseAmount", new java.math.BigDecimal("20.02"))), List.of());
+            if ("detail".equals(input.mode()) && input.requestId() != null) return new ProjectQueryResult("detail", input.page(), input.pageSize(),
+                    1L, false, List.of(), List.of(Map.of("requestId", input.requestId(), "projectIds", billProjectIds,
+                    "registrationCode", "BX-001", "reimburseUserName", "张三", "reimburseReason", "现场费用报销",
+                    "reimburseAmount", new java.math.BigDecimal("120.03"))), List.of());
             if ("detail".equals(input.mode())) return new ProjectQueryResult("detail", input.page(), input.pageSize(),
                     2L, false, List.of(), List.of(Map.of("requestId", "r1", "projectIds", billProjectIds, "registrationCode", "FK-001"),
                     Map.of("requestId", "r2", "projectIds", List.of("p1"), "registrationCode", "FK-002")), List.of());
@@ -187,6 +194,40 @@ class ProjectReimburseChatTest {
 
     private boolean hasCurrentResult(ModelRequest request) {
         return request.redactedConversationMessages().stream().anyMatch(ModelRequest.ToolResultMessage.class::isInstance);
+    }
+
+    @Test void documentItemsPagingAndReturnKeepParentAndDatesAndQueryEveryTurn() {
+        ChatOrchestrator chat = orchestrator(request -> {
+            if (hasCurrentResult(request)) return Flux.just(new ModelEvent.Completed("本轮项目报销查询完成", 1, 1));
+            int turn = queries.size();
+            if (turn == 1) assertThat(request.redactedConversationMessages().toString())
+                    .contains("trusted-project-reimburse-references", "r1");
+            if (turn == 3 || turn == 4) assertThat(request.redactedConversationMessages().toString())
+                    .contains("trusted-project-reimburse-items", "requestId=r1", "reimburseDate", "2026-02-02")
+                    .doesNotContain("trusted-project-reimburse-references:");
+            String args = switch (turn) {
+                case 0 -> "{\"mode\":\"detail\",\"page\":2";
+                case 1 -> "{\"mode\":\"detail\",\"requestId\":\"r1\",\"page\":2";
+                case 2 -> "{\"mode\":\"items\",\"requestId\":\"r1\",\"pageSize\":1";
+                case 3 -> "{\"mode\":\"items\",\"requestId\":\"r1\",\"page\":2,\"pageSize\":1";
+                default -> "{\"mode\":\"detail\",\"requestId\":\"r1\",\"page\":2";
+            };
+            args += ",\"dateField\":\"reimburseDate\",\"startDate\":\"2026-02-02\",\"endDate\":\"2026-02-02\"}";
+            return Flux.just(new ModelEvent.ToolRequested("q", "projectReimburse.query", args));
+        });
+        for (String question : List.of("按报销日期查询2026年2月2日项目报销第2页", "查看第一单详情",
+                "看这单费用明细，每页1条", "下一页", "返回这张报销单详情")) {
+            var events = chat.stream(new ChatCommand(conversationId, question, null), user, "trace").collectList().block();
+            assertThat(events).noneMatch(e -> "error".equals(e.type()));
+            assertThat(events.toString()).contains("本轮项目报销查询完成");
+        }
+        assertThat(queries).hasSize(5);
+        assertThat(queries.subList(1, 5)).extracting(ProjectReimburseQueryInput::requestId).containsOnly("r1");
+        assertThat(queries).extracting(ProjectReimburseQueryInput::dateField).containsOnly("reimburseDate");
+        assertThat(queries).extracting(ProjectReimburseQueryInput::endDate).containsOnly("2026-02-02");
+        assertThat(queries.get(1).page()).isEqualTo(1); assertThat(queries.get(3).page()).isEqualTo(2);
+        assertThat(queries.get(4).page()).isEqualTo(1); assertThat(queries.get(4).mode()).isEqualTo("detail");
+        assertThat(requests.getLast().redactedConversationMessages().toString()).contains("现场费用报销", "120.03");
     }
 
     @Test void multiProjectBillReferenceIsNarrowedToCurrentPermissionsBeforeOrdinalFollowUp() {

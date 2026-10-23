@@ -36,7 +36,7 @@ class SmartBootMaterialRefundBusinessClientTest {
     }
 
     @org.junit.jupiter.params.ParameterizedTest
-    @org.junit.jupiter.params.provider.ValueSource(strings={"QUERY","YOY","CUSTOM"})
+    @org.junit.jupiter.params.provider.ValueSource(strings={"QUERY","DOCUMENT","ITEMS","YOY","CUSTOM"})
     void queriesSignedEndpointWithTrustedScopeAndReturnsPreciseAmounts(String mode) throws Exception {
         AtomicReference<String> body = new AtomicReference<>();
         AtomicReference<String> signature = new AtomicReference<>();
@@ -60,15 +60,26 @@ class SmartBootMaterialRefundBusinessClientTest {
             var context = new ToolContext("tenant", "user", "identity", Set.of("role"), Set.of("p2", "p1"), Set.of("menu:material:refund"));
             var input = new MaterialRefundQueryInput("p1", "测试项目", null, "summary", "createDate",
                     "2026-01-01", "2026-01-31", 1, 20);
+            boolean single = "DOCUMENT".equals(mode) || "ITEMS".equals(mode);
+            boolean query = "QUERY".equals(mode) || single;
+            if (single) input = new MaterialRefundQueryInput("p1", null, "TH-001", "ITEMS".equals(mode) ? "items" : "detail",
+                    "returnDate", "2026-01-01", "2026-01-31", 2, 1, null, "exact", "r1");
             var baseline = new MaterialRefundQueryInput("p2",null,null,"summary","createDate","2025-01-01","2025-01-31",1,20);
-            var result = "QUERY".equals(mode) ? client.query(context,input) : client.compare(context,
+            var result = query ? client.query(context,input) : client.compare(context,
                     new MaterialRefundCompareInput(mode,"MONTH",input,"CUSTOM".equals(mode)?baseline:null));
-            String path="/internal/ai/tools/material-refund-"+("QUERY".equals(mode)?"query":"compare");
+            String path="/internal/ai/tools/material-refund-"+(query?"query":"compare");
             assertThat(uri.get()).isEqualTo(path);
             var payload=new ObjectMapper().readTree(body.get());
-            var group="QUERY".equals(mode)?payload:payload.path("current");
+            var group=query?payload:payload.path("current");
             assertThat(group.path("projectIds").get(0).asText()).isEqualTo("p1");
-            assertThat(group.path("dateField").asText()).isEqualTo("createDate");
+            assertThat(group.path("dateField").asText()).isEqualTo(single ? "returnDate" : "createDate");
+            if (single) {
+                assertThat(group.path("requestId").asText()).isEqualTo("r1");
+                assertThat(group.path("registrationCode").asText()).isEqualTo("TH-001");
+                assertThat(group.path("endDate").asText()).isEqualTo("2026-01-31");
+                assertThat(group.path("page").asInt()).isEqualTo("ITEMS".equals(mode) ? 2 : 1);
+                assertThat(group.path("mode").asText()).isEqualTo("ITEMS".equals(mode) ? "items" : "detail");
+            }
             if("CUSTOM".equals(mode)) assertThat(payload.path("baseline").path("projectIds").get(0).asText()).isEqualTo("p2");
             if("YOY".equals(mode)) assertThat(payload.has("baseline")).isFalse();
             assertThat(result.rows().getFirst().get("refundAmount").toString()).isEqualTo("123456789012345.67");

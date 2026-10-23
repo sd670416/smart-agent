@@ -1,0 +1,76 @@
+18:06:28.711 [main] INFO com.smart.agent.tool.budget.SmartBootBudgetCostBusinessClient -- ����Ԥ��ɱ���ѯ����: userId=user, trustedProjectCount=1, mode=summary, page=1, pageSize=20
+18:06:28.874 [main] INFO com.smart.agent.tool.budget.SmartBootBudgetCostBusinessClient -- ����Ԥ��ɱ���ѯ����: userId=user, trustedProjectCount=2, mode=summary, page=1, pageSize=20
+[ERROR] Tests run: 6, Failures: 2, Errors: 1, Skipped: 0, Time elapsed: 1.555 s <<< FAILURE! -- in com.smart.agent.tool.budget.SmartBootBudgetCostBusinessClientTest
+[ERROR] com.smart.agent.tool.budget.SmartBootBudgetCostBusinessClientTest.comparisonSignsItsOwnPathAndCarriesSeparateGroupsWithoutLosingPrecision -- Time elapsed: 0.880 s <<< ERROR!
+java.lang.UnsupportedOperationException: Comparison not implemented
+	at com.smart.agent.tool.budget.BudgetCostBusinessClient.compare(BudgetCostBusinessClient.java:7)
+	at com.smart.agent.tool.budget.SmartBootBudgetCostBusinessClientTest.comparisonSignsItsOwnPathAndCarriesSeparateGroupsWithoutLosingPrecision(SmartBootBudgetCostBusinessClientTest.java:31)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+
+[ERROR] com.smart.agent.tool.budget.SmartBootBudgetCostBusinessClientTest.incompleteBudgetAmountsAreExplainedWithoutCallingThemInvalidFilters -- Time elapsed: 0.022 s <<< FAILURE!
+java.lang.AssertionError: 
+
+Expecting actual throwable to be an instance of:
+  com.smart.agent.common.error.AgentException
+but was:
+  java.lang.UnsupportedOperationException: Comparison not implemented
+	at com.smart.agent.tool.budget.BudgetCostBusinessClient.compare(BudgetCostBusinessClient.java:7)
+	at com.smart.agent.tool.budget.SmartBootBudgetCostBusinessClientTest.lambda$incompleteBudgetAmountsAreExplainedWithoutCallingThemInvalidFilters$5(SmartBootBudgetCostBusinessClientTest.java:56)
+	at org.assertj.core.api.ThrowableAssert.catchThrowable(ThrowableAssert.java:66)
+	...(79 remaining lines not displayed - this can be changed with Assertions.setMaxStackTraceElementsDisplayed)
+	at com.smart.agent.tool.budget.SmartBootBudgetCostBusinessClientTest.incompleteBudgetAmountsAreExplainedWithoutCallingThemInvalidFilters(SmartBootBudgetCostBusinessClientTest.java:57)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+
+[ERROR] com.smart.agent.tool.budget.SmartBootBudgetCostBusinessClientTest.secondGroupOutsideTrustedScopeNeverSendsHttpRequest -- Time elapsed: 0.003 s <<< FAILURE!
+java.lang.AssertionError: 
+
+Expecting actual throwable to be an instance of:
+  java.lang.SecurityException
+but was:
+  java.lang.UnsupportedOperationException: Comparison not implemented
+	at com.smart.agent.tool.budget.BudgetCostBusinessClient.compare(BudgetCostBusinessClient.java:7)
+	at com.smart.agent.tool.budget.SmartBootBudgetCostBusinessClientTest.lambda$secondGroupOutsideTrustedScopeNeverSendsHttpRequest$3(SmartBootBudgetCostBusinessClientTest.java:48)
+	at org.assertj.core.api.ThrowableAssert.catchThrowable(ThrowableAssert.java:66)
+	...(79 remaining lines not displayed - this can be changed with Assertions.setMaxStackTraceElementsDisplayed)
+	at com.smart.agent.tool.budget.SmartBootBudgetCostBusinessClientTest.secondGroupOutsideTrustedScopeNeverSendsHttpRequest(SmartBootBudgetCostBusinessClientTest.java:49)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+
+[ERROR] Failures: 
+[ERROR]   SmartBootBudgetCostBusinessClientTest.incompleteBudgetAmountsAreExplainedWithoutCallingThemInvalidFilters:57 
+Expecting actual throwable to be an instance of:
+  com.smart.agent.common.error.AgentException
+but was:
+  java.lang.UnsupportedOperationException: Comparison not implemented
+	at com.smart.agent.tool.budget.BudgetCostBusinessClient.compare(BudgetCostBusinessClient.java:7)
+	at com.smart.agent.tool.budget.SmartBootBudgetCostBusinessClientTest.lambda$incompleteBudgetAmountsAreExplainedWithoutCallingThemInvalidFilters$5(SmartBootBudgetCostBusinessClientTest.java:56)
+	at org.assertj.core.api.ThrowableAssert.catchThrowable(ThrowableAssert.java:66)
+	...(79 remaining lines not displayed - this can be changed with Assertions.setMaxStackTraceElementsDisplayed)
+[ERROR]   SmartBootBudgetCostBusinessClientTest.secondGroupOutsideTrustedScopeNeverSendsHttpRequest:49 
+Expecting actual throwable to be an instance of:
+  java.lang.SecurityException
+but was:
+  java.lang.UnsupportedOperationException: Comparison not implemented
+	at com.smart.agent.tool.budget.BudgetCostBusinessClient.compare(BudgetCostBusinessClient.java:7)
+	at com.smart.agent.tool.budget.SmartBootBudgetCostBusinessClientTest.lambda$secondGroupOutsideTrustedScopeNeverSendsHttpRequest$3(SmartBootBudgetCostBusinessClientTest.java:48)
+	at org.assertj.core.api.ThrowableAssert.catchThrowable(ThrowableAssert.java:66)
+	...(79 remaining lines not displayed - this can be changed with Assertions.setMaxStackTraceElementsDisplayed)
+[ERROR] Errors: 
+[ERROR]   SmartBootBudgetCostBusinessClientTest.comparisonSignsItsOwnPathAndCarriesSeparateGroupsWithoutLosingPrecision:31 ? UnsupportedOperation Comparison not implemented
+[ERROR] Tests run: 10, Failures: 2, Errors: 1, Skipped: 0
+[ERROR] Failed to execute goal org.apache.maven.plugins:maven-surefire-plugin:3.5.6:test (default-test) on project smart-agent: There are test failures.
+[ERROR] 
+[ERROR] See F:\project\gongcheng\agent\target\surefire-reports for the individual test results.
+[ERROR] See dump files (if any exist) [date].dump, [date]-jvmRun[N].dump and [date].dumpstream.
+[ERROR] -> [Help 1]
+[ERROR] 
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR] 
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException

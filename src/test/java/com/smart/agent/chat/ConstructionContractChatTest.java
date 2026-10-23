@@ -83,6 +83,13 @@ class ConstructionContractChatTest {
         ConstructionContractBusinessClient client = new ConstructionContractBusinessClient() {
             @Override public ProjectQueryResult compare(ToolContext context, ConstructionContractCompareInput input) {
                 comparisons.add(input);
+                if (input.current().groupBy() != null) return new ProjectQueryResult("aggregate",1,3,3L,false,
+                        List.of(new com.smart.agent.tool.project.ProjectQueryColumn("projectTypeName","项目类型","string")),
+                        List.of(Map.of("projectType","1","projectTypeName","土建","metric","合同数量","currentValue",1,"baselineValue",1,"difference",0),
+                                Map.of("projectType","1","projectTypeName","土建","metric","建设合同总金额","currentValue",110,"baselineValue",100,"difference",10),
+                                Map.of("projectType","1","projectTypeName","土建","metric","合同金额占比（%）","currentValue",100,"baselineValue",100,"difference",0)),
+                        List.of(Map.of("current",Map.of("dateField","signingDate","startDate","2026-09-01","endDate","2026-09-30"),
+                                "baseline",Map.of("dateField","signingDate","startDate","2025-09-01","endDate","2025-09-30"))));
                 return new ProjectQueryResult("aggregate", 1, 2, 2L, false, List.of(),
                         List.of(Map.of("metric", "建设合同总金额", "difference", 10)), List.of());
             }
@@ -171,6 +178,28 @@ class ConstructionContractChatTest {
         assertThat(requests.get(2).redactedConversationMessages().toString()).contains("projectId", "p1");
     }
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans={false,true})
+    void groupedComparisonRefreshAndTypeDetailKeepTheSelectedPeriod(boolean baseline) {
+        String selectedYear = baseline ? "2025" : "2026";
+        ChatOrchestrator chat = orchestrator(request -> {
+            if (hasCurrentResult(request)) return Flux.just(new ModelEvent.Completed("实时类型比较结果",1,1));
+            if (!comparisons.isEmpty()) assertThat(request.redactedConversationMessages().toString())
+                    .contains("trusted-construction-contract-types","土建","2025-09-30");
+            if (comparisons.size() >= 2) return Flux.just(new ModelEvent.ToolRequested("details","constructionContract.query",
+                    "{\"mode\":\"detail\",\"projectType\":\"1\",\"dateField\":\"signingDate\",\"startDate\":\""+selectedYear+"-09-01\",\"endDate\":\""+selectedYear+"-09-30\"}"));
+            return Flux.just(new ModelEvent.ToolRequested("compare","constructionContract.compare",
+                    "{\"comparisonType\":\"YOY\",\"periodUnit\":\"MONTH\",\"current\":{\"mode\":\"summary\",\"groupBy\":\"projectType\",\"dateField\":\"signingDate\",\"startDate\":\"2026-09-01\",\"endDate\":\"2026-09-30\"}}"));
+        });
+        for(String question : List.of("2026年9月签订的施工合同按项目类型同比比较","重新查一次","查看"+(baseline?"对比期":"本期")+"土建类型的合同明细"))
+            assertThat(chat.stream(new ChatCommand(conversationId,question,null),user,"trace").collectList().block().toString())
+                    .contains("实时类型比较结果");
+        assertThat(comparisons).hasSize(2).allSatisfy(i -> assertThat(i.current().groupBy()).isEqualTo("projectType"));
+        assertThat(queries).hasSize(1);
+        assertThat(queries.getFirst().projectType()).isEqualTo("1"); assertThat(queries.getFirst().groupBy()).isNull();
+        assertThat(queries.getFirst().startDate()).isEqualTo(selectedYear+"-09-01");
+        assertThat(queries.getFirst().endDate()).isEqualTo(selectedYear+"-09-30");
+    }
     @Test void comparisonReturnsToModelAndRefreshesEveryTurn() {
         ChatOrchestrator chat = orchestrator(request -> hasCurrentResult(request)
                 ? Flux.just(new ModelEvent.Completed("实时合同比较完成", 1, 1))

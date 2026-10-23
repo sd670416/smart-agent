@@ -7,6 +7,25 @@ import static org.assertj.core.api.Assertions.*;
 class ProjectReimburseInputTest {
     private final ObjectMapper mapper = new ObjectMapper();
 
+    @Test void singleDocumentResetsOldPageWithoutLosingScopeOrDates() throws Exception {
+        var input = mapper.readValue("""
+                {"projectCode":"001","requestId":" r1 ","registrationCode":"BX-001","mode":"detail","page":5,
+                 "pageSize":1,"dateField":"projectCreateDate","startDate":"2026-01-01","endDate":"2026-01-31"}
+                """, ProjectReimburseQueryInput.class).withProjectId("p1");
+        assertThat(input.page()).isEqualTo(1);
+        assertThat(input.requestId()).isEqualTo("r1");
+        assertThat(input.registrationCode()).isEqualTo("BX-001");
+        assertThat(input.projectId()).isEqualTo("p1");
+        assertThat(input.dateField()).isEqualTo("projectCreateDate");
+        assertThat(input.startDate()).isEqualTo("2026-01-01");
+        assertThat(input.endDate()).isEqualTo("2026-01-31");
+    }
+
+    @Test void wholeScopeSummaryCannotInheritOneDocumentId() {
+        assertThatThrownBy(() -> mapper.readValue("{\"mode\":\"summary\",\"requestId\":\"r1\"}",
+                ProjectReimburseQueryInput.class)).isInstanceOf(Exception.class);
+    }
+
     @Test void itemQueryPreservesRequestAndDatesWhenProjectIsResolved() throws Exception {
         var input = mapper.readValue("""
                 {"projectCode":"001","requestId":"r1","mode":"items","page":2,"pageSize":3,

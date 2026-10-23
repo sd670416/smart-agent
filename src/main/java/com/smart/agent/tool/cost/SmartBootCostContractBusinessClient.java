@@ -28,6 +28,16 @@ public class SmartBootCostContractBusinessClient implements CostContractBusiness
     }
 
     @Override public ProjectQueryResult query(ToolContext context, CostContractQueryInput input) {
+        return post(PATH,context,body(context,input));
+    }
+
+    @Override public ProjectQueryResult compare(ToolContext context,CostContractCompareInput input) {
+        Map<String,Object> request=new LinkedHashMap<>();request.put("comparisonType",input.comparisonType());
+        request.put("current",body(context,input.current()));request.put("baseline",body(context,input.baseline()));
+        return post("/internal/ai/tools/cost-contract-compare",context,request);
+    }
+
+    private Map<String,Object> body(ToolContext context,CostContractQueryInput input) {
         if (input.projectId() != null && !context.canAccessProject(input.projectId()))
             throw new SecurityException("Project is outside trusted scope");
         Map<String, Object> body = new LinkedHashMap<>();
@@ -41,11 +51,15 @@ public class SmartBootCostContractBusinessClient implements CostContractBusiness
         body.put("endDate", input.endDate());
         body.put("page", input.page());
         body.put("pageSize", input.pageSize());
+        return body;
+    }
+
+    private ProjectQueryResult post(String path,ToolContext context,Map<String,Object> body) {
         org.slf4j.LoggerFactory.getLogger(getClass()).info(
                 "调用成本合同查询工具: userId={}, trustedProjectCount={}, mode={}, page={}, pageSize={}",
-                context.userId(), context.projectIds().size(), input.mode(), input.page(), input.pageSize());
+                context.userId(), context.projectIds().size(), body.get("mode"), body.get("page"), body.get("pageSize"));
         try {
-            String raw = client.post().uri(PATH).headers(headers -> sign(headers, context))
+            String raw = client.post().uri(path).headers(headers -> sign(headers, context,path))
                     .bodyValue(body).retrieve().bodyToMono(String.class).block();
             if (raw == null || raw.isBlank()) throw new AgentException("AGENT_TOOL_EXECUTION_FAILED",
                     HttpStatus.BAD_GATEWAY, "成本合同查询响应为空");
@@ -65,7 +79,7 @@ public class SmartBootCostContractBusinessClient implements CostContractBusiness
         }
     }
 
-    private void sign(HttpHeaders headers, ToolContext context) {
+    private void sign(HttpHeaders headers, ToolContext context,String path) {
         String timestamp = String.valueOf(Instant.now().getEpochSecond());
         String roles = String.join(",", new TreeSet<>(context.roleIds()));
         String permissions = String.join(",", new TreeSet<>(context.permissions()));
@@ -80,7 +94,7 @@ public class SmartBootCostContractBusinessClient implements CostContractBusiness
         try {
             Mac mac = Mac.getInstance("HmacSHA256");
             mac.init(new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
-            String canonical = timestamp + "\nPOST\n" + PATH + "\n" + context.tenantId() + "\n" + context.userId()
+            String canonical = timestamp + "\nPOST\n" + path + "\n" + context.tenantId() + "\n" + context.userId()
                     + "\n" + context.identityId() + "\n" + roles + "\n" + permissions + "\n" + projects;
             headers.set("X-Agent-Internal-Signature", Base64.getUrlEncoder().withoutPadding().encodeToString(
                     mac.doFinal(canonical.getBytes(StandardCharsets.UTF_8))));

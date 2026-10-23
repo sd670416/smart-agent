@@ -1,0 +1,51 @@
+16:08:21.067 [main] INFO com.smart.agent.tool.cost.SmartBootCostContractBusinessClient -- ���óɱ���ͬ��ѯ����: userId=u, trustedProjectCount=2, mode=summary, page=1, pageSize=20
+16:08:21.477 [main] INFO com.smart.agent.tool.cost.SmartBootCostContractBusinessClient -- ���óɱ���ͬ��ѯ����: userId=u, trustedProjectCount=1, mode=summary, page=1, pageSize=20
+[ERROR] Tests run: 5, Failures: 1, Errors: 1, Skipped: 0, Time elapsed: 1.071 s <<< FAILURE! -- in com.smart.agent.tool.cost.CostContractClientTest
+[ERROR] com.smart.agent.tool.cost.CostContractClientTest.unauthorizedSecondGroupNeverSendsComparisonRequest -- Time elapsed: 0.194 s <<< FAILURE!
+java.lang.AssertionError: 
+
+Expecting actual throwable to be an instance of:
+  java.lang.SecurityException
+but was:
+  java.lang.UnsupportedOperationException: Comparison not implemented
+	at com.smart.agent.tool.cost.CostContractBusinessClient.compare(CostContractBusinessClient.java:7)
+	at com.smart.agent.tool.cost.CostContractClientTest.lambda$unauthorizedSecondGroupNeverSendsComparisonRequest$3(CostContractClientTest.java:41)
+	at org.assertj.core.api.ThrowableAssert.catchThrowable(ThrowableAssert.java:66)
+	...(79 remaining lines not displayed - this can be changed with Assertions.setMaxStackTraceElementsDisplayed)
+	at com.smart.agent.tool.cost.CostContractClientTest.unauthorizedSecondGroupNeverSendsComparisonRequest(CostContractClientTest.java:42)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+
+[ERROR] com.smart.agent.tool.cost.CostContractClientTest.comparisonUsesItsOwnSignedPathAndSeparateProjectScopes -- Time elapsed: 0.005 s <<< ERROR!
+java.lang.UnsupportedOperationException: Comparison not implemented
+	at com.smart.agent.tool.cost.CostContractBusinessClient.compare(CostContractBusinessClient.java:7)
+	at com.smart.agent.tool.cost.CostContractClientTest.comparisonUsesItsOwnSignedPathAndSeparateProjectScopes(CostContractClientTest.java:25)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+
+[ERROR] Failures: 
+[ERROR]   CostContractClientTest.unauthorizedSecondGroupNeverSendsComparisonRequest:42 
+Expecting actual throwable to be an instance of:
+  java.lang.SecurityException
+but was:
+  java.lang.UnsupportedOperationException: Comparison not implemented
+	at com.smart.agent.tool.cost.CostContractBusinessClient.compare(CostContractBusinessClient.java:7)
+	at com.smart.agent.tool.cost.CostContractClientTest.lambda$unauthorizedSecondGroupNeverSendsComparisonRequest$3(CostContractClientTest.java:41)
+	at org.assertj.core.api.ThrowableAssert.catchThrowable(ThrowableAssert.java:66)
+	...(79 remaining lines not displayed - this can be changed with Assertions.setMaxStackTraceElementsDisplayed)
+[ERROR] Errors: 
+[ERROR]   CostContractClientTest.comparisonUsesItsOwnSignedPathAndSeparateProjectScopes:25 ? UnsupportedOperation Comparison not implemented
+[ERROR] Tests run: 9, Failures: 1, Errors: 1, Skipped: 0
+[ERROR] Failed to execute goal org.apache.maven.plugins:maven-surefire-plugin:3.5.6:test (default-test) on project smart-agent: There are test failures.
+[ERROR] 
+[ERROR] See F:\project\gongcheng\agent\target\surefire-reports for the individual test results.
+[ERROR] See dump files (if any exist) [date].dump, [date]-jvmRun[N].dump and [date].dumpstream.
+[ERROR] -> [Help 1]
+[ERROR] 
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR] 
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException

@@ -1,0 +1,3 @@
+16:11:48.331 [main] INFO com.smart.agent.tool.cost.SmartBootCostContractBusinessClient -- ���óɱ���ͬ��ѯ����: userId=u, trustedProjectCount=2, mode=summary, page=1, pageSize=20
+16:11:48.738 [main] INFO com.smart.agent.tool.cost.SmartBootCostContractBusinessClient -- ���óɱ���ͬ��ѯ����: userId=u, trustedProjectCount=1, mode=summary, page=1, pageSize=20
+16:11:48.766 [main] INFO com.smart.agent.tool.cost.SmartBootCostContractBusinessClient -- ���óɱ���ͬ��ѯ����: userId=u, trustedProjectCount=2, mode=null, page=null, pageSize=null

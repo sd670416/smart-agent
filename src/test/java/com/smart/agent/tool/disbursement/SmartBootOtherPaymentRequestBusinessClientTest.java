@@ -36,7 +36,7 @@ class SmartBootOtherPaymentRequestBusinessClientTest {
     }
 
     @org.junit.jupiter.params.ParameterizedTest
-    @org.junit.jupiter.params.provider.ValueSource(strings={"QUERY","YOY","CUSTOM"})
+    @org.junit.jupiter.params.provider.ValueSource(strings={"QUERY","YOY","CUSTOM","DOCUMENT","ITEMS"})
     void queriesSignedEndpointWithTrustedScopeAndReturnsPreciseAmounts(String mode) throws Exception {
         AtomicReference<String> body = new AtomicReference<>();
         AtomicReference<String> signature = new AtomicReference<>();
@@ -60,15 +60,26 @@ class SmartBootOtherPaymentRequestBusinessClientTest {
             var context = new ToolContext("tenant", "user", "identity", Set.of("role"), Set.of("p2", "p1"), Set.of("menu:finance:other-payment-request"));
             var input = new OtherPaymentRequestQueryInput("p1", "测试项目", null, "summary", "createDate",
                     "2026-01-01", "2026-01-31", 1, 20);
+            boolean document="DOCUMENT".equals(mode),items="ITEMS".equals(mode);
+            boolean singleQuery="QUERY".equals(mode)||document||items;
+            if(document||items)input=new OtherPaymentRequestQueryInput("p1",null,"FK-001",items?"items":"detail",
+                    "paymentDate","2026-01-01","2026-01-31",2,1,null,"exact","r1");
             var baseline = new OtherPaymentRequestQueryInput("p2",null,null,"summary","createDate","2025-01-01","2025-01-31",1,20);
-            var result = "QUERY".equals(mode) ? client.query(context,input) : client.compare(context,
+            var result = singleQuery ? client.query(context,input) : client.compare(context,
                     new OtherPaymentRequestCompareInput(mode,"MONTH",input,"CUSTOM".equals(mode)?baseline:null));
-            String path="/internal/ai/tools/other-payment-request-"+("QUERY".equals(mode)?"query":"compare");
+            String path="/internal/ai/tools/other-payment-request-"+(singleQuery?"query":"compare");
             assertThat(uri.get()).isEqualTo(path);
             var payload=new ObjectMapper().readTree(body.get());
-            var group="QUERY".equals(mode)?payload:payload.path("current");
+            var group=singleQuery?payload:payload.path("current");
             assertThat(group.path("projectIds").get(0).asText()).isEqualTo("p1");
-            assertThat(group.path("dateField").asText()).isEqualTo("createDate");
+            assertThat(group.path("dateField").asText()).isEqualTo(document||items?"paymentDate":"createDate");
+            if(document||items) {
+                assertThat(group.path("requestId").asText()).isEqualTo("r1");
+                assertThat(group.path("registrationCode").asText()).isEqualTo("FK-001");
+                assertThat(group.path("page").asInt()).isEqualTo(document?1:2);
+                assertThat(group.path("endDate").asText()).isEqualTo("2026-01-31");
+                assertThat(group.path("mode").asText()).isEqualTo(document?"detail":"items");
+            }
             if("CUSTOM".equals(mode)) assertThat(payload.path("baseline").path("projectIds").get(0).asText()).isEqualTo("p2");
             if("YOY".equals(mode)) assertThat(payload.has("baseline")).isFalse();
             assertThat(result.rows().getFirst().get("paymentAmount").toString()).isEqualTo("123456789012345.67");

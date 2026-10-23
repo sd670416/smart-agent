@@ -21,7 +21,7 @@ public class ProjectFundingDomainContributor implements BusinessDomainContributo
         return question!=null && question.contains("垫资")?"funding":question!=null && question.contains("净付款")?"net":"cumulative";
     }
     @Override public BusinessDomainDescriptor descriptor(){return new BusinessDomainDescriptor(CODE,"总付款与项目垫资",
-            List.of("projectFunding.query","projectFunding.clarifyDate"),List.of(new DataScopeDescriptor("FINANCE_MENUS","对应来源菜单及可见项目范围",List.of("MENU","PROJECT_MEMBER"))),"REALTIME",TERMS);}
+            List.of("projectFunding.query","projectFunding.compare","projectFunding.clarifyDate"),List.of(new DataScopeDescriptor("FINANCE_MENUS","对应来源菜单及可见项目范围",List.of("MENU","PROJECT_MEMBER"))),"REALTIME",TERMS);}
     @Override public boolean availableTo(AgentUserContext context) {
         return context!=null && context.permissions().containsAll(permissions("cumulative"));
     }

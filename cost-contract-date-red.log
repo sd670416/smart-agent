@@ -1,0 +1,34 @@
+Access is denied.
+16:36:23.796 [boundedElastic-1] INFO com.smart.agent.run.AgentRunService -- tool_execution_summary toolKey=costContract.clarifyDate risk=L1 outcome=SUCCEEDED durationMillis=51 resultSizeBytes=384
+16:36:23.972 [boundedElastic-1] INFO com.smart.agent.run.AgentRunService -- tool_execution_summary toolKey=costContract.compare risk=L1 outcome=FAILED durationMillis=131 resultSizeBytes=0
+[ERROR] Tests run: 1, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 0.978 s <<< FAILURE! -- in com.smart.agent.chat.CostContractChatTest
+[ERROR] com.smart.agent.chat.CostContractChatTest.choosingNoDatesRemovesStaleDatesFromBothComparisonGroups -- Time elapsed: 0.940 s <<< FAILURE!
+java.lang.AssertionError: 
+
+Expecting actual:
+  "[ChatEvent[type=message_start, runId=2ebb588e-2fe8-4e63-b31f-23d332d40d27, sequence=1, traceId=b, messageId=7659454f-34a6-43a7-9cbe-111441bcc9cc, code=null, text=null, toolKey=null, data={}], ChatEvent[type=status, runId=2ebb588e-2fe8-4e63-b31f-23d332d40d27, sequence=2, traceId=b, messageId=null, code=ROUTING, text=null, toolKey=null, data={}], ChatEvent[type=status, runId=2ebb588e-2fe8-4e63-b31f-23d332d40d27, sequence=3, traceId=b, messageId=null, code=PLANNING, text=null, toolKey=null, data={}], ChatEvent[type=status, runId=2ebb588e-2fe8-4e63-b31f-23d332d40d27, sequence=4, traceId=b, messageId=null, code=GENERATING, text=null, toolKey=null, data={}], ChatEvent[type=ai_debug, runId=2ebb588e-2fe8-4e63-b31f-23d332d40d27, sequence=5, traceId=b, messageId=null, code=MODEL_REQUEST, text=null, toolKey=null, data={turn=1, stage=MODEL_REQUEST, toolUseMode=REQUIRED, allowedTools=[costContract.clarifyDate, costContract.compare, costContract.query], messageCount=3, evidenceCount=0}], ChatEvent[type=ai_debug, runId=2ebb588e-2fe8-4e63-b31f-23d332d40d27, sequence=6, traceId=b, messageId=null, code=TOOL_REQUEST, text=null, toolKey=null, data={toolCallIndex=1, toolKey=costContract.compare, stage=TOOL_REQUEST, turn=1, arguments={"comparisonType":"CUSTOM","current":{"projectId":"p1","dateField":"projectCreateDate","startDate":"2026-01-01","endDate":"2026-01-31"},"baseline":{"projectId":"p2","dateField":"projectCreateDate","startDate":"2025-01-01","endDate":"2025-01-31"}}}], ChatEvent[type=tool_start, runId=2ebb588e-2fe8-4e63-b31f-23d332d40d27, sequence=7, traceId=b, messageId=null, code=null, text=null, toolKey=costContract.compare, data={}], ChatEvent[type=status, runId=2ebb588e-2fe8-4e63-b31f-23d332d40d27, sequence=8, traceId=b, messageId=null, code=TOOL_EXECUTING, text=null, toolKey=null, data={}], ChatEvent[type=ai_debug, runId=2ebb588e-2fe8-4e63-b31f-23d332d40d27, sequence=9, traceId=b, messageId=null, code=TOOL_ERROR, text=null, toolKey=null, data={error=AGENT_TOOL_EXECUTION_FAILED, toolKey=costContract.compare, stage=TOOL_ERROR, turn=1, message=Tool execution failed}], ChatEvent[type=error, runId=2ebb588e-2fe8-4e63-b31f-23d332d40d27, sequence=0, traceId=b, messageId=null, code=AGENT_TOOL_EXECUTION_FAILED, text=ҵ�����ݲ�ѯʧ�ܣ����Ժ����ԡ�, toolKey=null, data={}]]"
+to contain:
+  "��ǰ��ͬ�ṹ�Ƚ����" 
+	at com.smart.agent.chat.CostContractChatTest.choosingNoDatesRemovesStaleDatesFromBothComparisonGroups(CostContractChatTest.java:56)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+
+[ERROR] Failures: 
+[ERROR]   CostContractChatTest.choosingNoDatesRemovesStaleDatesFromBothComparisonGroups:56 
+Expecting actual:
+  "[ChatEvent[type=message_start, runId=2ebb588e-2fe8-4e63-b31f-23d332d40d27, sequence=1, traceId=b, messageId=7659454f-34a6-43a7-9cbe-111441bcc9cc, code=null, text=null, toolKey=null, data={}], ChatEvent[type=status, runId=2ebb588e-2fe8-4e63-b31f-23d332d40d27, sequence=2, traceId=b, messageId=null, code=ROUTING, text=null, toolKey=null, data={}], ChatEvent[type=status, runId=2ebb588e-2fe8-4e63-b31f-23d332d40d27, sequence=3, traceId=b, messageId=null, code=PLANNING, text=null, toolKey=null, data={}], ChatEvent[type=status, runId=2ebb588e-2fe8-4e63-b31f-23d332d40d27, sequence=4, traceId=b, messageId=null, code=GENERATING, text=null, toolKey=null, data={}], ChatEvent[type=ai_debug, runId=2ebb588e-2fe8-4e63-b31f-23d332d40d27, sequence=5, traceId=b, messageId=null, code=MODEL_REQUEST, text=null, toolKey=null, data={turn=1, stage=MODEL_REQUEST, toolUseMode=REQUIRED, allowedTools=[costContract.clarifyDate, costContract.compare, costContract.query], messageCount=3, evidenceCount=0}], ChatEvent[type=ai_debug, runId=2ebb588e-2fe8-4e63-b31f-23d332d40d27, sequence=6, traceId=b, messageId=null, code=TOOL_REQUEST, text=null, toolKey=null, data={toolCallIndex=1, toolKey=costContract.compare, stage=TOOL_REQUEST, turn=1, arguments={"comparisonType":"CUSTOM","current":{"projectId":"p1","dateField":"projectCreateDate","startDate":"2026-01-01","endDate":"2026-01-31"},"baseline":{"projectId":"p2","dateField":"projectCreateDate","startDate":"2025-01-01","endDate":"2025-01-31"}}}], ChatEvent[type=tool_start, runId=2ebb588e-2fe8-4e63-b31f-23d332d40d27, sequence=7, traceId=b, messageId=null, code=null, text=null, toolKey=costContract.compare, data={}], ChatEvent[type=status, runId=2ebb588e-2fe8-4e63-b31f-23d332d40d27, sequence=8, traceId=b, messageId=null, code=TOOL_EXECUTING, text=null, toolKey=null, data={}], ChatEvent[type=ai_debug, runId=2ebb588e-2fe8-4e63-b31f-23d332d40d27, sequence=9, traceId=b, messageId=null, code=TOOL_ERROR, text=null, toolKey=null, data={error=AGENT_TOOL_EXECUTION_FAILED, toolKey=costContract.compare, stage=TOOL_ERROR, turn=1, message=Tool execution failed}], ChatEvent[type=error, runId=2ebb588e-2fe8-4e63-b31f-23d332d40d27, sequence=0, traceId=b, messageId=null, code=AGENT_TOOL_EXECUTION_FAILED, text=ҵ�����ݲ�ѯʧ�ܣ����Ժ����ԡ�, toolKey=null, data={}]]"
+to contain:
+  "��ǰ��ͬ�ṹ�Ƚ����" 
+[ERROR] Tests run: 1, Failures: 1, Errors: 0, Skipped: 0
+[ERROR] Failed to execute goal org.apache.maven.plugins:maven-surefire-plugin:3.5.6:test (default-test) on project smart-agent: There are test failures.
+[ERROR] 
+[ERROR] See F:\project\gongcheng\agent\target\surefire-reports for the individual test results.
+[ERROR] See dump files (if any exist) [date].dump, [date]-jvmRun[N].dump and [date].dumpstream.
+[ERROR] -> [Help 1]
+[ERROR] 
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR] 
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException

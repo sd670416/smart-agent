@@ -1,0 +1,4 @@
+18:20:18.035 [main] INFO com.smart.agent.tool.budget.SmartBootBudgetCostBusinessClient -- ����Ԥ��ɱ���ѯ����: userId=u, trustedProjectCount=2, mode=null, page=null, pageSize=null
+18:20:18.627 [main] INFO com.smart.agent.tool.budget.SmartBootBudgetCostBusinessClient -- ����Ԥ��ɱ���ѯ����: userId=u, trustedProjectCount=1, mode=null, page=null, pageSize=null
+18:20:18.668 [main] INFO com.smart.agent.tool.budget.SmartBootBudgetCostBusinessClient -- ����Ԥ��ɱ���ѯ����: userId=user, trustedProjectCount=1, mode=summary, page=1, pageSize=20
+18:20:18.713 [main] INFO com.smart.agent.tool.budget.SmartBootBudgetCostBusinessClient -- ����Ԥ��ɱ���ѯ����: userId=user, trustedProjectCount=2, mode=summary, page=1, pageSize=20

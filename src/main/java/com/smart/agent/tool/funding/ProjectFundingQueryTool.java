@@ -19,17 +19,17 @@ public class ProjectFundingQueryTool implements AgentTool<ProjectFundingQueryInp
     @Override public Optional<String> projectId(ProjectFundingQueryInput input){return Optional.empty();}
     @Override public String description(){return "实时查询累计付款、净付款和项目垫资。summary全范围汇总，detail按项目分页。"
             +"累计付款=付款申请+其他付款申请+项目报销；净付款再减材料退货退款；垫资逐项目减已收项目款后负值归零再汇总。"
-            +"不是实际银行支付。缺少必要来源权限拒绝返回完整统计。不支持利润或比较。日期仅支持项目创建范围内项目的累计金额，"
+            +"不是实际银行支付。缺少必要来源权限拒绝返回完整统计。不支持利润；两组当前累计比较使用projectFunding.compare，不支持同比环比或历史余额。日期仅支持项目创建范围内项目的累计金额，"
             +"不能当作期间收支；日期含义不明调用projectFunding.clarifyDate追问用户，相对日期先取当前时间。按序号追问须使用上次列表真实projectId并重新查询。";}
     @Override public String argumentsSchemaJson(){return """
             {"type":"object","properties":{
             "projectId":{"type":"string","description":"真实项目ID"},
             "projectCode":{"type":"string","description":"精确项目编号"},
             "projectName":{"type":"string","description":"默认精确名称，同名先确认"},
-            "projectNameMatch":{"type":"string","enum":["exact","contains"],"description":"只有明确要求包含才用contains"},
-            "mode":{"type":"string","enum":["summary","detail"],"description":"全量统计或按项目列表"},
-            "metric":{"type":"string","enum":["cumulative","net","funding"],"description":"累计付款、净付款、项目垫资"},
-            "dateField":{"type":"string","enum":["projectCreateDate"],"description":"仅项目创建日期，用户未确认日期维度不得默认填入"},
+            "projectNameMatch":{"type":"string","description":"仅exact精确或contains包含；只有明确要求包含才用contains"},
+            "mode":{"type":"string","description":"仅summary全量统计或detail按项目列表"},
+            "metric":{"type":"string","description":"仅cumulative累计付款、net净付款或funding项目垫资"},
+            "dateField":{"type":"string","description":"仅projectCreateDate项目创建日期，用户未确认日期维度不得默认填入"},
             "startDate":{"type":"string"},"endDate":{"type":"string"},
             "page":{"type":"integer"},"pageSize":{"type":"integer"}},"additionalProperties":false}
             """;}
