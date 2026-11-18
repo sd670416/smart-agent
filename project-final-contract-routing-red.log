@@ -1,0 +1,24 @@
+Access is denied.
+[ERROR] Tests run: 17, Failures: 0, Errors: 1, Skipped: 0, Time elapsed: 0.143 s <<< FAILURE! -- in com.smart.agent.routing.QueryIntentResolverTest
+[ERROR] com.smart.agent.routing.QueryIntentResolverTest.contractAmountSortingOfProjectsStaysInProjectDomain -- Time elapsed: 0.006 s <<< ERROR!
+java.util.NoSuchElementException: No value present
+	at java.base/java.util.Optional.orElseThrow(Optional.java:377)
+	at com.smart.agent.routing.QueryIntentResolverTest.contractAmountSortingOfProjectsStaysInProjectDomain(QueryIntentResolverTest.java:20)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+
+[ERROR] Errors: 
+[ERROR]   QueryIntentResolverTest.contractAmountSortingOfProjectsStaysInProjectDomain:20 ? NoSuchElement No value present
+[ERROR] Tests run: 17, Failures: 0, Errors: 1, Skipped: 0
+[ERROR] Failed to execute goal org.apache.maven.plugins:maven-surefire-plugin:3.5.6:test (default-test) on project smart-agent: 
+[ERROR] 
+[ERROR] See F:\project\gongcheng\agent\target\surefire-reports for the individual test results.
+[ERROR] See dump files (if any exist) [date].dump, [date]-jvmRun[N].dump and [date].dumpstream.
+[ERROR] -> [Help 1]
+[ERROR] 
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR] 
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException

@@ -9,7 +9,7 @@ import org.springframework.stereotype.Component;
 public class ProjectQueryTool implements AgentTool<ProjectQueryInput, ProjectQueryResult> {
     private static final String SCHEMA = """
             {"type":"object","properties":{
-              "select":{"type":"array","description":"要返回的项目业务字段。普通项目概况默认不传；如需指定，可用 projectName、projectCode、organizationName、projectNature、affiliatedCompanyName、projectType、constructionCompany、personInChargeName、projectStatus、approvalStatus、projectBudget、createDate、projectProvince（项目区域/省份）、regionName（完整项目地址）","items":{"type":"string"}},
+              "select":{"type":"array","description":"要返回的项目业务字段。普通项目概况默认不传；如需指定，可用 projectName、projectCode、organizationName、projectNature、affiliatedCompanyName、projectType、constructionCompany、personInChargeName、projectStatus、approvalStatus、projectBudget、finalContractAmount（合同额/最终合同金额，项目一对一关联的已审批登记施工合同最终金额，无合同或金额缺失为空，不是项目预算）、createDate、projectProvince（项目区域/省份）、regionName（完整项目地址）","items":{"type":"string"}},
               "filter":{"type":"object","properties":{
                 "logic":{"type":"string"},
                 "conditions":{"type":"array","items":{"type":"object","properties":{"field":{"type":"string"},"operator":{"type":"string"},"value":{}},"required":["field","operator"],"additionalProperties":false}},
@@ -17,7 +17,7 @@ public class ProjectQueryTool implements AgentTool<ProjectQueryInput, ProjectQue
               },"additionalProperties":false},
               "groupBy":{"type":"array","description":"使用已注册的项目业务字段分组。项目区域/省份分布使用 projectProvince，项目类型分布使用 projectType，项目状态分布使用 projectStatus；配合 aggregations 的 count 统计数量。完整地址 regionName 不用于省级区域统计。","items":{"type":"string"}},
               "aggregations":{"type":"array","items":{"type":"object","properties":{"function":{"type":"string"},"field":{"type":"string"},"alias":{"type":"string"}},"required":["function"],"additionalProperties":false}},
-              "orderBy":{"type":"array","items":{"type":"object","properties":{"field":{"type":"string"},"direction":{"type":"string"}},"required":["field"],"additionalProperties":false}},
+              "orderBy":{"type":"array","description":"按已注册项目字段全量排序后分页。项目按合同额从高到低排列使用 field=finalContractAmount、direction=desc，从低到高使用asc。","items":{"type":"object","properties":{"field":{"type":"string"},"direction":{"type":"string"}},"required":["field"],"additionalProperties":false}},
               "page":{"type":"integer"},"pageSize":{"type":"integer"}
             },"additionalProperties":false}
             """;

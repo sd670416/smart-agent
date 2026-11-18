@@ -240,6 +240,11 @@ public class QueryIntentResolver {
                 return "APPROVAL".equals(domain.code()) ? 100 : 0;
             if (ProjectOutputDomainContributor.CODE.equals(domain.code())) score += 50;
         }
+        if (registry.findDomain("PROJECT").isPresent()
+                && !ConstructionContractDomainContributor.isWorkflowQuery(question)
+                && isProjectContractAmountQuery(question, activeDomain)) {
+            return "PROJECT".equals(domain.code()) ? 100 : 0;
+        }
         if (registry.findDomain(ConstructionContractDomainContributor.CODE).isPresent()
                 && ConstructionContractDomainContributor.matches(question)) {
             if (ConstructionContractDomainContributor.isWorkflowQuery(question))
@@ -277,7 +282,17 @@ public class QueryIntentResolver {
     }
 
     private boolean isContextualFollowUp(String question) {
-        return question.matches(".*(查|看|多少|数量|金额|总额|合计|总计|签订|创建|日期|第|上一页|下一页|明细|详情|筛选|状态|比较|对比|继续|项目|审批|看板|这[份张笔单]|该合同).*" );
+        return question.matches(".*(查|看|多少|数量|金额|合同额|总额|合计|总计|排序|升序|降序|从高到低|从低到高|签订|创建|日期|第|上一页|下一页|明细|详情|筛选|状态|比较|对比|继续|项目|审批|看板|这[份张笔单]|该合同).*" );
+    }
+
+    private boolean isProjectContractAmountQuery(String question, String activeDomain) {
+        if (!question.matches(".*合同(金额|额).*")) return false;
+        if (question.matches(".*(合同列表|合同明细|合同数量|合同详情|合同记录|所有施工合同|全部施工合同|各类型项目合同金额|项目类型合同金额).*"))
+            return false;
+        if (question.matches(".*(改查|切换到?|转查)(施工合同|建设合同).*"))
+            return false;
+        return question.matches(".*(项目列表|项目信息|项目档案|各项目|每个项目|哪些项目|项目合同额|项目合同金额).*" )
+                || "PROJECT".equals(activeDomain);
     }
 
     private String reason(BusinessDomainDescriptor domain, int score) {

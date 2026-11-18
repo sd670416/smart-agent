@@ -13,6 +13,18 @@ import org.junit.jupiter.api.Test;
 
 class ProjectQueryToolTest {
     @Test
+    void projectContractAmountNamesMeanFinalContractAmountAndNotBudget() {
+        ProjectQueryInput input = new ProjectQueryInput(
+                List.of("合同额", "合同金额", "最终合同金额", "最终合同额", "项目合同额"),
+                null, List.of(), List.of(), List.of(new ProjectQueryOrder("合同额", "DESC")), 1, 20);
+
+        assertThat(input.select()).containsOnly("finalContractAmount");
+        assertThat(input.orderBy()).containsExactly(new ProjectQueryOrder("finalContractAmount", "desc"));
+        assertThat(new ProjectQueryTool(mock(ProjectBusinessClient.class)).argumentsSchemaJson())
+                .contains("finalContractAmount", "最终合同金额", "一对一");
+    }
+
+    @Test
     void normalizesRegionGroupingFromRecordedModelToolCall() throws Exception {
         ProjectQueryInput input = new ObjectMapper().readValue("""
                 {"aggregations":[{"alias":"项目数量","function":"count"}],

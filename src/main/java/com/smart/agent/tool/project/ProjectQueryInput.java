@@ -53,6 +53,7 @@ public record ProjectQueryInput(List<String> select, ProjectQueryFilter filter, 
         if (field.equals(chars(0x9879, 0x76ee, 0x540d, 0x79f0))) return "projectName";
         if (field.equals(chars(0x9879, 0x76ee, 0x7f16, 0x53f7))) return "projectCode";
         return switch (field) {
+            case "合同额", "合同金额", "最终合同金额", "最终合同额", "项目合同额", "项目合同金额", "施工合同金额" -> "finalContractAmount";
             case "projectRegion", "项目区域", "省份", "省级区域" -> "projectProvince";
             case "\u9879\u76ee\u540d\u79f0" -> "projectName";
             case "\u9879\u76ee\u7f16\u53f7" -> "projectCode";

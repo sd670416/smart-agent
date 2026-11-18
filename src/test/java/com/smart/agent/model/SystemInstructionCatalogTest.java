@@ -6,6 +6,12 @@ import org.junit.jupiter.api.Test;
 
 class SystemInstructionCatalogTest {
     @Test
+    void projectContractAmountUsesRelatedFinalAmountWithoutSwitchingToBudget() {
+        assertThat(new SystemInstructionCatalog().resolve("v1").orElseThrow())
+                .contains("finalContractAmount", "一对一", "合同额", "不得改用项目预算", "project.query");
+    }
+
+    @Test
     void routesOnlyPublicInformationToWebSearch() {
         String instruction = new SystemInstructionCatalog().resolve("v1").orElseThrow();
 

@@ -11,6 +11,27 @@ import org.junit.jupiter.api.Test;
 
 class QueryIntentResolverTest {
     @Test
+    void contractAmountSortingOfProjectsStaysInProjectDomain() {
+        QueryIntentResolver routing = contractResolver();
+        for (String question : List.of("我想看一下项目信息，按合同额从高到低排列", "项目列表按施工合同金额从高到低排列")) {
+            assertEquals("PROJECT", routing.resolve(question, Map.of(), null, user)
+                    .candidate().orElseThrow().domain().code(), question);
+        }
+        for (String question : List.of("按合同额从高到低排列", "改成升序", "合同额超过300万元的呢", "按施工合同金额排序")) {
+            assertEquals("PROJECT", routing.resolve(question, Map.of(), "PROJECT", user)
+                    .candidate().orElseThrow().domain().code(), question);
+        }
+        assertEquals("CONSTRUCTION_CONTRACT", routing.resolve("施工合同列表按金额排序", Map.of(), "PROJECT", user)
+                .candidate().orElseThrow().domain().code());
+        assertEquals("CONSTRUCTION_CONTRACT", routing.resolve("改查施工合同列表，按合同金额排序", Map.of(), "PROJECT", user)
+                .candidate().orElseThrow().domain().code());
+        for (String question : List.of("改查项目列表，按施工合同金额排序", "切换到项目信息，按施工合同金额从高到低排列")) {
+            assertEquals("PROJECT", routing.resolve(question, Map.of(), "CONSTRUCTION_CONTRACT", user)
+                    .candidate().orElseThrow().domain().code(), question);
+        }
+    }
+
+    @Test
     void constructionContractMetricOverridesLegacyBoardAndProjectTerms() {
         QueryIntentResolver routing = contractResolver();
         for (String question : List.of("经营看板的建设合同总金额", "查询项目的施工合同", "建设合同总金额是多少")) {
