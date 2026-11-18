@@ -1,6 +1,6 @@
 # 项目付款与垫资自定义两组比较
 
-日期：2026-10-23。用户已确认范围；实现及定向验证完成，全量回归与审查中，未人工验收。
+日期：2026-10-23；收尾更新：2026-11-11。开发、自动回归及只读审查完成，待人工验收。
 
 ## 范围和计算
 
@@ -17,10 +17,18 @@
 
 | 步骤 | 内容 | 状态 |
 | --- | --- | --- |
-| 1 | 服务端比较、双组范围和金额完整性 | 已实现，定向测试通过；新增负基数回归待执行 |
+| 1 | 服务端比较、双组范围和金额完整性 | 已实现，SQL 13项通过，含负基数、零基数与金额缺失回归 |
 | 2 | 智能体工具、签名接口和模型Schema | 已实现，定向测试通过 |
 | 3 | 同名恢复、清除日期、按组追问与实时重查 | 已实现，脚本化对话回归通过 |
-| 4 | 全量回归、只读审查及人工验收说明 | 进行中；人工验收待用户执行 |
+| 4 | 全量回归、只读审查及人工验收说明 | 自动验证和审查完成；人工验收待用户执行 |
+
+## 2026-11-11收尾验证
+
+- Agent：JDK21执行 `mvn -o -q test`，退出码0；Surefire报告汇总843项，失败0、错误0、跳过0。日志：`agent/funding-closeout-agent-tests.log`。
+- Boot：JDK8执行 `mvn -o -q -pl smart-ai,smart-business/smart-finance -am test '-Dtest=AiProjectFundingToolControllerTest,ProjectFundingSqlTest,AiQueryAccessPolicyTest,AiTrustedUserContextInterceptorTest' '-Dsurefire.failIfNoSpecifiedTests=false' '-DfailIfNoTests=false'`，退出码0；AI22项、财务SQL13项，共35项通过，无失败、错误或跳过。日志：`smart-boot/funding-closeout-boot-tests.log`。
+- 只读审查覆盖服务端公式与SQL、可信范围、Agent工具和客户端、两组上下文、日期确认及实时重查；未发现需要修复的代码缺陷。本轮仅验证与更新文档，没有修改业务实现、启动应用或更新数据库。
+- 权限验收应在 `ai_query_permission_enabled=1` 时执行缺菜单/项目范围受限场景；值为0时使用新开关的业务只读授权规则，不能把预期放开误判为比较模块越权。业务审批和项目状态限制仍保留。
+- 验证边界：多轮测试采用脚本化模型回复，真实模型理解待人工验收；两组查询声明只读可重复读事务，但未覆盖并发写入一致性实验。SQL缺失金额及状态排除有覆盖，尚非每个来源、每种状态的穷举验证。
 
 ## 人工测试
 

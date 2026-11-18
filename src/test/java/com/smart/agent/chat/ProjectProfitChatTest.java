@@ -31,6 +31,7 @@ class ProjectProfitChatTest {
     private final AgentUserContext user = new AgentUserContext("tenant", "user", "identity", com.smart.agent.routing.ProjectProfitDomainContributor.permissions("both"), Set.of("p1"));
     private final List<ModelRequest> requests = new CopyOnWriteArrayList<>();
     private final List<ProjectProfitQueryInput> queries = new CopyOnWriteArrayList<>();
+    private final List<ProjectProfitCompareInput> comparisons = new CopyOnWriteArrayList<>();
     private final String conversationId = conversationService.create("tenant", "user", "项目利润查询").id();
     private ToolExecutor executor;
     private List<Map<String, Object>> projectRows = List.of(Map.of("projectId", "p1", "projectName", "示例",
@@ -44,13 +45,20 @@ class ProjectProfitChatTest {
 
     private ChatOrchestrator orchestrator(ModelGateway model,
             com.smart.agent.tool.approval.ApprovalBusinessClient approvalClient) {
-        ProjectProfitBusinessClient client = (context, input) -> {
+        ProjectProfitBusinessClient client = new ProjectProfitBusinessClient() {
+            @Override public ProjectQueryResult compare(ToolContext context,ProjectProfitCompareInput input) {
+                comparisons.add(input);
+                return new ProjectQueryResult("aggregate",1,20,1L,false,List.of(),
+                        List.of(Map.of("metric","实际收支利润（元）","currentValue",comparisons.size(),"baselineValue",1)),List.of());
+            }
+            @Override public ProjectQueryResult query(ToolContext context,ProjectProfitQueryInput input) {
             queries.add(input);
             if ("detail".equals(input.mode())) return new ProjectQueryResult("detail", input.page(), input.pageSize(),
                     2L, false, List.of(), List.of(Map.of("projectId", "p1", "projectName", "示例", "projectCode", "001"),
                     Map.of("projectId", "outside", "projectName", "不可见项目", "projectCode", "002")), List.of());
             return new ProjectQueryResult("aggregate", 1, 20, 1L, false, List.of(),
                     List.of(Map.of("projectCount", queries.size(), "actualProfit", new java.math.BigDecimal("123.45"))), List.of());
+            }
         };
         var projects = new com.smart.agent.tool.project.LocalProjectBusinessClient() {
             @Override public ProjectQueryResult query(ToolContext context, com.smart.agent.tool.project.ProjectQueryInput input) {
@@ -61,6 +69,7 @@ class ProjectProfitChatTest {
         };
         ToolRegistry tools = new ToolRegistry(List.of(new ProjectProfitQueryTool(client,
                 new com.smart.agent.tool.project.ProjectReferenceResolver(projects)),
+                new ProjectProfitCompareTool(client,new com.smart.agent.tool.project.ProjectReferenceResolver(projects)),
                 new com.smart.agent.tool.approval.ApprovalQueryTool(approvalClient),
                 new com.smart.agent.tool.project.ProjectQueryTool(projects),
                 new ProjectProfitClarifyDateTool(),
@@ -83,6 +92,97 @@ class ProjectProfitChatTest {
     }
 
 
+    @Test void comparisonRefreshesAndGroupFollowUpKeepsCanonicalProjectMetricAndDates() {
+        ChatOrchestrator chat=orchestrator(request->{
+            if(hasCurrentResult(request))return Flux.just(new ModelEvent.Completed("按本轮结果回答",1,1));
+            if(comparisons.size()<2) {
+                if(!comparisons.isEmpty())assertThat(request.redactedConversationMessages().toString()).contains("trusted-project-profit-comparison");
+                return Flux.just(new ModelEvent.ToolRequested("c","projectProfit.compare",
+                        "{\"comparisonType\":\"CUSTOM\",\"current\":{\"projectName\":\"示例\",\"metric\":\"actual\",\"dateField\":\"projectCreateDate\",\"startDate\":\"2026-01-01\",\"endDate\":\"2026-01-31\"},\"baseline\":{\"projectCode\":\"20260708001\",\"metric\":\"actual\",\"dateField\":\"projectCreateDate\",\"startDate\":\"2025-01-01\",\"endDate\":\"2025-01-31\"}}"));
+            }
+            String messages=request.redactedConversationMessages().toString();
+            if(queries.isEmpty())assertThat(messages).contains("trusted-project-profit-comparison","p1").doesNotContain("trusted-project-profit-references");
+            return Flux.just(new ModelEvent.ToolRequested("q","projectProfit.query",
+                    "{\"projectId\":\"p1\",\"metric\":\"actual\",\"mode\":\"detail\",\"dateField\":\"projectCreateDate\",\"startDate\":\"2025-01-01\",\"endDate\":\"2025-01-31\",\"page\":"+(queries.size()+1)+"}"));
+        });
+        for(String question:List.of("比较两组项目实际收支利润","再查一次","查看第二组项目实际收支利润列表","下一页")) {
+            var events=chat.stream(new ChatCommand(conversationId,question,null),user,question).collectList().block();
+            assertThat(events.toString()).contains("按本轮结果回答");
+        }
+        assertThat(comparisons).hasSize(2);assertThat(queries).hasSize(2);
+        assertThat(comparisons.getFirst().current().projectId()).isEqualTo("p1");
+        assertThat(comparisons.getFirst().baseline().projectId()).isEqualTo("p1");
+        assertThat(queries.getLast().page()).isEqualTo(2);assertThat(queries.getLast().metric()).isEqualTo("actual");
+        assertThat(queries.getLast().startDate()).isEqualTo("2025-01-01");
+    }
+    @Test void comparisonProjectConfirmationRestoresBothGroupsEvenWithEmptyModelArguments() {
+        projectRows=List.of(Map.of("projectId","p1","projectName","同名","projectCode","001"),Map.of("projectId","p2","projectName","同名","projectCode","002"));
+        var scoped=new AgentUserContext("tenant","user","identity",ProjectProfitDomainContributor.permissions("both"),Set.of("p1","p2"));
+        ChatOrchestrator chat=orchestrator(request->{
+            if(hasCurrentResult(request))return Flux.just(new ModelEvent.Completed("比较完成",1,1));
+            if(request.redactedConversationMessages().toString().contains("用户已确认比较条件"))return Flux.just(new ModelEvent.ToolRequested("c","projectProfit.compare","{}"));
+            return Flux.just(new ModelEvent.ToolRequested("c","projectProfit.compare",
+                    "{\"comparisonType\":\"CUSTOM\",\"current\":{\"projectName\":\"同名\",\"metric\":\"actual\"},\"baseline\":{\"projectId\":\"p1\",\"metric\":\"actual\"}}"));
+        });
+        var first=chat.stream(new ChatCommand(conversationId,"比较同名项目与指定项目的实际收支利润",null),scoped,"a").collectList().block();
+        assertThat(first.toString()).contains("clarification");assertThat(comparisons).isEmpty();
+        var confirmation=pending.findActive("tenant","user",conversationId).orElseThrow();
+        var events=chat.stream(new ChatCommand(conversationId,"第二个",List.of(),null,new ChatCommand.ClarificationSelection(confirmation.id(),"current:project:p2")),scoped,"b").collectList().block();
+        assertThat(events.toString()).contains("比较完成");assertThat(comparisons).hasSize(1);
+        assertThat(comparisons.getFirst().current().projectId()).isEqualTo("p2");assertThat(comparisons.getFirst().baseline().projectId()).isEqualTo("p1");
+        assertThat(comparisons.getFirst().current().metric()).isEqualTo("actual");
+    }
+    @Test void budgetOnlyComparisonProjectConfirmationKeepsTheConfirmedMetric() {
+        projectRows=List.of(Map.of("projectId","p1","projectName","同名","projectCode","001"),Map.of("projectId","p2","projectName","同名","projectCode","002"));
+        var scoped=new AgentUserContext("tenant","user","identity",ProjectProfitDomainContributor.permissions("budget"),Set.of("p1","p2"));
+        ChatOrchestrator chat=orchestrator(request->{
+            if(hasCurrentResult(request))return Flux.just(new ModelEvent.Completed("比较完成",1,1));
+            if(request.redactedConversationMessages().toString().contains("用户已确认比较条件"))return Flux.just(new ModelEvent.ToolRequested("c","projectProfit.compare","{}"));
+            return Flux.just(new ModelEvent.ToolRequested("c","projectProfit.compare",
+                    "{\"comparisonType\":\"CUSTOM\",\"current\":{\"projectName\":\"同名\",\"metric\":\"budget\"},\"baseline\":{\"projectId\":\"p1\",\"metric\":\"budget\"}}"));
+        });
+        var first=chat.stream(new ChatCommand(conversationId,"比较同名项目与指定项目的预算利润",null),scoped,"a").collectList().block();
+        assertThat(first.toString()).contains("clarification");assertThat(comparisons).isEmpty();
+        var confirmation=pending.findActive("tenant","user",conversationId).orElseThrow();
+        var events=chat.stream(new ChatCommand(conversationId,"第二个",List.of(),null,new ChatCommand.ClarificationSelection(confirmation.id(),"current:project:p2")),scoped,"b").collectList().block();
+        assertThat(events.toString()).contains("比较完成");assertThat(comparisons).hasSize(1);
+        assertThat(comparisons.getFirst().current().projectId()).isEqualTo("p2");assertThat(comparisons.getFirst().baseline().projectId()).isEqualTo("p1");
+        assertThat(comparisons.getFirst().current().metric()).isEqualTo("budget");
+    }
+    @Test void comparisonAllDateConfirmationRemovesDatesFromBothGroups() {
+        ChatOrchestrator chat=orchestrator(request->{
+            if(hasCurrentResult(request))return Flux.just(new ModelEvent.Completed("当前利润比较完成",1,1));
+            if(!request.redactedConversationMessages().toString().contains("用户确认不限定日期"))return Flux.just(new ModelEvent.ToolRequested("d","projectProfit.clarifyDate","{}"));
+            return Flux.just(new ModelEvent.ToolRequested("c","projectProfit.compare",
+                    "{\"comparisonType\":\"CUSTOM\",\"current\":{\"dateField\":\"projectCreateDate\",\"startDate\":\"2026-01-01\",\"endDate\":\"2026-01-31\"},\"baseline\":{\"dateField\":\"projectCreateDate\",\"startDate\":\"2025-01-01\",\"endDate\":\"2025-01-31\"}}"));
+        });
+        chat.stream(new ChatCommand(conversationId,"比较两组项目利润",null),user,"a").collectList().block();
+        var confirmation=pending.findActive("tenant","user",conversationId).orElseThrow();
+        var events=chat.stream(new ChatCommand(conversationId,"不限定日期",List.of(),null,new ChatCommand.ClarificationSelection(confirmation.id(),"date:allProjectDates")),user,"b").collectList().block();
+        assertThat(events.toString()).contains("当前利润比较完成");assertThat(comparisons).hasSize(1);
+        for(var group:List.of(comparisons.getFirst().current(),comparisons.getFirst().baseline())) {
+            assertThat(group.dateField()).isNull();assertThat(group.startDate()).isNull();assertThat(group.endDate()).isNull();
+        }
+    }
+    @Test void limitedMetricComparisonFollowUpKeepsItsSourcePermissions() {
+        for(String metric:List.of("budget","actual")) {
+            int previousComparisons=comparisons.size(),previousQueries=queries.size();
+            var limited=new AgentUserContext("tenant","user","identity",ProjectProfitDomainContributor.permissions(metric),Set.of("p1"));
+            ChatOrchestrator chat=orchestrator(request->{
+                if(hasCurrentResult(request))return Flux.just(new ModelEvent.Completed("利润结果",1,1));
+                if(comparisons.size()==previousComparisons)return Flux.just(new ModelEvent.ToolRequested("c","projectProfit.compare",
+                        "{\"comparisonType\":\"CUSTOM\",\"current\":{\"metric\":\""+metric+"\"},\"baseline\":{\"metric\":\""+metric+"\"}}"));
+                return Flux.just(new ModelEvent.ToolRequested("q","projectProfit.query","{\"mode\":\"detail\",\"metric\":\""+metric+"\"}"));
+            });
+            String question="budget".equals(metric)?"比较两组项目预算利润":"比较两组项目实际收支利润";
+            chat.stream(new ChatCommand(conversationId,question,null),limited,"a").collectList().block();
+            var events=chat.stream(new ChatCommand(conversationId,"查看第二组列表",null),limited,"b").collectList().block();
+            assertThat(events).noneMatch(e->"error".equals(e.type()));
+            assertThat(queries).hasSize(previousQueries+1);assertThat(comparisons).hasSize(previousComparisons+1);
+            executor.close();
+        }
+    }
+
     @Test void eachFollowUpRequeriesAndModelReceivesTheResult() {
         ChatOrchestrator chat=orchestrator(request->hasCurrentResult(request)
                 ? Flux.just(new ModelEvent.Completed("根据本轮结果给出利润金额",1,1))
@@ -92,7 +192,7 @@ class ProjectProfitChatTest {
         assertThat(queries).hasSize(2);
         assertThat(first.toString()).contains("根据本轮结果给出利润金额");
         assertThat(requests.get(0).allowedToolSpecifications()).extracting(ModelRequest.AllowedToolSpecification::key)
-                .containsExactlyInAnyOrder("projectProfit.query", "projectProfit.clarifyDate");
+                .containsExactlyInAnyOrder("projectProfit.query", "projectProfit.compare", "projectProfit.clarifyDate");
         assertThat(requests.get(0).toolUseMode()).isEqualTo(ModelRequest.ToolUseMode.REQUIRED);
         assertThat(requests.get(2).redactedConversationMessages().toString()).contains("trusted-query-context");
     }

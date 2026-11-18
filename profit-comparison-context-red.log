@@ -1,0 +1,365 @@
+17:11:23.416 [boundedElastic-1] INFO com.smart.agent.run.AgentRunService -- tool_execution_summary toolKey=projectProfit.query risk=L1 outcome=SUCCEEDED durationMillis=81 resultSizeBytes=152
+17:11:23.616 [boundedElastic-2] INFO com.smart.agent.run.AgentRunService -- tool_execution_summary toolKey=projectProfit.query risk=L1 outcome=SUCCEEDED durationMillis=9 resultSizeBytes=246
+17:11:23.673 [boundedElastic-1] INFO com.smart.agent.run.AgentRunService -- tool_execution_summary toolKey=projectProfit.query risk=L1 outcome=SUCCEEDED durationMillis=0 resultSizeBytes=246
+17:11:23.734 [main] ERROR com.smart.agent.chat.ChatOrchestrator -- AI�Ự׼��ʧ��: runId=2c910981-8970-41f2-bbe9-c41d558ae88f, traceId=t, stage=prepareContext, exception=com.smart.agent.common.error.AgentException
+com.smart.agent.common.error.AgentException: Required profit source menus missing
+	at com.smart.agent.chat.ChatOrchestrator$Session.validateProjectMenuPermission(ChatOrchestrator.java:795)
+	at com.smart.agent.chat.ChatOrchestrator$Session.start(ChatOrchestrator.java:359)
+	at com.smart.agent.chat.ChatOrchestrator.lambda$stream$0(ChatOrchestrator.java:231)
+	at reactor.core.publisher.FluxCreate.subscribe(FluxCreate.java:97)
+	at reactor.core.publisher.Mono.subscribe(Mono.java:4576)
+	at reactor.core.publisher.Mono.block(Mono.java:1778)
+	at com.smart.agent.chat.ProjectProfitChatTest.missingOneSourcePermissionRefusesBeforeAnyModelOrQuery(ProjectProfitChatTest.java:251)
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at org.junit.platform.commons.util.ReflectionUtils.invokeMethod(ReflectionUtils.java:775)
+	at org.junit.platform.commons.support.ReflectionSupport.invokeMethod(ReflectionSupport.java:479)
+	at org.junit.jupiter.engine.execution.MethodInvocation.proceed(MethodInvocation.java:60)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain$ValidatingInvocation.proceed(InvocationInterceptorChain.java:131)
+	at org.junit.jupiter.engine.extension.TimeoutExtension.intercept(TimeoutExtension.java:161)
+	at org.junit.jupiter.engine.extension.TimeoutExtension.interceptTestableMethod(TimeoutExtension.java:152)
+	at org.junit.jupiter.engine.extension.TimeoutExtension.interceptTestMethod(TimeoutExtension.java:91)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker$ReflectiveInterceptorCall.lambda$ofVoidMethod$0(InterceptingExecutableInvoker.java:112)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker.lambda$invoke$0(InterceptingExecutableInvoker.java:94)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain$InterceptedInvocation.proceed(InvocationInterceptorChain.java:106)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain.proceed(InvocationInterceptorChain.java:64)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain.chainAndInvoke(InvocationInterceptorChain.java:45)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain.invoke(InvocationInterceptorChain.java:37)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker.invoke(InterceptingExecutableInvoker.java:93)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker.invoke(InterceptingExecutableInvoker.java:87)
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.lambda$invokeTestMethod$7(TestMethodTestDescriptor.java:216)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.invokeTestMethod(TestMethodTestDescriptor.java:212)
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.execute(TestMethodTestDescriptor.java:137)
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.execute(TestMethodTestDescriptor.java:69)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$6(NodeTestTask.java:156)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$8(NodeTestTask.java:146)
+	at org.junit.platform.engine.support.hierarchical.Node.around(Node.java:137)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$9(NodeTestTask.java:144)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.executeRecursively(NodeTestTask.java:143)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.execute(NodeTestTask.java:100)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+	at org.junit.platform.engine.support.hierarchical.SameThreadHierarchicalTestExecutorService.invokeAll(SameThreadHierarchicalTestExecutorService.java:41)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$6(NodeTestTask.java:160)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$8(NodeTestTask.java:146)
+	at org.junit.platform.engine.support.hierarchical.Node.around(Node.java:137)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$9(NodeTestTask.java:144)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.executeRecursively(NodeTestTask.java:143)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.execute(NodeTestTask.java:100)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+	at org.junit.platform.engine.support.hierarchical.SameThreadHierarchicalTestExecutorService.invokeAll(SameThreadHierarchicalTestExecutorService.java:41)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$6(NodeTestTask.java:160)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$8(NodeTestTask.java:146)
+	at org.junit.platform.engine.support.hierarchical.Node.around(Node.java:137)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$9(NodeTestTask.java:144)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.executeRecursively(NodeTestTask.java:143)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.execute(NodeTestTask.java:100)
+	at org.junit.platform.engine.support.hierarchical.SameThreadHierarchicalTestExecutorService.submit(SameThreadHierarchicalTestExecutorService.java:35)
+	at org.junit.platform.engine.support.hierarchical.HierarchicalTestExecutor.execute(HierarchicalTestExecutor.java:57)
+	at org.junit.platform.engine.support.hierarchical.HierarchicalTestEngine.execute(HierarchicalTestEngine.java:54)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:201)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:170)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:94)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.lambda$execute$0(EngineExecutionOrchestrator.java:59)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.withInterceptedStreams(EngineExecutionOrchestrator.java:142)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:58)
+	at org.junit.platform.launcher.core.DefaultLauncher.execute(DefaultLauncher.java:103)
+	at org.junit.platform.launcher.core.DefaultLauncher.execute(DefaultLauncher.java:85)
+	at org.junit.platform.launcher.core.DelegatingLauncher.execute(DelegatingLauncher.java:47)
+	at org.junit.platform.launcher.core.InterceptingLauncher.lambda$execute$1(InterceptingLauncher.java:39)
+	at org.junit.platform.launcher.core.ClasspathAlignmentCheckingLauncherInterceptor.intercept(ClasspathAlignmentCheckingLauncherInterceptor.java:25)
+	at org.junit.platform.launcher.core.InterceptingLauncher.execute(InterceptingLauncher.java:38)
+	at org.junit.platform.launcher.core.DelegatingLauncher.execute(DelegatingLauncher.java:47)
+	at org.apache.maven.surefire.junitplatform.LauncherAdapter.executeWithoutCancellationToken(LauncherAdapter.java:60)
+	at org.apache.maven.surefire.junitplatform.LauncherAdapter.execute(LauncherAdapter.java:52)
+	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.execute(JUnitPlatformProvider.java:203)
+	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.invokeAllTests(JUnitPlatformProvider.java:168)
+	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.invoke(JUnitPlatformProvider.java:136)
+	at org.apache.maven.surefire.booter.ForkedBooter.runSuitesInProcess(ForkedBooter.java:385)
+	at org.apache.maven.surefire.booter.ForkedBooter.execute(ForkedBooter.java:162)
+	at org.apache.maven.surefire.booter.ForkedBooter.run(ForkedBooter.java:507)
+	at org.apache.maven.surefire.booter.ForkedBooter.main(ForkedBooter.java:495)
+17:11:23.775 [boundedElastic-2] INFO com.smart.agent.run.AgentRunService -- tool_execution_summary toolKey=projectProfit.clarifyDate risk=L1 outcome=SUCCEEDED durationMillis=10 resultSizeBytes=410
+17:11:23.823 [boundedElastic-2] INFO com.smart.agent.run.AgentRunService -- tool_execution_summary toolKey=projectProfit.query risk=L1 outcome=SUCCEEDED durationMillis=10 resultSizeBytes=152
+17:11:23.867 [boundedElastic-1] INFO com.smart.agent.run.AgentRunService -- tool_execution_summary toolKey=projectProfit.clarifyDate risk=L1 outcome=SUCCEEDED durationMillis=6 resultSizeBytes=410
+17:11:23.900 [boundedElastic-1] INFO com.smart.agent.run.AgentRunService -- tool_execution_summary toolKey=projectProfit.query risk=L1 outcome=SUCCEEDED durationMillis=12 resultSizeBytes=152
+17:11:23.927 [boundedElastic-2] INFO com.smart.agent.run.AgentRunService -- tool_execution_summary toolKey=projectProfit.clarifyDate risk=L1 outcome=SUCCEEDED durationMillis=3 resultSizeBytes=410
+17:11:23.956 [boundedElastic-2] INFO com.smart.agent.run.AgentRunService -- tool_execution_summary toolKey=projectProfit.compare risk=L1 outcome=SUCCEEDED durationMillis=10 resultSizeBytes=187
+17:11:24.006 [boundedElastic-1] INFO com.smart.agent.run.AgentRunService -- tool_execution_summary toolKey=projectProfit.query risk=L1 outcome=SUCCEEDED durationMillis=4 resultSizeBytes=246
+17:11:24.030 [boundedElastic-2] INFO com.smart.agent.run.AgentRunService -- tool_execution_summary toolKey=projectProfit.query risk=L1 outcome=SUCCEEDED durationMillis=5 resultSizeBytes=196
+17:11:24.051 [boundedElastic-1] INFO com.smart.agent.run.AgentRunService -- tool_execution_summary toolKey=projectProfit.clarifyDate risk=L1 outcome=SUCCEEDED durationMillis=2 resultSizeBytes=410
+17:11:24.086 [boundedElastic-1] INFO com.smart.agent.run.AgentRunService -- tool_execution_summary toolKey=projectProfit.compare risk=L1 outcome=SUCCEEDED durationMillis=13 resultSizeBytes=299
+17:11:24.097 [main] ERROR com.smart.agent.chat.ChatOrchestrator -- AI�Ự׼��ʧ��: runId=38e94781-7da2-4adf-87d6-930f61d97bf5, traceId=b, stage=prepareContext, exception=com.smart.agent.common.error.AgentException
+com.smart.agent.common.error.AgentException: Clarification selection is invalid
+	at com.smart.agent.chat.ChatOrchestrator$Session.clarificationFailure(ChatOrchestrator.java:539)
+	at com.smart.agent.chat.ChatOrchestrator$Session.resolveClarificationSelection(ChatOrchestrator.java:510)
+	at com.smart.agent.chat.ChatOrchestrator$Session.start(ChatOrchestrator.java:315)
+	at com.smart.agent.chat.ChatOrchestrator.lambda$stream$0(ChatOrchestrator.java:231)
+	at reactor.core.publisher.FluxCreate.subscribe(FluxCreate.java:97)
+	at reactor.core.publisher.Mono.subscribe(Mono.java:4576)
+	at reactor.core.publisher.Mono.block(Mono.java:1778)
+	at com.smart.agent.chat.ProjectProfitChatTest.comparisonProjectConfirmationRestoresBothGroupsEvenWithEmptyModelArguments(ProjectProfitChatTest.java:130)
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at org.junit.platform.commons.util.ReflectionUtils.invokeMethod(ReflectionUtils.java:775)
+	at org.junit.platform.commons.support.ReflectionSupport.invokeMethod(ReflectionSupport.java:479)
+	at org.junit.jupiter.engine.execution.MethodInvocation.proceed(MethodInvocation.java:60)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain$ValidatingInvocation.proceed(InvocationInterceptorChain.java:131)
+	at org.junit.jupiter.engine.extension.TimeoutExtension.intercept(TimeoutExtension.java:161)
+	at org.junit.jupiter.engine.extension.TimeoutExtension.interceptTestableMethod(TimeoutExtension.java:152)
+	at org.junit.jupiter.engine.extension.TimeoutExtension.interceptTestMethod(TimeoutExtension.java:91)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker$ReflectiveInterceptorCall.lambda$ofVoidMethod$0(InterceptingExecutableInvoker.java:112)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker.lambda$invoke$0(InterceptingExecutableInvoker.java:94)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain$InterceptedInvocation.proceed(InvocationInterceptorChain.java:106)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain.proceed(InvocationInterceptorChain.java:64)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain.chainAndInvoke(InvocationInterceptorChain.java:45)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain.invoke(InvocationInterceptorChain.java:37)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker.invoke(InterceptingExecutableInvoker.java:93)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker.invoke(InterceptingExecutableInvoker.java:87)
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.lambda$invokeTestMethod$7(TestMethodTestDescriptor.java:216)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.invokeTestMethod(TestMethodTestDescriptor.java:212)
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.execute(TestMethodTestDescriptor.java:137)
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.execute(TestMethodTestDescriptor.java:69)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$6(NodeTestTask.java:156)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$8(NodeTestTask.java:146)
+	at org.junit.platform.engine.support.hierarchical.Node.around(Node.java:137)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$9(NodeTestTask.java:144)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.executeRecursively(NodeTestTask.java:143)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.execute(NodeTestTask.java:100)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+	at org.junit.platform.engine.support.hierarchical.SameThreadHierarchicalTestExecutorService.invokeAll(SameThreadHierarchicalTestExecutorService.java:41)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$6(NodeTestTask.java:160)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$8(NodeTestTask.java:146)
+	at org.junit.platform.engine.support.hierarchical.Node.around(Node.java:137)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$9(NodeTestTask.java:144)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.executeRecursively(NodeTestTask.java:143)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.execute(NodeTestTask.java:100)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+	at org.junit.platform.engine.support.hierarchical.SameThreadHierarchicalTestExecutorService.invokeAll(SameThreadHierarchicalTestExecutorService.java:41)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$6(NodeTestTask.java:160)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$8(NodeTestTask.java:146)
+	at org.junit.platform.engine.support.hierarchical.Node.around(Node.java:137)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$9(NodeTestTask.java:144)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.executeRecursively(NodeTestTask.java:143)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.execute(NodeTestTask.java:100)
+	at org.junit.platform.engine.support.hierarchical.SameThreadHierarchicalTestExecutorService.submit(SameThreadHierarchicalTestExecutorService.java:35)
+	at org.junit.platform.engine.support.hierarchical.HierarchicalTestExecutor.execute(HierarchicalTestExecutor.java:57)
+	at org.junit.platform.engine.support.hierarchical.HierarchicalTestEngine.execute(HierarchicalTestEngine.java:54)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:201)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:170)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:94)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.lambda$execute$0(EngineExecutionOrchestrator.java:59)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.withInterceptedStreams(EngineExecutionOrchestrator.java:142)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:58)
+	at org.junit.platform.launcher.core.DefaultLauncher.execute(DefaultLauncher.java:103)
+	at org.junit.platform.launcher.core.DefaultLauncher.execute(DefaultLauncher.java:85)
+	at org.junit.platform.launcher.core.DelegatingLauncher.execute(DelegatingLauncher.java:47)
+	at org.junit.platform.launcher.core.InterceptingLauncher.lambda$execute$1(InterceptingLauncher.java:39)
+	at org.junit.platform.launcher.core.ClasspathAlignmentCheckingLauncherInterceptor.intercept(ClasspathAlignmentCheckingLauncherInterceptor.java:25)
+	at org.junit.platform.launcher.core.InterceptingLauncher.execute(InterceptingLauncher.java:38)
+	at org.junit.platform.launcher.core.DelegatingLauncher.execute(DelegatingLauncher.java:47)
+	at org.apache.maven.surefire.junitplatform.LauncherAdapter.executeWithoutCancellationToken(LauncherAdapter.java:60)
+	at org.apache.maven.surefire.junitplatform.LauncherAdapter.execute(LauncherAdapter.java:52)
+	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.execute(JUnitPlatformProvider.java:203)
+	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.invokeAllTests(JUnitPlatformProvider.java:168)
+	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.invoke(JUnitPlatformProvider.java:136)
+	at org.apache.maven.surefire.booter.ForkedBooter.runSuitesInProcess(ForkedBooter.java:385)
+	at org.apache.maven.surefire.booter.ForkedBooter.execute(ForkedBooter.java:162)
+	at org.apache.maven.surefire.booter.ForkedBooter.run(ForkedBooter.java:507)
+	at org.apache.maven.surefire.booter.ForkedBooter.main(ForkedBooter.java:495)
+17:11:24.122 [boundedElastic-1] INFO com.smart.agent.run.AgentRunService -- tool_execution_summary toolKey=projectProfit.query risk=L1 outcome=SUCCEEDED durationMillis=6 resultSizeBytes=152
+17:11:24.163 [boundedElastic-2] INFO com.smart.agent.run.AgentRunService -- tool_execution_summary toolKey=projectProfit.query risk=L1 outcome=SUCCEEDED durationMillis=10 resultSizeBytes=152
+17:11:24.176 [main] ERROR com.smart.agent.chat.ChatOrchestrator -- AI�Ự׼��ʧ��: runId=7384534e-9a21-487c-83eb-3bf6bcf2e1bb, traceId=t2, stage=prepareContext, exception=com.smart.agent.common.error.AgentException
+com.smart.agent.common.error.AgentException: Required profit source menus missing
+	at com.smart.agent.chat.ChatOrchestrator$Session.validateProjectMenuPermission(ChatOrchestrator.java:795)
+	at com.smart.agent.chat.ChatOrchestrator$Session.start(ChatOrchestrator.java:359)
+	at com.smart.agent.chat.ChatOrchestrator.lambda$stream$0(ChatOrchestrator.java:231)
+	at reactor.core.publisher.FluxCreate.subscribe(FluxCreate.java:97)
+	at reactor.core.publisher.Mono.subscribe(Mono.java:4576)
+	at reactor.core.publisher.Mono.block(Mono.java:1778)
+	at com.smart.agent.chat.ProjectProfitChatTest.explicitMetricSwitchRechecksNewSourcesBeforeModel(ProjectProfitChatTest.java:214)
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at org.junit.platform.commons.util.ReflectionUtils.invokeMethod(ReflectionUtils.java:775)
+	at org.junit.platform.commons.support.ReflectionSupport.invokeMethod(ReflectionSupport.java:479)
+	at org.junit.jupiter.engine.execution.MethodInvocation.proceed(MethodInvocation.java:60)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain$ValidatingInvocation.proceed(InvocationInterceptorChain.java:131)
+	at org.junit.jupiter.engine.extension.TimeoutExtension.intercept(TimeoutExtension.java:161)
+	at org.junit.jupiter.engine.extension.TimeoutExtension.interceptTestableMethod(TimeoutExtension.java:152)
+	at org.junit.jupiter.engine.extension.TimeoutExtension.interceptTestMethod(TimeoutExtension.java:91)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker$ReflectiveInterceptorCall.lambda$ofVoidMethod$0(InterceptingExecutableInvoker.java:112)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker.lambda$invoke$0(InterceptingExecutableInvoker.java:94)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain$InterceptedInvocation.proceed(InvocationInterceptorChain.java:106)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain.proceed(InvocationInterceptorChain.java:64)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain.chainAndInvoke(InvocationInterceptorChain.java:45)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain.invoke(InvocationInterceptorChain.java:37)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker.invoke(InterceptingExecutableInvoker.java:93)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker.invoke(InterceptingExecutableInvoker.java:87)
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.lambda$invokeTestMethod$7(TestMethodTestDescriptor.java:216)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.invokeTestMethod(TestMethodTestDescriptor.java:212)
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.execute(TestMethodTestDescriptor.java:137)
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.execute(TestMethodTestDescriptor.java:69)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$6(NodeTestTask.java:156)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$8(NodeTestTask.java:146)
+	at org.junit.platform.engine.support.hierarchical.Node.around(Node.java:137)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$9(NodeTestTask.java:144)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.executeRecursively(NodeTestTask.java:143)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.execute(NodeTestTask.java:100)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+	at org.junit.platform.engine.support.hierarchical.SameThreadHierarchicalTestExecutorService.invokeAll(SameThreadHierarchicalTestExecutorService.java:41)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$6(NodeTestTask.java:160)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$8(NodeTestTask.java:146)
+	at org.junit.platform.engine.support.hierarchical.Node.around(Node.java:137)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$9(NodeTestTask.java:144)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.executeRecursively(NodeTestTask.java:143)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.execute(NodeTestTask.java:100)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+	at org.junit.platform.engine.support.hierarchical.SameThreadHierarchicalTestExecutorService.invokeAll(SameThreadHierarchicalTestExecutorService.java:41)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$6(NodeTestTask.java:160)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$8(NodeTestTask.java:146)
+	at org.junit.platform.engine.support.hierarchical.Node.around(Node.java:137)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$9(NodeTestTask.java:144)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.executeRecursively(NodeTestTask.java:143)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.execute(NodeTestTask.java:100)
+	at org.junit.platform.engine.support.hierarchical.SameThreadHierarchicalTestExecutorService.submit(SameThreadHierarchicalTestExecutorService.java:35)
+	at org.junit.platform.engine.support.hierarchical.HierarchicalTestExecutor.execute(HierarchicalTestExecutor.java:57)
+	at org.junit.platform.engine.support.hierarchical.HierarchicalTestEngine.execute(HierarchicalTestEngine.java:54)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:201)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:170)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:94)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.lambda$execute$0(EngineExecutionOrchestrator.java:59)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.withInterceptedStreams(EngineExecutionOrchestrator.java:142)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:58)
+	at org.junit.platform.launcher.core.DefaultLauncher.execute(DefaultLauncher.java:103)
+	at org.junit.platform.launcher.core.DefaultLauncher.execute(DefaultLauncher.java:85)
+	at org.junit.platform.launcher.core.DelegatingLauncher.execute(DelegatingLauncher.java:47)
+	at org.junit.platform.launcher.core.InterceptingLauncher.lambda$execute$1(InterceptingLauncher.java:39)
+	at org.junit.platform.launcher.core.ClasspathAlignmentCheckingLauncherInterceptor.intercept(ClasspathAlignmentCheckingLauncherInterceptor.java:25)
+	at org.junit.platform.launcher.core.InterceptingLauncher.execute(InterceptingLauncher.java:38)
+	at org.junit.platform.launcher.core.DelegatingLauncher.execute(DelegatingLauncher.java:47)
+	at org.apache.maven.surefire.junitplatform.LauncherAdapter.executeWithoutCancellationToken(LauncherAdapter.java:60)
+	at org.apache.maven.surefire.junitplatform.LauncherAdapter.execute(LauncherAdapter.java:52)
+	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.execute(JUnitPlatformProvider.java:203)
+	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.invokeAllTests(JUnitPlatformProvider.java:168)
+	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.invoke(JUnitPlatformProvider.java:136)
+	at org.apache.maven.surefire.booter.ForkedBooter.runSuitesInProcess(ForkedBooter.java:385)
+	at org.apache.maven.surefire.booter.ForkedBooter.execute(ForkedBooter.java:162)
+	at org.apache.maven.surefire.booter.ForkedBooter.run(ForkedBooter.java:507)
+	at org.apache.maven.surefire.booter.ForkedBooter.main(ForkedBooter.java:495)
+17:11:24.203 [boundedElastic-1] INFO com.smart.agent.run.AgentRunService -- tool_execution_summary toolKey=projectProfit.query risk=L1 outcome=SUCCEEDED durationMillis=11 resultSizeBytes=152
+17:11:24.222 [boundedElastic-2] INFO com.smart.agent.run.AgentRunService -- tool_execution_summary toolKey=projectProfit.query risk=L1 outcome=SUCCEEDED durationMillis=0 resultSizeBytes=152
+17:11:24.238 [boundedElastic-1] INFO com.smart.agent.run.AgentRunService -- tool_execution_summary toolKey=projectProfit.query risk=L1 outcome=SUCCEEDED durationMillis=4 resultSizeBytes=152
+17:11:24.247 [boundedElastic-2] INFO com.smart.agent.run.AgentRunService -- tool_execution_summary toolKey=projectProfit.query risk=L1 outcome=SUCCEEDED durationMillis=0 resultSizeBytes=152
+17:11:24.273 [boundedElastic-1] INFO com.smart.agent.run.AgentRunService -- tool_execution_summary toolKey=projectProfit.compare risk=L1 outcome=SUCCEEDED durationMillis=7 resultSizeBytes=281
+[ERROR] Tests run: 13, Failures: 2, Errors: 1, Skipped: 0, Time elapsed: 1.728 s <<< FAILURE! -- in com.smart.agent.chat.ProjectProfitChatTest
+[ERROR] com.smart.agent.chat.ProjectProfitChatTest.comparisonAllDateConfirmationRemovesDatesFromBothGroups -- Time elapsed: 0.069 s <<< FAILURE!
+org.opentest4j.AssertionFailedError: 
+
+expected: null
+ but was: "projectCreateDate"
+	at com.smart.agent.chat.ProjectProfitChatTest.comparisonAllDateConfirmationRemovesDatesFromBothGroups(ProjectProfitChatTest.java:147)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+
+[ERROR] com.smart.agent.chat.ProjectProfitChatTest.comparisonProjectConfirmationRestoresBothGroupsEvenWithEmptyModelArguments -- Time elapsed: 0.043 s <<< FAILURE!
+java.lang.AssertionError: 
+
+Expecting actual:
+  "[ChatEvent[type=message_start, runId=38e94781-7da2-4adf-87d6-930f61d97bf5, sequence=1, traceId=b, messageId=e1fe7aa1-9414-49fc-8e98-081ba94acfe6, code=null, text=null, toolKey=null, data={}], ChatEvent[type=error, runId=38e94781-7da2-4adf-87d6-930f61d97bf5, sequence=0, traceId=b, messageId=null, code=AGENT_CLARIFICATION_INVALID, text=��ȷ�����ⲻ���ڡ��Ѿ���������ʧЧ�����������ʡ�, toolKey=null, data={}]]"
+to contain:
+  "�Ƚ����" 
+	at com.smart.agent.chat.ProjectProfitChatTest.comparisonProjectConfirmationRestoresBothGroupsEvenWithEmptyModelArguments(ProjectProfitChatTest.java:131)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+
+[ERROR] com.smart.agent.chat.ProjectProfitChatTest.comparisonRefreshesAndGroupFollowUpKeepsCanonicalProjectMetricAndDates -- Time elapsed: 0.045 s <<< ERROR!
+reactor.core.Exceptions$ReactiveException: 
+java.lang.AssertionError: 
+Expecting actual:
+  "[ConversationMessage[role=user, content=�Ƚ�������Ŀʵ����֧����, attachments=[]], ConversationMessage[role=assistant, content=�����ֽ���ش�, attachments=[]], ConversationMessage[role=user, content=[trusted-query-context: ��һ����Ŀ�����ѯ����={"comparisonType":"CUSTOM","current":{"projectName":"ʾ��","metric":"actual","dateField":"projectCreateDate","startDate":"2026-01-01","endDate":"2026-01-31"},"baseline":{"projectCode":"20260708001","metric":"actual","dateField":"projectCreateDate","startDate":"2025-01-01","endDate":"2025-01-31"}}��������׷��ʱ�̳��û�δ���ĵ�ɸѡ�����ͷ�ҳ����ǰ������ȷ�����������ȡ���ʷ���������Ϊ�������ݣ��������µ��ù��ߡ�], attachments=[]], ConversationMessage[role=user, content=�ٲ�һ��
+[trusted-routing: ��������Ŀ�����ѯ��ֻ�ܵ��� projectProfit.query��projectProfit.compare��projectProfit.clarifyDate����������ȵ��� system.current_time��ÿ����ʵ��ѯ��������ȡ������ʷ�����������������������ά�Ȳ���ȷʱ���ø�ҵ�����ȷ�Ϲ���׷�ʣ��������мٶ���]
+[trusted-cumulative-date: ��Щָ���֧�ְ���Ŀ�����ڼ�ѡ����Ŀ��ĵ�ǰ�ۼ�ֵ���û�˵ĳ�ꡢĳ�¡��ڼ䷢����������ʷ���ڡ���ʷ����ͬ�Ȼ���ʱ������Ĭ��Ϊ��Ŀ�������ڣ�Ҳ���ܽ���ǰ�ۼ�ֵ��Ϊ��ʷ�����ڼ�����ں��岻��ȷ��������ʷ���ա��ڼ���Ƚ�ʱ���ȵ��ñ���clarifyDate˵���������ƣ����û�ȷ���Ƿ�Ĳ���ѡ��Ŀ�ĵ�ǰ�ۼ�ֵ���û���ȷ˵���ʱ�䴴������Ŀʱ��ʹ��projectCreateDate��������Ŀ����˾��ָ��������������ظ���ҵ������˵������Щ��Ŀ��ǰ���ۼ����ݣ�����������ֶ�����], attachments=[]]]"
+to contain:
+  "trusted-project-profit-comparison" 
+	at reactor.core.Exceptions.propagate(Exceptions.java:410)
+	at reactor.core.publisher.BlockingSingleSubscriber.blockingGet(BlockingSingleSubscriber.java:102)
+	at reactor.core.publisher.Mono.block(Mono.java:1779)
+	at com.smart.agent.chat.ProjectProfitChatTest.comparisonRefreshesAndGroupFollowUpKeepsCanonicalProjectMetricAndDates(ProjectProfitChatTest.java:109)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+	Suppressed: java.lang.Exception: #block terminated with an error
+		at reactor.core.publisher.BlockingSingleSubscriber.blockingGet(BlockingSingleSubscriber.java:104)
+		... 5 more
+Caused by: java.lang.AssertionError: 
+Expecting actual:
+  "[ConversationMessage[role=user, content=�Ƚ�������Ŀʵ����֧����, attachments=[]], ConversationMessage[role=assistant, content=�����ֽ���ش�, attachments=[]], ConversationMessage[role=user, content=[trusted-query-context: ��һ����Ŀ�����ѯ����={"comparisonType":"CUSTOM","current":{"projectName":"ʾ��","metric":"actual","dateField":"projectCreateDate","startDate":"2026-01-01","endDate":"2026-01-31"},"baseline":{"projectCode":"20260708001","metric":"actual","dateField":"projectCreateDate","startDate":"2025-01-01","endDate":"2025-01-31"}}��������׷��ʱ�̳��û�δ���ĵ�ɸѡ�����ͷ�ҳ����ǰ������ȷ�����������ȡ���ʷ���������Ϊ�������ݣ��������µ��ù��ߡ�], attachments=[]], ConversationMessage[role=user, content=�ٲ�һ��
+[trusted-routing: ��������Ŀ�����ѯ��ֻ�ܵ��� projectProfit.query��projectProfit.compare��projectProfit.clarifyDate����������ȵ��� system.current_time��ÿ����ʵ��ѯ��������ȡ������ʷ�����������������������ά�Ȳ���ȷʱ���ø�ҵ�����ȷ�Ϲ���׷�ʣ��������мٶ���]
+[trusted-cumulative-date: ��Щָ���֧�ְ���Ŀ�����ڼ�ѡ����Ŀ��ĵ�ǰ�ۼ�ֵ���û�˵ĳ�ꡢĳ�¡��ڼ䷢����������ʷ���ڡ���ʷ����ͬ�Ȼ���ʱ������Ĭ��Ϊ��Ŀ�������ڣ�Ҳ���ܽ���ǰ�ۼ�ֵ��Ϊ��ʷ�����ڼ�����ں��岻��ȷ��������ʷ���ա��ڼ���Ƚ�ʱ���ȵ��ñ���clarifyDate˵���������ƣ����û�ȷ���Ƿ�Ĳ���ѡ��Ŀ�ĵ�ǰ�ۼ�ֵ���û���ȷ˵���ʱ�䴴������Ŀʱ��ʹ��projectCreateDate��������Ŀ����˾��ָ��������������ظ���ҵ������˵������Щ��Ŀ��ǰ���ۼ����ݣ�����������ֶ�����], attachments=[]]]"
+to contain:
+  "trusted-project-profit-comparison" 
+	at com.smart.agent.chat.ProjectProfitChatTest.lambda$comparisonRefreshesAndGroupFollowUpKeepsCanonicalProjectMetricAndDates$1(ProjectProfitChatTest.java:99)
+	at com.smart.agent.chat.ProjectProfitChatTest.lambda$orchestrator$0(ProjectProfitChatTest.java:86)
+	at com.smart.agent.chat.ChatOrchestrator$Session.callModel(ChatOrchestrator.java:1417)
+	at com.smart.agent.chat.ChatOrchestrator$Session.start(ChatOrchestrator.java:387)
+	at com.smart.agent.chat.ChatOrchestrator.lambda$stream$0(ChatOrchestrator.java:231)
+	at reactor.core.publisher.FluxCreate.subscribe(FluxCreate.java:97)
+	at reactor.core.publisher.Mono.subscribe(Mono.java:4576)
+	at reactor.core.publisher.Mono.block(Mono.java:1778)
+	... 4 more
+
+17:11:25.187 [main] INFO com.smart.agent.tool.profit.SmartBootProjectProfitBusinessClient -- ������Ŀ�����ѯ����: userId=user, trustedProjectCount=2, mode=null, page=null, pageSize=null
+17:11:25.781 [main] INFO com.smart.agent.tool.profit.SmartBootProjectProfitBusinessClient -- ������Ŀ�����ѯ����: userId=u, trustedProjectCount=1, mode=null, page=null, pageSize=null
+17:11:25.827 [main] INFO com.smart.agent.tool.profit.SmartBootProjectProfitBusinessClient -- ������Ŀ�����ѯ����: userId=user, trustedProjectCount=1, mode=summary, page=1, pageSize=20
+17:11:25.858 [main] INFO com.smart.agent.tool.profit.SmartBootProjectProfitBusinessClient -- ������Ŀ�����ѯ����: userId=user, trustedProjectCount=2, mode=summary, page=1, pageSize=20
+[ERROR] Failures: 
+[ERROR]   ProjectProfitChatTest.comparisonAllDateConfirmationRemovesDatesFromBothGroups:147 
+expected: null
+ but was: "projectCreateDate"
+[ERROR]   ProjectProfitChatTest.comparisonProjectConfirmationRestoresBothGroupsEvenWithEmptyModelArguments:131 
+Expecting actual:
+  "[ChatEvent[type=message_start, runId=38e94781-7da2-4adf-87d6-930f61d97bf5, sequence=1, traceId=b, messageId=e1fe7aa1-9414-49fc-8e98-081ba94acfe6, code=null, text=null, toolKey=null, data={}], ChatEvent[type=error, runId=38e94781-7da2-4adf-87d6-930f61d97bf5, sequence=0, traceId=b, messageId=null, code=AGENT_CLARIFICATION_INVALID, text=��ȷ�����ⲻ���ڡ��Ѿ���������ʧЧ�����������ʡ�, toolKey=null, data={}]]"
+to contain:
+  "�Ƚ����" 
+[ERROR] Errors: 
+[ERROR]   ProjectProfitChatTest.comparisonRefreshesAndGroupFollowUpKeepsCanonicalProjectMetricAndDates:109 ? Reactive java.lang.AssertionError: 
+Expecting actual:
+  "[ConversationMessage[role=user, content=�Ƚ�������Ŀʵ����֧����, attachments=[]], ConversationMessage[role=assistant, content=�����ֽ���ش�, attachments=[]], ConversationMessage[role=user, content=[trusted-query-context: ��һ����Ŀ�����ѯ����={"comparisonType":"CUSTOM","current":{"projectName":"ʾ��","metric":"actual","dateField":"projectCreateDate","startDate":"2026-01-01","endDate":"2026-01-31"},"baseline":{"projectCode":"20260708001","metric":"actual","dateField":"projectCreateDate","startDate":"2025-01-01","endDate":"2025-01-31"}}��������׷��ʱ�̳��û�δ���ĵ�ɸѡ�����ͷ�ҳ����ǰ������ȷ�����������ȡ���ʷ���������Ϊ�������ݣ��������µ��ù��ߡ�], attachments=[]], ConversationMessage[role=user, content=�ٲ�һ��
+[trusted-routing: ��������Ŀ�����ѯ��ֻ�ܵ��� projectProfit.query��projectProfit.compare��projectProfit.clarifyDate����������ȵ��� system.current_time��ÿ����ʵ��ѯ��������ȡ������ʷ�����������������������ά�Ȳ���ȷʱ���ø�ҵ�����ȷ�Ϲ���׷�ʣ��������мٶ���]
+[trusted-cumulative-date: ��Щָ���֧�ְ���Ŀ�����ڼ�ѡ����Ŀ��ĵ�ǰ�ۼ�ֵ���û�˵ĳ�ꡢĳ�¡��ڼ䷢����������ʷ���ڡ���ʷ����ͬ�Ȼ���ʱ������Ĭ��Ϊ��Ŀ�������ڣ�Ҳ���ܽ���ǰ�ۼ�ֵ��Ϊ��ʷ�����ڼ�����ں��岻��ȷ��������ʷ���ա��ڼ���Ƚ�ʱ���ȵ��ñ���clarifyDate˵���������ƣ����û�ȷ���Ƿ�Ĳ���ѡ��Ŀ�ĵ�ǰ�ۼ�ֵ���û���ȷ˵���ʱ�䴴������Ŀʱ��ʹ��projectCreateDate��������Ŀ����˾��ָ��������������ظ���ҵ������˵������Щ��Ŀ��ǰ���ۼ����ݣ�����������ֶ�����], attachments=[]]]"
+to contain:
+  "trusted-project-profit-comparison" 
+[ERROR] Tests run: 22, Failures: 2, Errors: 1, Skipped: 0
+[ERROR] Failed to execute goal org.apache.maven.plugins:maven-surefire-plugin:3.5.6:test (default-test) on project smart-agent: There are test failures.
+[ERROR] 
+[ERROR] See F:\project\gongcheng\agent\target\surefire-reports for the individual test results.
+[ERROR] See dump files (if any exist) [date].dump, [date]-jvmRun[N].dump and [date].dumpstream.
+[ERROR] -> [Help 1]
+[ERROR] 
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR] 
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException

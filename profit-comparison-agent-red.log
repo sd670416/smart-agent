@@ -1,0 +1,69 @@
+[ERROR] COMPILATION ERROR : 
+[ERROR] /F:/project/gongcheng/agent/src/test/java/com/smart/agent/tool/profit/ProjectProfitCompareTest.java:[12,13] �Ҳ�������
+  ����:   �� ProjectProfitCompareInput
+  λ��: �� com.smart.agent.tool.profit.ProjectProfitCompareTest
+[ERROR] /F:/project/gongcheng/agent/src/test/java/com/smart/agent/tool/profit/ProjectProfitCompareInputTest.java:[11,24] �Ҳ�������
+  ����:   �� ProjectProfitCompareInput
+  λ��: �� com.smart.agent.tool.profit.ProjectProfitCompareInputTest
+[ERROR] /F:/project/gongcheng/agent/src/test/java/com/smart/agent/tool/profit/ProjectProfitCompareInputTest.java:[12,36] �Ҳ�������
+  ����:   �� ProjectProfitCompareInput
+  λ��: �� com.smart.agent.tool.profit.ProjectProfitCompareInputTest
+[ERROR] /F:/project/gongcheng/agent/src/test/java/com/smart/agent/tool/profit/ProjectProfitCompareInputTest.java:[13,36] �Ҳ�������
+  ����:   �� ProjectProfitCompareInput
+  λ��: �� com.smart.agent.tool.profit.ProjectProfitCompareInputTest
+[ERROR] /F:/project/gongcheng/agent/src/test/java/com/smart/agent/tool/profit/ProjectProfitCompareInputTest.java:[14,36] �Ҳ�������
+  ����:   �� ProjectProfitCompareInput
+  λ��: �� com.smart.agent.tool.profit.ProjectProfitCompareInputTest
+[ERROR] /F:/project/gongcheng/agent/src/test/java/com/smart/agent/tool/profit/ProjectProfitCompareTest.java:[13,50] �Ҳ�������
+  ����:   �� ProjectProfitCompareInput
+  λ��: �� com.smart.agent.tool.profit.ProjectProfitCompareTest
+[ERROR] /F:/project/gongcheng/agent/src/test/java/com/smart/agent/tool/profit/ProjectProfitCompareTest.java:[25,22] �Ҳ�������
+  ����:   �� ProjectProfitCompareTool
+  λ��: �� com.smart.agent.tool.profit.ProjectProfitCompareTest
+[ERROR] /F:/project/gongcheng/agent/src/test/java/com/smart/agent/tool/profit/SmartBootProjectProfitBusinessClientTest.java:[32,51] �Ҳ�������
+  ����:   �� ProjectProfitCompareInput
+  λ��: �� com.smart.agent.tool.profit.SmartBootProjectProfitBusinessClientTest
+[ERROR] /F:/project/gongcheng/agent/src/test/java/com/smart/agent/tool/profit/SmartBootProjectProfitBusinessClientTest.java:[48,93] �Ҳ�������
+  ����:   �� ProjectProfitCompareInput
+  λ��: �� com.smart.agent.tool.profit.SmartBootProjectProfitBusinessClientTest
+[ERROR] /F:/project/gongcheng/agent/src/test/java/com/smart/agent/tool/profit/SmartBootProjectProfitBusinessClientTest.java:[54,93] �Ҳ�������
+  ����:   �� ProjectProfitCompareInput
+  λ��: �� com.smart.agent.tool.profit.SmartBootProjectProfitBusinessClientTest
+[ERROR] Failed to execute goal org.apache.maven.plugins:maven-compiler-plugin:3.14.1:testCompile (default-testCompile) on project smart-agent: Compilation failure: Compilation failure: 
+[ERROR] /F:/project/gongcheng/agent/src/test/java/com/smart/agent/tool/profit/ProjectProfitCompareTest.java:[12,13] �Ҳ�������
+[ERROR]   ����:   �� ProjectProfitCompareInput
+[ERROR]   λ��: �� com.smart.agent.tool.profit.ProjectProfitCompareTest
+[ERROR] /F:/project/gongcheng/agent/src/test/java/com/smart/agent/tool/profit/ProjectProfitCompareInputTest.java:[11,24] �Ҳ�������
+[ERROR]   ����:   �� ProjectProfitCompareInput
+[ERROR]   λ��: �� com.smart.agent.tool.profit.ProjectProfitCompareInputTest
+[ERROR] /F:/project/gongcheng/agent/src/test/java/com/smart/agent/tool/profit/ProjectProfitCompareInputTest.java:[12,36] �Ҳ�������
+[ERROR]   ����:   �� ProjectProfitCompareInput
+[ERROR]   λ��: �� com.smart.agent.tool.profit.ProjectProfitCompareInputTest
+[ERROR] /F:/project/gongcheng/agent/src/test/java/com/smart/agent/tool/profit/ProjectProfitCompareInputTest.java:[13,36] �Ҳ�������
+[ERROR]   ����:   �� ProjectProfitCompareInput
+[ERROR]   λ��: �� com.smart.agent.tool.profit.ProjectProfitCompareInputTest
+[ERROR] /F:/project/gongcheng/agent/src/test/java/com/smart/agent/tool/profit/ProjectProfitCompareInputTest.java:[14,36] �Ҳ�������
+[ERROR]   ����:   �� ProjectProfitCompareInput
+[ERROR]   λ��: �� com.smart.agent.tool.profit.ProjectProfitCompareInputTest
+[ERROR] /F:/project/gongcheng/agent/src/test/java/com/smart/agent/tool/profit/ProjectProfitCompareTest.java:[13,50] �Ҳ�������
+[ERROR]   ����:   �� ProjectProfitCompareInput
+[ERROR]   λ��: �� com.smart.agent.tool.profit.ProjectProfitCompareTest
+[ERROR] /F:/project/gongcheng/agent/src/test/java/com/smart/agent/tool/profit/ProjectProfitCompareTest.java:[25,22] �Ҳ�������
+[ERROR]   ����:   �� ProjectProfitCompareTool
+[ERROR]   λ��: �� com.smart.agent.tool.profit.ProjectProfitCompareTest
+[ERROR] /F:/project/gongcheng/agent/src/test/java/com/smart/agent/tool/profit/SmartBootProjectProfitBusinessClientTest.java:[32,51] �Ҳ�������
+[ERROR]   ����:   �� ProjectProfitCompareInput
+[ERROR]   λ��: �� com.smart.agent.tool.profit.SmartBootProjectProfitBusinessClientTest
+[ERROR] /F:/project/gongcheng/agent/src/test/java/com/smart/agent/tool/profit/SmartBootProjectProfitBusinessClientTest.java:[48,93] �Ҳ�������
+[ERROR]   ����:   �� ProjectProfitCompareInput
+[ERROR]   λ��: �� com.smart.agent.tool.profit.SmartBootProjectProfitBusinessClientTest
+[ERROR] /F:/project/gongcheng/agent/src/test/java/com/smart/agent/tool/profit/SmartBootProjectProfitBusinessClientTest.java:[54,93] �Ҳ�������
+[ERROR]   ����:   �� ProjectProfitCompareInput
+[ERROR]   λ��: �� com.smart.agent.tool.profit.SmartBootProjectProfitBusinessClientTest
+[ERROR] -> [Help 1]
+[ERROR] 
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR] 
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException

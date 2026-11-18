@@ -21,7 +21,7 @@ public class ProjectProfitQueryTool implements AgentTool<ProjectProfitQueryInput
             +"budget预算利润=施工合同最终金额-合并预算成本；actual实际收支利润=已收项目款-净付款，净付款已减退款，不二次减退款。both同时展示。"
             +"预算利润率分母是施工合同最终金额，实际利润率分母是已收项目款，保留亏损负值；分母零显示暂无法计算，汇总率按总金额计算不是平均项目率。"
             +"实际利润是审批记录的收支估算，不是会计核算利润。按metric验证全部来源权限。"
-            +"不支持比较。日期仅项目创建范围内项目的当前累计利润，不是期间利润；含义不明用projectProfit.clarifyDate。序号按可信真实projectId重查。";}
+            +"两组当前数据比较使用projectProfit.compare，不支持同比环比或历史快照。日期仅项目创建范围内项目的当前累计利润，不是期间利润；含义不明用projectProfit.clarifyDate。序号按可信真实projectId重查。";}
     @Override public String argumentsSchemaJson(){return """
             {"type":"object","properties":{
             "projectId":{"type":"string","description":"真实项目ID"},
