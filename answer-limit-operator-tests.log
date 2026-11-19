@@ -1,0 +1,1028 @@
+14:14:12.135 [main] WARN org.springframework.context.annotation.AnnotationConfigApplicationContext -- Exception encountered during context initialization - cancelling refresh attempt: org.springframework.beans.factory.BeanCreationException: Error creating bean with name 'chatOrchestrator': Injection of autowired dependencies failed
+14:14:13.071 [main] INFO org.springframework.boot.test.context.SpringBootTestContextBootstrapper -- Found @SpringBootConfiguration com.smart.agent.SmartAgentApplication for test class com.smart.agent.chat.ChatControllerIT
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::               (v3.5.16)
+
+2026-11-19T14:14:13.675+08:00  INFO 29388 --- [smart-agent] [           main] com.smart.agent.chat.ChatControllerIT    : Starting ChatControllerIT using Java 21.0.6 with PID 29388 (started by 34248 in F:\project\gongcheng\agent)
+2026-11-19T14:14:13.678+08:00  INFO 29388 --- [smart-agent] [           main] com.smart.agent.chat.ChatControllerIT    : No active profile set, falling back to 1 default profile: "local"
+2026-11-19T14:14:16.813+08:00  INFO 29388 --- [smart-agent] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Multiple Spring Data modules found, entering strict repository configuration mode
+2026-11-19T14:14:16.824+08:00  INFO 29388 --- [smart-agent] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data Redis repositories in DEFAULT mode.
+2026-11-19T14:14:17.046+08:00  INFO 29388 --- [smart-agent] [           main] .RepositoryConfigurationExtensionSupport : Spring Data Redis - Could not safely identify store assignment for repository candidate interface com.smart.agent.model.audit.ModelCallLogRepository; If you want this repository to be a Redis repository, consider annotating your entities with one of these annotations: org.springframework.data.redis.core.RedisHash (preferred), or consider extending one of the following types with your repository: org.springframework.data.keyvalue.repository.KeyValueRepository
+2026-11-19T14:14:17.050+08:00  INFO 29388 --- [smart-agent] [           main] .RepositoryConfigurationExtensionSupport : Spring Data Redis - Could not safely identify store assignment for repository candidate interface com.smart.agent.model.config.ModelTestLogRepository; If you want this repository to be a Redis repository, consider annotating your entities with one of these annotations: org.springframework.data.redis.core.RedisHash (preferred), or consider extending one of the following types with your repository: org.springframework.data.keyvalue.repository.KeyValueRepository
+2026-11-19T14:14:17.051+08:00  INFO 29388 --- [smart-agent] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 181 ms. Found 0 Redis repository interfaces.
+2026-11-19T14:14:17.962+08:00  INFO 29388 --- [smart-agent] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 0 (http)
+2026-11-19T14:14:17.988+08:00  INFO 29388 --- [smart-agent] [           main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+2026-11-19T14:14:17.990+08:00  INFO 29388 --- [smart-agent] [           main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/10.1.55]
+2026-11-19T14:14:18.108+08:00  INFO 29388 --- [smart-agent] [           main] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
+2026-11-19T14:14:18.108+08:00  INFO 29388 --- [smart-agent] [           main] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 4412 ms
+2026-11-19T14:14:20.593+08:00  INFO 29388 --- [smart-agent] [           main] c.s.a.model.ModelGatewayConfiguration    : AIģ������: mode=openai-compatible, baseUrl=https://api.iruidong.com/v1, chatModel=glm-5.3, connectTimeout=PT10S, readTimeout=PT2M, apiKeyPresent=true
+2026-11-19T14:14:22.878+08:00  INFO 29388 --- [smart-agent] [           main] o.s.b.a.e.web.EndpointLinksResolver      : Exposing 2 endpoints beneath base path '/actuator'
+2026-11-19T14:14:23.097+08:00  INFO 29388 --- [smart-agent] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port 50654 (http) with context path '/'
+2026-11-19T14:14:23.132+08:00  INFO 29388 --- [smart-agent] [           main] com.smart.agent.chat.ChatControllerIT    : Started ChatControllerIT in 9.912 seconds (process running for 13.677)
+2026-11-19T14:14:23.807+08:00 ERROR 29388 --- [smart-agent] [           main] com.smart.agent.chat.ChatOrchestrator    : AI�Ự׼��ʧ��: runId=a8006972-678c-4eba-93f7-c0ea0dbae2ce, traceId=trace-timeout, stage=routeRun, exception=reactor.core.Exceptions$ReactiveException
+
+reactor.core.Exceptions$ReactiveException: java.util.concurrent.TimeoutException: Did not observe any item or terminal signal within 25ms in 'subscribeOnCallable' (and no fallback has been configured)
+	at reactor.core.Exceptions.propagate(Exceptions.java:410) ~[reactor-core-3.7.19.jar:3.7.19]
+	at reactor.core.publisher.BlockingSingleSubscriber.blockingGet(BlockingSingleSubscriber.java:102) ~[reactor-core-3.7.19.jar:3.7.19]
+	at reactor.core.publisher.Mono.block(Mono.java:1779) ~[reactor-core-3.7.19.jar:3.7.19]
+	at com.smart.agent.chat.ChatOrchestrator$Session.withinBudget(ChatOrchestrator.java:2514) ~[classes/:na]
+	at com.smart.agent.chat.ChatOrchestrator$Session.retrieveKnowledgeIfRequired(ChatOrchestrator.java:1357) ~[classes/:na]
+	at com.smart.agent.chat.ChatOrchestrator$Session.start(ChatOrchestrator.java:386) ~[classes/:na]
+	at com.smart.agent.chat.ChatOrchestrator.lambda$stream$0(ChatOrchestrator.java:244) ~[classes/:na]
+	at reactor.core.publisher.FluxCreate.subscribe(FluxCreate.java:97) ~[reactor-core-3.7.19.jar:3.7.19]
+	at reactor.core.publisher.Mono.subscribe(Mono.java:4576) ~[reactor-core-3.7.19.jar:3.7.19]
+	at reactor.core.publisher.Mono.block(Mono.java:1806) ~[reactor-core-3.7.19.jar:3.7.19]
+	at com.smart.agent.chat.ChatControllerIT.absoluteDeadlineStopsBlockingKnowledgeAndPersistsTimeout(ChatControllerIT.java:739) ~[test-classes/:na]
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103) ~[na:na]
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580) ~[na:na]
+	at org.junit.platform.commons.util.ReflectionUtils.invokeMethod(ReflectionUtils.java:775) ~[junit-platform-commons-1.12.2.jar:1.12.2]
+	at org.junit.platform.commons.support.ReflectionSupport.invokeMethod(ReflectionSupport.java:479) ~[junit-platform-commons-1.12.2.jar:1.12.2]
+	at org.junit.jupiter.engine.execution.MethodInvocation.proceed(MethodInvocation.java:60) ~[junit-jupiter-engine-5.12.2.jar:5.12.2]
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain$ValidatingInvocation.proceed(InvocationInterceptorChain.java:131) ~[junit-jupiter-engine-5.12.2.jar:5.12.2]
+	at org.junit.jupiter.engine.extension.TimeoutExtension.intercept(TimeoutExtension.java:161) ~[junit-jupiter-engine-5.12.2.jar:5.12.2]
+	at org.junit.jupiter.engine.extension.TimeoutExtension.interceptTestableMethod(TimeoutExtension.java:152) ~[junit-jupiter-engine-5.12.2.jar:5.12.2]
+	at org.junit.jupiter.engine.extension.TimeoutExtension.interceptTestMethod(TimeoutExtension.java:91) ~[junit-jupiter-engine-5.12.2.jar:5.12.2]
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker$ReflectiveInterceptorCall.lambda$ofVoidMethod$0(InterceptingExecutableInvoker.java:112) ~[junit-jupiter-engine-5.12.2.jar:5.12.2]
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker.lambda$invoke$0(InterceptingExecutableInvoker.java:94) ~[junit-jupiter-engine-5.12.2.jar:5.12.2]
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain$InterceptedInvocation.proceed(InvocationInterceptorChain.java:106) ~[junit-jupiter-engine-5.12.2.jar:5.12.2]
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain.proceed(InvocationInterceptorChain.java:64) ~[junit-jupiter-engine-5.12.2.jar:5.12.2]
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain.chainAndInvoke(InvocationInterceptorChain.java:45) ~[junit-jupiter-engine-5.12.2.jar:5.12.2]
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain.invoke(InvocationInterceptorChain.java:37) ~[junit-jupiter-engine-5.12.2.jar:5.12.2]
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker.invoke(InterceptingExecutableInvoker.java:93) ~[junit-jupiter-engine-5.12.2.jar:5.12.2]
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker.invoke(InterceptingExecutableInvoker.java:87) ~[junit-jupiter-engine-5.12.2.jar:5.12.2]
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.lambda$invokeTestMethod$7(TestMethodTestDescriptor.java:216) ~[junit-jupiter-engine-5.12.2.jar:5.12.2]
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73) ~[junit-platform-engine-1.12.2.jar:1.12.2]
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.invokeTestMethod(TestMethodTestDescriptor.java:212) ~[junit-jupiter-engine-5.12.2.jar:5.12.2]
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.execute(TestMethodTestDescriptor.java:137) ~[junit-jupiter-engine-5.12.2.jar:5.12.2]
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.execute(TestMethodTestDescriptor.java:69) ~[junit-jupiter-engine-5.12.2.jar:5.12.2]
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$6(NodeTestTask.java:156) ~[junit-platform-engine-1.12.2.jar:1.12.2]
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73) ~[junit-platform-engine-1.12.2.jar:1.12.2]
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$8(NodeTestTask.java:146) ~[junit-platform-engine-1.12.2.jar:1.12.2]
+	at org.junit.platform.engine.support.hierarchical.Node.around(Node.java:137) ~[junit-platform-engine-1.12.2.jar:1.12.2]
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$9(NodeTestTask.java:144) ~[junit-platform-engine-1.12.2.jar:1.12.2]
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73) ~[junit-platform-engine-1.12.2.jar:1.12.2]
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.executeRecursively(NodeTestTask.java:143) ~[junit-platform-engine-1.12.2.jar:1.12.2]
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.execute(NodeTestTask.java:100) ~[junit-platform-engine-1.12.2.jar:1.12.2]
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596) ~[na:na]
+	at org.junit.platform.engine.support.hierarchical.SameThreadHierarchicalTestExecutorService.invokeAll(SameThreadHierarchicalTestExecutorService.java:41) ~[junit-platform-engine-1.12.2.jar:1.12.2]
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$6(NodeTestTask.java:160) ~[junit-platform-engine-1.12.2.jar:1.12.2]
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73) ~[junit-platform-engine-1.12.2.jar:1.12.2]
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$8(NodeTestTask.java:146) ~[junit-platform-engine-1.12.2.jar:1.12.2]
+	at org.junit.platform.engine.support.hierarchical.Node.around(Node.java:137) ~[junit-platform-engine-1.12.2.jar:1.12.2]
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$9(NodeTestTask.java:144) ~[junit-platform-engine-1.12.2.jar:1.12.2]
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73) ~[junit-platform-engine-1.12.2.jar:1.12.2]
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.executeRecursively(NodeTestTask.java:143) ~[junit-platform-engine-1.12.2.jar:1.12.2]
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.execute(NodeTestTask.java:100) ~[junit-platform-engine-1.12.2.jar:1.12.2]
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596) ~[na:na]
+	at org.junit.platform.engine.support.hierarchical.SameThreadHierarchicalTestExecutorService.invokeAll(SameThreadHierarchicalTestExecutorService.java:41) ~[junit-platform-engine-1.12.2.jar:1.12.2]
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$6(NodeTestTask.java:160) ~[junit-platform-engine-1.12.2.jar:1.12.2]
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73) ~[junit-platform-engine-1.12.2.jar:1.12.2]
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$8(NodeTestTask.java:146) ~[junit-platform-engine-1.12.2.jar:1.12.2]
+	at org.junit.platform.engine.support.hierarchical.Node.around(Node.java:137) ~[junit-platform-engine-1.12.2.jar:1.12.2]
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$9(NodeTestTask.java:144) ~[junit-platform-engine-1.12.2.jar:1.12.2]
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73) ~[junit-platform-engine-1.12.2.jar:1.12.2]
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.executeRecursively(NodeTestTask.java:143) ~[junit-platform-engine-1.12.2.jar:1.12.2]
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.execute(NodeTestTask.java:100) ~[junit-platform-engine-1.12.2.jar:1.12.2]
+	at org.junit.platform.engine.support.hierarchical.SameThreadHierarchicalTestExecutorService.submit(SameThreadHierarchicalTestExecutorService.java:35) ~[junit-platform-engine-1.12.2.jar:1.12.2]
+	at org.junit.platform.engine.support.hierarchical.HierarchicalTestExecutor.execute(HierarchicalTestExecutor.java:57) ~[junit-platform-engine-1.12.2.jar:1.12.2]
+	at org.junit.platform.engine.support.hierarchical.HierarchicalTestEngine.execute(HierarchicalTestEngine.java:54) ~[junit-platform-engine-1.12.2.jar:1.12.2]
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:201) ~[junit-platform-launcher-1.12.2.jar:1.12.2]
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:170) ~[junit-platform-launcher-1.12.2.jar:1.12.2]
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:94) ~[junit-platform-launcher-1.12.2.jar:1.12.2]
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.lambda$execute$0(EngineExecutionOrchestrator.java:59) ~[junit-platform-launcher-1.12.2.jar:1.12.2]
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.withInterceptedStreams(EngineExecutionOrchestrator.java:142) ~[junit-platform-launcher-1.12.2.jar:1.12.2]
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:58) ~[junit-platform-launcher-1.12.2.jar:1.12.2]
+	at org.junit.platform.launcher.core.DefaultLauncher.execute(DefaultLauncher.java:103) ~[junit-platform-launcher-1.12.2.jar:1.12.2]
+	at org.junit.platform.launcher.core.DefaultLauncher.execute(DefaultLauncher.java:85) ~[junit-platform-launcher-1.12.2.jar:1.12.2]
+	at org.junit.platform.launcher.core.DelegatingLauncher.execute(DelegatingLauncher.java:47) ~[junit-platform-launcher-1.12.2.jar:1.12.2]
+	at org.junit.platform.launcher.core.InterceptingLauncher.lambda$execute$1(InterceptingLauncher.java:39) ~[junit-platform-launcher-1.12.2.jar:1.12.2]
+	at org.junit.platform.launcher.core.ClasspathAlignmentCheckingLauncherInterceptor.intercept(ClasspathAlignmentCheckingLauncherInterceptor.java:25) ~[junit-platform-launcher-1.12.2.jar:1.12.2]
+	at org.junit.platform.launcher.core.InterceptingLauncher.execute(InterceptingLauncher.java:38) ~[junit-platform-launcher-1.12.2.jar:1.12.2]
+	at org.junit.platform.launcher.core.DelegatingLauncher.execute(DelegatingLauncher.java:47) ~[junit-platform-launcher-1.12.2.jar:1.12.2]
+	at org.apache.maven.surefire.junitplatform.LauncherAdapter.executeWithoutCancellationToken(LauncherAdapter.java:60) ~[surefire-junit-platform-3.5.6.jar:3.5.6]
+	at org.apache.maven.surefire.junitplatform.LauncherAdapter.execute(LauncherAdapter.java:52) ~[surefire-junit-platform-3.5.6.jar:3.5.6]
+	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.execute(JUnitPlatformProvider.java:203) ~[surefire-junit-platform-3.5.6.jar:3.5.6]
+	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.invokeAllTests(JUnitPlatformProvider.java:168) ~[surefire-junit-platform-3.5.6.jar:3.5.6]
+	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.invoke(JUnitPlatformProvider.java:136) ~[surefire-junit-platform-3.5.6.jar:3.5.6]
+	at org.apache.maven.surefire.booter.ForkedBooter.runSuitesInProcess(ForkedBooter.java:385) ~[surefire-booter-3.5.6.jar:3.5.6]
+	at org.apache.maven.surefire.booter.ForkedBooter.execute(ForkedBooter.java:162) ~[surefire-booter-3.5.6.jar:3.5.6]
+	at org.apache.maven.surefire.booter.ForkedBooter.run(ForkedBooter.java:507) ~[surefire-booter-3.5.6.jar:3.5.6]
+	at org.apache.maven.surefire.booter.ForkedBooter.main(ForkedBooter.java:495) ~[surefire-booter-3.5.6.jar:3.5.6]
+	Suppressed: java.lang.Exception: #block terminated with an error
+		at reactor.core.publisher.BlockingSingleSubscriber.blockingGet(BlockingSingleSubscriber.java:104) ~[reactor-core-3.7.19.jar:3.7.19]
+		... 84 common frames omitted
+Caused by: java.util.concurrent.TimeoutException: Did not observe any item or terminal signal within 25ms in 'subscribeOnCallable' (and no fallback has been configured)
+	at reactor.core.publisher.FluxTimeout$TimeoutMainSubscriber.handleTimeout(FluxTimeout.java:296) ~[reactor-core-3.7.19.jar:3.7.19]
+	at reactor.core.publisher.FluxTimeout$TimeoutMainSubscriber.doTimeout(FluxTimeout.java:281) ~[reactor-core-3.7.19.jar:3.7.19]
+	at reactor.core.publisher.FluxTimeout$TimeoutTimeoutSubscriber.onNext(FluxTimeout.java:420) ~[reactor-core-3.7.19.jar:3.7.19]
+	at reactor.core.publisher.FluxOnErrorReturn$ReturnSubscriber.onNext(FluxOnErrorReturn.java:162) ~[reactor-core-3.7.19.jar:3.7.19]
+	at reactor.core.publisher.MonoDelay$MonoDelayRunnable.propagateDelay(MonoDelay.java:270) ~[reactor-core-3.7.19.jar:3.7.19]
+	at reactor.core.publisher.MonoDelay$MonoDelayRunnable.run(MonoDelay.java:285) ~[reactor-core-3.7.19.jar:3.7.19]
+	at reactor.core.scheduler.SchedulerTask.call(SchedulerTask.java:68) ~[reactor-core-3.7.19.jar:3.7.19]
+	at reactor.core.scheduler.SchedulerTask.call(SchedulerTask.java:28) ~[reactor-core-3.7.19.jar:3.7.19]
+	at java.base/java.util.concurrent.FutureTask.run(FutureTask.java:317) ~[na:na]
+	at java.base/java.util.concurrent.ScheduledThreadPoolExecutor$ScheduledFutureTask.run(ScheduledThreadPoolExecutor.java:304) ~[na:na]
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1144) ~[na:na]
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:642) ~[na:na]
+	at java.base/java.lang.Thread.run(Thread.java:1583) ~[na:na]
+
+2026-11-19T14:14:24.430+08:00  INFO 29388 --- [smart-agent] [o-auto-1-exec-1] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring DispatcherServlet 'dispatcherServlet'
+2026-11-19T14:14:24.431+08:00  INFO 29388 --- [smart-agent] [o-auto-1-exec-1] o.s.web.servlet.DispatcherServlet        : Initializing Servlet 'dispatcherServlet'
+2026-11-19T14:14:24.433+08:00  INFO 29388 --- [smart-agent] [o-auto-1-exec-1] o.s.web.servlet.DispatcherServlet        : Completed initialization in 2 ms
+2026-11-19T14:14:24.807+08:00  INFO 29388 --- [smart-agent] [oundedElastic-1] com.smart.agent.run.AgentRunService      : tool_execution_summary toolKey=approval.query risk=L1 outcome=SUCCEEDED durationMillis=26 resultSizeBytes=218
+2026-11-19T14:14:24.925+08:00  INFO 29388 --- [smart-agent] [oundedElastic-1] com.smart.agent.run.AgentRunService      : tool_execution_summary toolKey=approval.getDetail risk=L1 outcome=SUCCEEDED durationMillis=6 resultSizeBytes=204
+2026-11-19T14:14:25.019+08:00  INFO 29388 --- [smart-agent] [oundedElastic-3] com.smart.agent.run.AgentRunService      : tool_execution_summary toolKey=approval.query risk=L1 outcome=SUCCEEDED durationMillis=0 resultSizeBytes=218
+2026-11-19T14:14:25.041+08:00  INFO 29388 --- [smart-agent] [oundedElastic-3] com.smart.agent.run.AgentRunService      : tool_execution_summary toolKey=approval.getDetail risk=L1 outcome=SUCCEEDED durationMillis=0 resultSizeBytes=204
+2026-11-19T14:14:25.081+08:00  INFO 29388 --- [smart-agent] [oundedElastic-1] com.smart.agent.run.AgentRunService      : tool_execution_summary toolKey=approval.query risk=L1 outcome=SUCCEEDED durationMillis=0 resultSizeBytes=218
+2026-11-19T14:14:25.101+08:00  INFO 29388 --- [smart-agent] [oundedElastic-1] com.smart.agent.run.AgentRunService      : tool_execution_summary toolKey=approval.getDetail risk=L1 outcome=SUCCEEDED durationMillis=0 resultSizeBytes=204
+2026-11-19T14:14:25.163+08:00  INFO 29388 --- [smart-agent] [oundedElastic-3] com.smart.agent.run.AgentRunService      : tool_execution_summary toolKey=approval.query risk=L1 outcome=SUCCEEDED durationMillis=0 resultSizeBytes=218
+2026-11-19T14:14:25.182+08:00  INFO 29388 --- [smart-agent] [oundedElastic-3] com.smart.agent.run.AgentRunService      : tool_execution_summary toolKey=approval.getDetail risk=L1 outcome=SUCCEEDED durationMillis=0 resultSizeBytes=204
+2026-11-19T14:14:25.264+08:00  INFO 29388 --- [smart-agent] [oundedElastic-1] com.smart.agent.run.AgentRunService      : tool_execution_summary toolKey=approval.query risk=L1 outcome=SUCCEEDED durationMillis=0 resultSizeBytes=218
+2026-11-19T14:14:25.283+08:00 ERROR 29388 --- [smart-agent] [o-auto-1-exec-3] com.smart.agent.chat.ChatOrchestrator    : AI�Ự׼��ʧ��: runId=ce1f8b0c-eb1e-486a-8538-402de74a07f5, traceId=57875d6b-7c6e-46d8-b838-e2881c9d4346, stage=callModel, exception=com.smart.agent.common.error.AgentException
+
+com.smart.agent.common.error.AgentException: AGENT_APPROVAL_ORDINAL_OUT_OF_RANGE
+	at com.smart.agent.chat.ChatOrchestrator$Session.approvalSelectionFailure(ChatOrchestrator.java:1713) ~[classes/:na]
+	at com.smart.agent.chat.ChatOrchestrator$Session.resolveApprovalOrdinalFollowUp(ChatOrchestrator.java:1600) ~[classes/:na]
+	at com.smart.agent.chat.ChatOrchestrator$Session.start(ChatOrchestrator.java:396) ~[classes/:na]
+	at com.smart.agent.chat.ChatOrchestrator.lambda$stream$0(ChatOrchestrator.java:244) ~[classes/:na]
+	at reactor.core.publisher.FluxCreate.subscribe(FluxCreate.java:97) ~[reactor-core-3.7.19.jar:3.7.19]
+	at reactor.core.publisher.Flux.subscribe(Flux.java:8891) ~[reactor-core-3.7.19.jar:3.7.19]
+	at reactor.core.publisher.Flux.subscribeWith(Flux.java:9012) ~[reactor-core-3.7.19.jar:3.7.19]
+	at reactor.core.publisher.Flux.subscribe(Flux.java:8856) ~[reactor-core-3.7.19.jar:3.7.19]
+	at reactor.core.publisher.Flux.subscribe(Flux.java:8780) ~[reactor-core-3.7.19.jar:3.7.19]
+	at com.smart.agent.chat.ChatSseUseCase.stream(ChatSseUseCase.java:17) ~[classes/:na]
+	at com.smart.agent.chat.ChatController.stream(ChatController.java:29) ~[classes/:na]
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103) ~[na:na]
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580) ~[na:na]
+	at org.springframework.web.method.support.InvocableHandlerMethod.doInvoke(InvocableHandlerMethod.java:258) ~[spring-web-6.2.19.jar:6.2.19]
+	at org.springframework.web.method.support.InvocableHandlerMethod.invokeForRequest(InvocableHandlerMethod.java:191) ~[spring-web-6.2.19.jar:6.2.19]
+	at org.springframework.web.servlet.mvc.method.annotation.ServletInvocableHandlerMethod.invokeAndHandle(ServletInvocableHandlerMethod.java:118) ~[spring-webmvc-6.2.19.jar:6.2.19]
+	at org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter.invokeHandlerMethod(RequestMappingHandlerAdapter.java:991) ~[spring-webmvc-6.2.19.jar:6.2.19]
+	at org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter.handleInternal(RequestMappingHandlerAdapter.java:896) ~[spring-webmvc-6.2.19.jar:6.2.19]
+	at org.springframework.web.servlet.mvc.method.AbstractHandlerMethodAdapter.handle(AbstractHandlerMethodAdapter.java:87) ~[spring-webmvc-6.2.19.jar:6.2.19]
+	at org.springframework.web.servlet.DispatcherServlet.doDispatch(DispatcherServlet.java:1089) ~[spring-webmvc-6.2.19.jar:6.2.19]
+	at org.springframework.web.servlet.DispatcherServlet.doService(DispatcherServlet.java:979) ~[spring-webmvc-6.2.19.jar:6.2.19]
+	at org.springframework.web.servlet.FrameworkServlet.processRequest(FrameworkServlet.java:1014) ~[spring-webmvc-6.2.19.jar:6.2.19]
+	at org.springframework.web.servlet.FrameworkServlet.doPost(FrameworkServlet.java:914) ~[spring-webmvc-6.2.19.jar:6.2.19]
+	at jakarta.servlet.http.HttpServlet.service(HttpServlet.java:590) ~[tomcat-embed-core-10.1.55.jar:6.0]
+	at org.springframework.web.servlet.FrameworkServlet.service(FrameworkServlet.java:885) ~[spring-webmvc-6.2.19.jar:6.2.19]
+	at jakarta.servlet.http.HttpServlet.service(HttpServlet.java:658) ~[tomcat-embed-core-10.1.55.jar:6.0]
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:193) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:138) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.tomcat.websocket.server.WsFilter.doFilter(WsFilter.java:51) ~[tomcat-embed-websocket-10.1.55.jar:10.1.55]
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:162) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:138) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.springframework.web.filter.RequestContextFilter.doFilterInternal(RequestContextFilter.java:100) ~[spring-web-6.2.19.jar:6.2.19]
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116) ~[spring-web-6.2.19.jar:6.2.19]
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:162) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:138) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.springframework.web.filter.FormContentFilter.doFilterInternal(FormContentFilter.java:93) ~[spring-web-6.2.19.jar:6.2.19]
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116) ~[spring-web-6.2.19.jar:6.2.19]
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:162) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:138) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at com.smart.agent.security.AgentContextFilter.doFilterInternal(AgentContextFilter.java:74) ~[classes/:na]
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116) ~[spring-web-6.2.19.jar:6.2.19]
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:162) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:138) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.springframework.web.filter.ServerHttpObservationFilter.doFilterInternal(ServerHttpObservationFilter.java:110) ~[spring-web-6.2.19.jar:6.2.19]
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116) ~[spring-web-6.2.19.jar:6.2.19]
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:162) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:138) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.springframework.web.filter.CharacterEncodingFilter.doFilterInternal(CharacterEncodingFilter.java:201) ~[spring-web-6.2.19.jar:6.2.19]
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116) ~[spring-web-6.2.19.jar:6.2.19]
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:162) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:138) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at com.smart.agent.common.trace.TraceIdFilter.doFilterInternal(TraceIdFilter.java:35) ~[classes/:na]
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116) ~[spring-web-6.2.19.jar:6.2.19]
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:162) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:138) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.catalina.core.StandardWrapperValve.invoke(StandardWrapperValve.java:165) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.catalina.core.StandardContextValve.invoke(StandardContextValve.java:88) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.catalina.authenticator.AuthenticatorBase.invoke(AuthenticatorBase.java:492) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.catalina.core.StandardHostValve.invoke(StandardHostValve.java:113) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.catalina.valves.ErrorReportValve.invoke(ErrorReportValve.java:83) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.catalina.core.StandardEngineValve.invoke(StandardEngineValve.java:72) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.catalina.connector.CoyoteAdapter.service(CoyoteAdapter.java:342) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.coyote.http11.Http11Processor.service(Http11Processor.java:399) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.coyote.AbstractProcessorLight.process(AbstractProcessorLight.java:63) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.coyote.AbstractProtocol$ConnectionHandler.process(AbstractProtocol.java:1272) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.tomcat.util.net.NioEndpoint$SocketProcessor.doRun(NioEndpoint.java:1797) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.tomcat.util.net.SocketProcessorBase.run(SocketProcessorBase.java:52) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.tomcat.util.threads.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:973) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.tomcat.util.threads.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:491) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.tomcat.util.threads.TaskThread$WrappingRunnable.run(TaskThread.java:63) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at java.base/java.lang.Thread.run(Thread.java:1583) ~[na:na]
+
+2026-11-19T14:14:25.500+08:00  WARN 29388 --- [smart-agent] [o-auto-1-exec-8] .w.s.m.s.DefaultHandlerExceptionResolver : Resolved [org.springframework.http.converter.HttpMessageNotReadableException: JSON parse error: Unrecognized field "permissions" (class com.smart.agent.chat.ChatCommand), not marked as ignorable]
+2026-11-19T14:14:25.592+08:00  INFO 29388 --- [smart-agent] [oundedElastic-1] com.smart.agent.run.AgentRunService      : tool_execution_summary toolKey=system.current_time risk=L0 outcome=SUCCEEDED durationMillis=3 resultSizeBytes=129
+2026-11-19T14:14:25.606+08:00  INFO 29388 --- [smart-agent] [oundedElastic-3] com.smart.agent.run.AgentRunService      : tool_execution_summary toolKey=approval.query risk=L1 outcome=SUCCEEDED durationMillis=5 resultSizeBytes=223
+2026-11-19T14:14:25.668+08:00  INFO 29388 --- [smart-agent] [oundedElastic-1] com.smart.agent.run.AgentRunService      : tool_execution_summary toolKey=web.search risk=L1 outcome=FAILED durationMillis=3 resultSizeBytes=0
+2026-11-19T14:14:25.719+08:00  INFO 29388 --- [smart-agent] [oundedElastic-1] com.smart.agent.run.AgentRunService      : tool_execution_summary toolKey=web.search risk=L1 outcome=SUCCEEDED durationMillis=6 resultSizeBytes=250
+2026-11-19T14:14:25.765+08:00  INFO 29388 --- [smart-agent] [oundedElastic-3] com.smart.agent.run.AgentRunService      : tool_execution_summary toolKey=project.getOverview risk=L1 outcome=SUCCEEDED durationMillis=10 resultSizeBytes=155
+2026-11-19T14:14:25.793+08:00 ERROR 29388 --- [smart-agent] [o-auto-1-exec-3] com.smart.agent.chat.ChatOrchestrator    : AI�Ự׼��ʧ��: runId=eaf1d997-f0f6-4a7c-9f50-84967f2bf3ab, traceId=f2b68b30-d147-4a8a-99aa-df1bb03976e3, stage=prepareContext, exception=com.smart.agent.common.error.AgentException
+
+com.smart.agent.common.error.AgentException: Project menu permission is required
+	at com.smart.agent.chat.ChatOrchestrator$Session.validateProjectMenuPermission(ChatOrchestrator.java:929) ~[classes/:na]
+	at com.smart.agent.chat.ChatOrchestrator$Session.start(ChatOrchestrator.java:372) ~[classes/:na]
+	at com.smart.agent.chat.ChatOrchestrator.lambda$stream$0(ChatOrchestrator.java:244) ~[classes/:na]
+	at reactor.core.publisher.FluxCreate.subscribe(FluxCreate.java:97) ~[reactor-core-3.7.19.jar:3.7.19]
+	at reactor.core.publisher.Flux.subscribe(Flux.java:8891) ~[reactor-core-3.7.19.jar:3.7.19]
+	at reactor.core.publisher.Flux.subscribeWith(Flux.java:9012) ~[reactor-core-3.7.19.jar:3.7.19]
+	at reactor.core.publisher.Flux.subscribe(Flux.java:8856) ~[reactor-core-3.7.19.jar:3.7.19]
+	at reactor.core.publisher.Flux.subscribe(Flux.java:8780) ~[reactor-core-3.7.19.jar:3.7.19]
+	at com.smart.agent.chat.ChatSseUseCase.stream(ChatSseUseCase.java:17) ~[classes/:na]
+	at com.smart.agent.chat.ChatController.stream(ChatController.java:29) ~[classes/:na]
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103) ~[na:na]
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580) ~[na:na]
+	at org.springframework.web.method.support.InvocableHandlerMethod.doInvoke(InvocableHandlerMethod.java:258) ~[spring-web-6.2.19.jar:6.2.19]
+	at org.springframework.web.method.support.InvocableHandlerMethod.invokeForRequest(InvocableHandlerMethod.java:191) ~[spring-web-6.2.19.jar:6.2.19]
+	at org.springframework.web.servlet.mvc.method.annotation.ServletInvocableHandlerMethod.invokeAndHandle(ServletInvocableHandlerMethod.java:118) ~[spring-webmvc-6.2.19.jar:6.2.19]
+	at org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter.invokeHandlerMethod(RequestMappingHandlerAdapter.java:991) ~[spring-webmvc-6.2.19.jar:6.2.19]
+	at org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter.handleInternal(RequestMappingHandlerAdapter.java:896) ~[spring-webmvc-6.2.19.jar:6.2.19]
+	at org.springframework.web.servlet.mvc.method.AbstractHandlerMethodAdapter.handle(AbstractHandlerMethodAdapter.java:87) ~[spring-webmvc-6.2.19.jar:6.2.19]
+	at org.springframework.web.servlet.DispatcherServlet.doDispatch(DispatcherServlet.java:1089) ~[spring-webmvc-6.2.19.jar:6.2.19]
+	at org.springframework.web.servlet.DispatcherServlet.doService(DispatcherServlet.java:979) ~[spring-webmvc-6.2.19.jar:6.2.19]
+	at org.springframework.web.servlet.FrameworkServlet.processRequest(FrameworkServlet.java:1014) ~[spring-webmvc-6.2.19.jar:6.2.19]
+	at org.springframework.web.servlet.FrameworkServlet.doPost(FrameworkServlet.java:914) ~[spring-webmvc-6.2.19.jar:6.2.19]
+	at jakarta.servlet.http.HttpServlet.service(HttpServlet.java:590) ~[tomcat-embed-core-10.1.55.jar:6.0]
+	at org.springframework.web.servlet.FrameworkServlet.service(FrameworkServlet.java:885) ~[spring-webmvc-6.2.19.jar:6.2.19]
+	at jakarta.servlet.http.HttpServlet.service(HttpServlet.java:658) ~[tomcat-embed-core-10.1.55.jar:6.0]
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:193) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:138) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.tomcat.websocket.server.WsFilter.doFilter(WsFilter.java:51) ~[tomcat-embed-websocket-10.1.55.jar:10.1.55]
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:162) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:138) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.springframework.web.filter.RequestContextFilter.doFilterInternal(RequestContextFilter.java:100) ~[spring-web-6.2.19.jar:6.2.19]
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116) ~[spring-web-6.2.19.jar:6.2.19]
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:162) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:138) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.springframework.web.filter.FormContentFilter.doFilterInternal(FormContentFilter.java:93) ~[spring-web-6.2.19.jar:6.2.19]
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116) ~[spring-web-6.2.19.jar:6.2.19]
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:162) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:138) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at com.smart.agent.security.AgentContextFilter.doFilterInternal(AgentContextFilter.java:74) ~[classes/:na]
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116) ~[spring-web-6.2.19.jar:6.2.19]
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:162) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:138) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.springframework.web.filter.ServerHttpObservationFilter.doFilterInternal(ServerHttpObservationFilter.java:110) ~[spring-web-6.2.19.jar:6.2.19]
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116) ~[spring-web-6.2.19.jar:6.2.19]
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:162) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:138) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.springframework.web.filter.CharacterEncodingFilter.doFilterInternal(CharacterEncodingFilter.java:201) ~[spring-web-6.2.19.jar:6.2.19]
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116) ~[spring-web-6.2.19.jar:6.2.19]
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:162) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:138) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at com.smart.agent.common.trace.TraceIdFilter.doFilterInternal(TraceIdFilter.java:35) ~[classes/:na]
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116) ~[spring-web-6.2.19.jar:6.2.19]
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:162) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:138) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.catalina.core.StandardWrapperValve.invoke(StandardWrapperValve.java:165) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.catalina.core.StandardContextValve.invoke(StandardContextValve.java:88) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.catalina.authenticator.AuthenticatorBase.invoke(AuthenticatorBase.java:492) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.catalina.core.StandardHostValve.invoke(StandardHostValve.java:113) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.catalina.valves.ErrorReportValve.invoke(ErrorReportValve.java:83) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.catalina.core.StandardEngineValve.invoke(StandardEngineValve.java:72) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.catalina.connector.CoyoteAdapter.service(CoyoteAdapter.java:342) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.coyote.http11.Http11Processor.service(Http11Processor.java:399) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.coyote.AbstractProcessorLight.process(AbstractProcessorLight.java:63) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.coyote.AbstractProtocol$ConnectionHandler.process(AbstractProtocol.java:1272) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.tomcat.util.net.NioEndpoint$SocketProcessor.doRun(NioEndpoint.java:1797) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.tomcat.util.net.SocketProcessorBase.run(SocketProcessorBase.java:52) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.tomcat.util.threads.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:973) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.tomcat.util.threads.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:491) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.tomcat.util.threads.TaskThread$WrappingRunnable.run(TaskThread.java:63) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at java.base/java.lang.Thread.run(Thread.java:1583) ~[na:na]
+
+2026-11-19T14:14:25.816+08:00 ERROR 29388 --- [smart-agent] [o-auto-1-exec-4] com.smart.agent.chat.ChatOrchestrator    : AI�Ự׼��ʧ��: runId=f54935eb-d7ce-4524-9eba-b8292fcf1b93, traceId=523485dc-cdcd-4fd1-a42c-be3f8d817dd4, stage=prepareContext, exception=com.smart.agent.common.error.AgentException
+
+com.smart.agent.common.error.AgentException: Project menu permission is required
+	at com.smart.agent.chat.ChatOrchestrator$Session.validateProjectMenuPermission(ChatOrchestrator.java:929) ~[classes/:na]
+	at com.smart.agent.chat.ChatOrchestrator$Session.start(ChatOrchestrator.java:372) ~[classes/:na]
+	at com.smart.agent.chat.ChatOrchestrator.lambda$stream$0(ChatOrchestrator.java:244) ~[classes/:na]
+	at reactor.core.publisher.FluxCreate.subscribe(FluxCreate.java:97) ~[reactor-core-3.7.19.jar:3.7.19]
+	at reactor.core.publisher.Flux.subscribe(Flux.java:8891) ~[reactor-core-3.7.19.jar:3.7.19]
+	at reactor.core.publisher.Flux.subscribeWith(Flux.java:9012) ~[reactor-core-3.7.19.jar:3.7.19]
+	at reactor.core.publisher.Flux.subscribe(Flux.java:8856) ~[reactor-core-3.7.19.jar:3.7.19]
+	at reactor.core.publisher.Flux.subscribe(Flux.java:8780) ~[reactor-core-3.7.19.jar:3.7.19]
+	at com.smart.agent.chat.ChatSseUseCase.stream(ChatSseUseCase.java:17) ~[classes/:na]
+	at com.smart.agent.chat.ChatController.stream(ChatController.java:29) ~[classes/:na]
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103) ~[na:na]
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580) ~[na:na]
+	at org.springframework.web.method.support.InvocableHandlerMethod.doInvoke(InvocableHandlerMethod.java:258) ~[spring-web-6.2.19.jar:6.2.19]
+	at org.springframework.web.method.support.InvocableHandlerMethod.invokeForRequest(InvocableHandlerMethod.java:191) ~[spring-web-6.2.19.jar:6.2.19]
+	at org.springframework.web.servlet.mvc.method.annotation.ServletInvocableHandlerMethod.invokeAndHandle(ServletInvocableHandlerMethod.java:118) ~[spring-webmvc-6.2.19.jar:6.2.19]
+	at org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter.invokeHandlerMethod(RequestMappingHandlerAdapter.java:991) ~[spring-webmvc-6.2.19.jar:6.2.19]
+	at org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter.handleInternal(RequestMappingHandlerAdapter.java:896) ~[spring-webmvc-6.2.19.jar:6.2.19]
+	at org.springframework.web.servlet.mvc.method.AbstractHandlerMethodAdapter.handle(AbstractHandlerMethodAdapter.java:87) ~[spring-webmvc-6.2.19.jar:6.2.19]
+	at org.springframework.web.servlet.DispatcherServlet.doDispatch(DispatcherServlet.java:1089) ~[spring-webmvc-6.2.19.jar:6.2.19]
+	at org.springframework.web.servlet.DispatcherServlet.doService(DispatcherServlet.java:979) ~[spring-webmvc-6.2.19.jar:6.2.19]
+	at org.springframework.web.servlet.FrameworkServlet.processRequest(FrameworkServlet.java:1014) ~[spring-webmvc-6.2.19.jar:6.2.19]
+	at org.springframework.web.servlet.FrameworkServlet.doPost(FrameworkServlet.java:914) ~[spring-webmvc-6.2.19.jar:6.2.19]
+	at jakarta.servlet.http.HttpServlet.service(HttpServlet.java:590) ~[tomcat-embed-core-10.1.55.jar:6.0]
+	at org.springframework.web.servlet.FrameworkServlet.service(FrameworkServlet.java:885) ~[spring-webmvc-6.2.19.jar:6.2.19]
+	at jakarta.servlet.http.HttpServlet.service(HttpServlet.java:658) ~[tomcat-embed-core-10.1.55.jar:6.0]
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:193) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:138) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.tomcat.websocket.server.WsFilter.doFilter(WsFilter.java:51) ~[tomcat-embed-websocket-10.1.55.jar:10.1.55]
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:162) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:138) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.springframework.web.filter.RequestContextFilter.doFilterInternal(RequestContextFilter.java:100) ~[spring-web-6.2.19.jar:6.2.19]
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116) ~[spring-web-6.2.19.jar:6.2.19]
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:162) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:138) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.springframework.web.filter.FormContentFilter.doFilterInternal(FormContentFilter.java:93) ~[spring-web-6.2.19.jar:6.2.19]
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116) ~[spring-web-6.2.19.jar:6.2.19]
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:162) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:138) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at com.smart.agent.security.AgentContextFilter.doFilterInternal(AgentContextFilter.java:74) ~[classes/:na]
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116) ~[spring-web-6.2.19.jar:6.2.19]
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:162) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:138) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.springframework.web.filter.ServerHttpObservationFilter.doFilterInternal(ServerHttpObservationFilter.java:110) ~[spring-web-6.2.19.jar:6.2.19]
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116) ~[spring-web-6.2.19.jar:6.2.19]
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:162) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:138) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.springframework.web.filter.CharacterEncodingFilter.doFilterInternal(CharacterEncodingFilter.java:201) ~[spring-web-6.2.19.jar:6.2.19]
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116) ~[spring-web-6.2.19.jar:6.2.19]
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:162) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:138) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at com.smart.agent.common.trace.TraceIdFilter.doFilterInternal(TraceIdFilter.java:35) ~[classes/:na]
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116) ~[spring-web-6.2.19.jar:6.2.19]
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:162) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:138) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.catalina.core.StandardWrapperValve.invoke(StandardWrapperValve.java:165) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.catalina.core.StandardContextValve.invoke(StandardContextValve.java:88) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.catalina.authenticator.AuthenticatorBase.invoke(AuthenticatorBase.java:492) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.catalina.core.StandardHostValve.invoke(StandardHostValve.java:113) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.catalina.valves.ErrorReportValve.invoke(ErrorReportValve.java:83) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.catalina.core.StandardEngineValve.invoke(StandardEngineValve.java:72) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.catalina.connector.CoyoteAdapter.service(CoyoteAdapter.java:342) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.coyote.http11.Http11Processor.service(Http11Processor.java:399) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.coyote.AbstractProcessorLight.process(AbstractProcessorLight.java:63) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.coyote.AbstractProtocol$ConnectionHandler.process(AbstractProtocol.java:1272) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.tomcat.util.net.NioEndpoint$SocketProcessor.doRun(NioEndpoint.java:1797) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.tomcat.util.net.SocketProcessorBase.run(SocketProcessorBase.java:52) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.tomcat.util.threads.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:973) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.tomcat.util.threads.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:491) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.tomcat.util.threads.TaskThread$WrappingRunnable.run(TaskThread.java:63) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at java.base/java.lang.Thread.run(Thread.java:1583) ~[na:na]
+
+2026-11-19T14:14:25.865+08:00  INFO 29388 --- [smart-agent] [oundedElastic-1] com.smart.agent.run.AgentRunService      : tool_execution_summary toolKey=project.getOverview risk=L1 outcome=DENIED durationMillis=0 resultSizeBytes=0
+2026-11-19T14:14:27.917+08:00  INFO 29388 --- [smart-agent] [oundedElastic-1] com.smart.agent.run.AgentRunService      : tool_execution_summary toolKey=approval.query risk=L1 outcome=SUCCEEDED durationMillis=0 resultSizeBytes=218
+2026-11-19T14:14:27.932+08:00  INFO 29388 --- [smart-agent] [oundedElastic-1] com.smart.agent.run.AgentRunService      : tool_execution_summary toolKey=approval.query risk=L1 outcome=SUCCEEDED durationMillis=0 resultSizeBytes=218
+2026-11-19T14:14:27.954+08:00 ERROR 29388 --- [smart-agent] [-auto-1-exec-10] com.smart.agent.chat.ChatOrchestrator    : AI�Ự׼��ʧ��: runId=4e07a0fa-0136-40e3-9795-78599c8e82ea, traceId=d3b19877-2373-4b34-92d0-0e8a4ad8de8a, stage=prepareContext, exception=com.smart.agent.common.error.AgentException
+
+com.smart.agent.common.error.AgentException: Project is not permitted
+	at com.smart.agent.chat.ChatOrchestrator$Session.validatePageProject(ChatOrchestrator.java:745) ~[classes/:na]
+	at com.smart.agent.chat.ChatOrchestrator$Session.start(ChatOrchestrator.java:378) ~[classes/:na]
+	at com.smart.agent.chat.ChatOrchestrator.lambda$stream$0(ChatOrchestrator.java:244) ~[classes/:na]
+	at reactor.core.publisher.FluxCreate.subscribe(FluxCreate.java:97) ~[reactor-core-3.7.19.jar:3.7.19]
+	at reactor.core.publisher.Flux.subscribe(Flux.java:8891) ~[reactor-core-3.7.19.jar:3.7.19]
+	at reactor.core.publisher.Flux.subscribeWith(Flux.java:9012) ~[reactor-core-3.7.19.jar:3.7.19]
+	at reactor.core.publisher.Flux.subscribe(Flux.java:8856) ~[reactor-core-3.7.19.jar:3.7.19]
+	at reactor.core.publisher.Flux.subscribe(Flux.java:8780) ~[reactor-core-3.7.19.jar:3.7.19]
+	at com.smart.agent.chat.ChatSseUseCase.stream(ChatSseUseCase.java:17) ~[classes/:na]
+	at com.smart.agent.chat.ChatController.stream(ChatController.java:29) ~[classes/:na]
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103) ~[na:na]
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580) ~[na:na]
+	at org.springframework.web.method.support.InvocableHandlerMethod.doInvoke(InvocableHandlerMethod.java:258) ~[spring-web-6.2.19.jar:6.2.19]
+	at org.springframework.web.method.support.InvocableHandlerMethod.invokeForRequest(InvocableHandlerMethod.java:191) ~[spring-web-6.2.19.jar:6.2.19]
+	at org.springframework.web.servlet.mvc.method.annotation.ServletInvocableHandlerMethod.invokeAndHandle(ServletInvocableHandlerMethod.java:118) ~[spring-webmvc-6.2.19.jar:6.2.19]
+	at org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter.invokeHandlerMethod(RequestMappingHandlerAdapter.java:991) ~[spring-webmvc-6.2.19.jar:6.2.19]
+	at org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter.handleInternal(RequestMappingHandlerAdapter.java:896) ~[spring-webmvc-6.2.19.jar:6.2.19]
+	at org.springframework.web.servlet.mvc.method.AbstractHandlerMethodAdapter.handle(AbstractHandlerMethodAdapter.java:87) ~[spring-webmvc-6.2.19.jar:6.2.19]
+	at org.springframework.web.servlet.DispatcherServlet.doDispatch(DispatcherServlet.java:1089) ~[spring-webmvc-6.2.19.jar:6.2.19]
+	at org.springframework.web.servlet.DispatcherServlet.doService(DispatcherServlet.java:979) ~[spring-webmvc-6.2.19.jar:6.2.19]
+	at org.springframework.web.servlet.FrameworkServlet.processRequest(FrameworkServlet.java:1014) ~[spring-webmvc-6.2.19.jar:6.2.19]
+	at org.springframework.web.servlet.FrameworkServlet.doPost(FrameworkServlet.java:914) ~[spring-webmvc-6.2.19.jar:6.2.19]
+	at jakarta.servlet.http.HttpServlet.service(HttpServlet.java:590) ~[tomcat-embed-core-10.1.55.jar:6.0]
+	at org.springframework.web.servlet.FrameworkServlet.service(FrameworkServlet.java:885) ~[spring-webmvc-6.2.19.jar:6.2.19]
+	at jakarta.servlet.http.HttpServlet.service(HttpServlet.java:658) ~[tomcat-embed-core-10.1.55.jar:6.0]
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:193) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:138) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.tomcat.websocket.server.WsFilter.doFilter(WsFilter.java:51) ~[tomcat-embed-websocket-10.1.55.jar:10.1.55]
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:162) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:138) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.springframework.web.filter.RequestContextFilter.doFilterInternal(RequestContextFilter.java:100) ~[spring-web-6.2.19.jar:6.2.19]
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116) ~[spring-web-6.2.19.jar:6.2.19]
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:162) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:138) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.springframework.web.filter.FormContentFilter.doFilterInternal(FormContentFilter.java:93) ~[spring-web-6.2.19.jar:6.2.19]
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116) ~[spring-web-6.2.19.jar:6.2.19]
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:162) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:138) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at com.smart.agent.security.AgentContextFilter.doFilterInternal(AgentContextFilter.java:74) ~[classes/:na]
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116) ~[spring-web-6.2.19.jar:6.2.19]
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:162) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:138) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.springframework.web.filter.ServerHttpObservationFilter.doFilterInternal(ServerHttpObservationFilter.java:110) ~[spring-web-6.2.19.jar:6.2.19]
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116) ~[spring-web-6.2.19.jar:6.2.19]
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:162) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:138) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.springframework.web.filter.CharacterEncodingFilter.doFilterInternal(CharacterEncodingFilter.java:201) ~[spring-web-6.2.19.jar:6.2.19]
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116) ~[spring-web-6.2.19.jar:6.2.19]
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:162) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:138) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at com.smart.agent.common.trace.TraceIdFilter.doFilterInternal(TraceIdFilter.java:35) ~[classes/:na]
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116) ~[spring-web-6.2.19.jar:6.2.19]
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:162) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:138) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.catalina.core.StandardWrapperValve.invoke(StandardWrapperValve.java:165) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.catalina.core.StandardContextValve.invoke(StandardContextValve.java:88) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.catalina.authenticator.AuthenticatorBase.invoke(AuthenticatorBase.java:492) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.catalina.core.StandardHostValve.invoke(StandardHostValve.java:113) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.catalina.valves.ErrorReportValve.invoke(ErrorReportValve.java:83) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.catalina.core.StandardEngineValve.invoke(StandardEngineValve.java:72) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.catalina.connector.CoyoteAdapter.service(CoyoteAdapter.java:342) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.coyote.http11.Http11Processor.service(Http11Processor.java:399) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.coyote.AbstractProcessorLight.process(AbstractProcessorLight.java:63) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.coyote.AbstractProtocol$ConnectionHandler.process(AbstractProtocol.java:1272) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.tomcat.util.net.NioEndpoint$SocketProcessor.doRun(NioEndpoint.java:1797) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.tomcat.util.net.SocketProcessorBase.run(SocketProcessorBase.java:52) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.tomcat.util.threads.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:973) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.tomcat.util.threads.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:491) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at org.apache.tomcat.util.threads.TaskThread$WrappingRunnable.run(TaskThread.java:63) ~[tomcat-embed-core-10.1.55.jar:10.1.55]
+	at java.base/java.lang.Thread.run(Thread.java:1583) ~[na:na]
+
+2026-11-19T14:14:30.315+08:00 ERROR 29388 --- [smart-agent] [           main] reactor.core.publisher.Operators         : Operator called default onErrorDropped
+
+reactor.core.Exceptions$ErrorCallbackNotImplemented: org.opentest4j.AssertionFailedError: 
+Expecting value to be true but was false
+Caused by: org.opentest4j.AssertionFailedError: 
+Expecting value to be true but was false
+	at com.smart.agent.chat.ChatControllerIT.lambda$cancellationAfterToolReturnsButBeforeAuditSuppressesEveryLaterSideEffect$49(ChatControllerIT.java:861) ~[test-classes/:na]
+	at org.mockito.internal.stubbing.StubbedInvocationMatcher.answer(StubbedInvocationMatcher.java:42) ~[mockito-core-5.17.0.jar:na]
+	at org.mockito.internal.handler.MockHandlerImpl.handle(MockHandlerImpl.java:103) ~[mockito-core-5.17.0.jar:na]
+	at org.mockito.internal.handler.NullResultGuardian.handle(NullResultGuardian.java:29) ~[mockito-core-5.17.0.jar:na]
+	at org.mockito.internal.handler.InvocationNotifierHandler.handle(InvocationNotifierHandler.java:34) ~[mockito-core-5.17.0.jar:na]
+	at org.mockito.internal.creation.bytebuddy.access.MockMethodInterceptor.doIntercept(MockMethodInterceptor.java:84) ~[mockito-core-5.17.0.jar:na]
+	at org.mockito.internal.creation.bytebuddy.MockMethodAdvice.handle(MockMethodAdvice.java:136) ~[mockito-core-5.17.0.jar:na]
+	at com.fasterxml.jackson.databind.ObjectMapper.writeValueAsString(ObjectMapper.java:4144) ~[jackson-databind-2.21.4.jar:2.21.4]
+	at com.smart.agent.chat.ChatOrchestrator$Session.persistDebug(ChatOrchestrator.java:2329) ~[classes/:na]
+	at com.smart.agent.chat.ChatOrchestrator$Session.callModel(ChatOrchestrator.java:1448) ~[classes/:na]
+	at com.smart.agent.chat.ChatOrchestrator$Session.start(ChatOrchestrator.java:400) ~[classes/:na]
+	at com.smart.agent.chat.ChatOrchestrator.lambda$stream$0(ChatOrchestrator.java:244) ~[classes/:na]
+	at reactor.core.publisher.FluxCreate.subscribe(FluxCreate.java:97) ~[reactor-core-3.7.19.jar:3.7.19]
+	at reactor.core.publisher.Flux.subscribe(Flux.java:8891) ~[reactor-core-3.7.19.jar:3.7.19]
+	at reactor.core.publisher.Flux.subscribeWith(Flux.java:9012) ~[reactor-core-3.7.19.jar:3.7.19]
+	at reactor.core.publisher.Flux.subscribe(Flux.java:8856) ~[reactor-core-3.7.19.jar:3.7.19]
+	at reactor.core.publisher.Flux.subscribe(Flux.java:8780) ~[reactor-core-3.7.19.jar:3.7.19]
+	at reactor.core.publisher.Flux.subscribe(Flux.java:8698) ~[reactor-core-3.7.19.jar:3.7.19]
+	at com.smart.agent.chat.ChatControllerIT.cancellationAfterToolReturnsButBeforeAuditSuppressesEveryLaterSideEffect(ChatControllerIT.java:877) ~[test-classes/:na]
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103) ~[na:na]
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580) ~[na:na]
+	at org.junit.platform.commons.util.ReflectionUtils.invokeMethod(ReflectionUtils.java:775) ~[junit-platform-commons-1.12.2.jar:1.12.2]
+	at org.junit.platform.commons.support.ReflectionSupport.invokeMethod(ReflectionSupport.java:479) ~[junit-platform-commons-1.12.2.jar:1.12.2]
+	at org.junit.jupiter.engine.execution.MethodInvocation.proceed(MethodInvocation.java:60) ~[junit-jupiter-engine-5.12.2.jar:5.12.2]
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain$ValidatingInvocation.proceed(InvocationInterceptorChain.java:131) ~[junit-jupiter-engine-5.12.2.jar:5.12.2]
+	at org.junit.jupiter.engine.extension.TimeoutExtension.intercept(TimeoutExtension.java:161) ~[junit-jupiter-engine-5.12.2.jar:5.12.2]
+	at org.junit.jupiter.engine.extension.TimeoutExtension.interceptTestableMethod(TimeoutExtension.java:152) ~[junit-jupiter-engine-5.12.2.jar:5.12.2]
+	at org.junit.jupiter.engine.extension.TimeoutExtension.interceptTestMethod(TimeoutExtension.java:91) ~[junit-jupiter-engine-5.12.2.jar:5.12.2]
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker$ReflectiveInterceptorCall.lambda$ofVoidMethod$0(InterceptingExecutableInvoker.java:112) ~[junit-jupiter-engine-5.12.2.jar:5.12.2]
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker.lambda$invoke$0(InterceptingExecutableInvoker.java:94) ~[junit-jupiter-engine-5.12.2.jar:5.12.2]
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain$InterceptedInvocation.proceed(InvocationInterceptorChain.java:106) ~[junit-jupiter-engine-5.12.2.jar:5.12.2]
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain.proceed(InvocationInterceptorChain.java:64) ~[junit-jupiter-engine-5.12.2.jar:5.12.2]
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain.chainAndInvoke(InvocationInterceptorChain.java:45) ~[junit-jupiter-engine-5.12.2.jar:5.12.2]
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain.invoke(InvocationInterceptorChain.java:37) ~[junit-jupiter-engine-5.12.2.jar:5.12.2]
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker.invoke(InterceptingExecutableInvoker.java:93) ~[junit-jupiter-engine-5.12.2.jar:5.12.2]
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker.invoke(InterceptingExecutableInvoker.java:87) ~[junit-jupiter-engine-5.12.2.jar:5.12.2]
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.lambda$invokeTestMethod$7(TestMethodTestDescriptor.java:216) ~[junit-jupiter-engine-5.12.2.jar:5.12.2]
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73) ~[junit-platform-engine-1.12.2.jar:1.12.2]
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.invokeTestMethod(TestMethodTestDescriptor.java:212) ~[junit-jupiter-engine-5.12.2.jar:5.12.2]
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.execute(TestMethodTestDescriptor.java:137) ~[junit-jupiter-engine-5.12.2.jar:5.12.2]
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.execute(TestMethodTestDescriptor.java:69) ~[junit-jupiter-engine-5.12.2.jar:5.12.2]
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$6(NodeTestTask.java:156) ~[junit-platform-engine-1.12.2.jar:1.12.2]
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73) ~[junit-platform-engine-1.12.2.jar:1.12.2]
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$8(NodeTestTask.java:146) ~[junit-platform-engine-1.12.2.jar:1.12.2]
+	at org.junit.platform.engine.support.hierarchical.Node.around(Node.java:137) ~[junit-platform-engine-1.12.2.jar:1.12.2]
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$9(NodeTestTask.java:144) ~[junit-platform-engine-1.12.2.jar:1.12.2]
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73) ~[junit-platform-engine-1.12.2.jar:1.12.2]
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.executeRecursively(NodeTestTask.java:143) ~[junit-platform-engine-1.12.2.jar:1.12.2]
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.execute(NodeTestTask.java:100) ~[junit-platform-engine-1.12.2.jar:1.12.2]
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596) ~[na:na]
+	at org.junit.platform.engine.support.hierarchical.SameThreadHierarchicalTestExecutorService.invokeAll(SameThreadHierarchicalTestExecutorService.java:41) ~[junit-platform-engine-1.12.2.jar:1.12.2]
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$6(NodeTestTask.java:160) ~[junit-platform-engine-1.12.2.jar:1.12.2]
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73) ~[junit-platform-engine-1.12.2.jar:1.12.2]
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$8(NodeTestTask.java:146) ~[junit-platform-engine-1.12.2.jar:1.12.2]
+	at org.junit.platform.engine.support.hierarchical.Node.around(Node.java:137) ~[junit-platform-engine-1.12.2.jar:1.12.2]
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$9(NodeTestTask.java:144) ~[junit-platform-engine-1.12.2.jar:1.12.2]
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73) ~[junit-platform-engine-1.12.2.jar:1.12.2]
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.executeRecursively(NodeTestTask.java:143) ~[junit-platform-engine-1.12.2.jar:1.12.2]
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.execute(NodeTestTask.java:100) ~[junit-platform-engine-1.12.2.jar:1.12.2]
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596) ~[na:na]
+	at org.junit.platform.engine.support.hierarchical.SameThreadHierarchicalTestExecutorService.invokeAll(SameThreadHierarchicalTestExecutorService.java:41) ~[junit-platform-engine-1.12.2.jar:1.12.2]
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$6(NodeTestTask.java:160) ~[junit-platform-engine-1.12.2.jar:1.12.2]
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73) ~[junit-platform-engine-1.12.2.jar:1.12.2]
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$8(NodeTestTask.java:146) ~[junit-platform-engine-1.12.2.jar:1.12.2]
+	at org.junit.platform.engine.support.hierarchical.Node.around(Node.java:137) ~[junit-platform-engine-1.12.2.jar:1.12.2]
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$9(NodeTestTask.java:144) ~[junit-platform-engine-1.12.2.jar:1.12.2]
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73) ~[junit-platform-engine-1.12.2.jar:1.12.2]
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.executeRecursively(NodeTestTask.java:143) ~[junit-platform-engine-1.12.2.jar:1.12.2]
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.execute(NodeTestTask.java:100) ~[junit-platform-engine-1.12.2.jar:1.12.2]
+	at org.junit.platform.engine.support.hierarchical.SameThreadHierarchicalTestExecutorService.submit(SameThreadHierarchicalTestExecutorService.java:35) ~[junit-platform-engine-1.12.2.jar:1.12.2]
+	at org.junit.platform.engine.support.hierarchical.HierarchicalTestExecutor.execute(HierarchicalTestExecutor.java:57) ~[junit-platform-engine-1.12.2.jar:1.12.2]
+	at org.junit.platform.engine.support.hierarchical.HierarchicalTestEngine.execute(HierarchicalTestEngine.java:54) ~[junit-platform-engine-1.12.2.jar:1.12.2]
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:201) ~[junit-platform-launcher-1.12.2.jar:1.12.2]
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:170) ~[junit-platform-launcher-1.12.2.jar:1.12.2]
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:94) ~[junit-platform-launcher-1.12.2.jar:1.12.2]
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.lambda$execute$0(EngineExecutionOrchestrator.java:59) ~[junit-platform-launcher-1.12.2.jar:1.12.2]
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.withInterceptedStreams(EngineExecutionOrchestrator.java:142) ~[junit-platform-launcher-1.12.2.jar:1.12.2]
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:58) ~[junit-platform-launcher-1.12.2.jar:1.12.2]
+	at org.junit.platform.launcher.core.DefaultLauncher.execute(DefaultLauncher.java:103) ~[junit-platform-launcher-1.12.2.jar:1.12.2]
+	at org.junit.platform.launcher.core.DefaultLauncher.execute(DefaultLauncher.java:85) ~[junit-platform-launcher-1.12.2.jar:1.12.2]
+	at org.junit.platform.launcher.core.DelegatingLauncher.execute(DelegatingLauncher.java:47) ~[junit-platform-launcher-1.12.2.jar:1.12.2]
+	at org.junit.platform.launcher.core.InterceptingLauncher.lambda$execute$1(InterceptingLauncher.java:39) ~[junit-platform-launcher-1.12.2.jar:1.12.2]
+	at org.junit.platform.launcher.core.ClasspathAlignmentCheckingLauncherInterceptor.intercept(ClasspathAlignmentCheckingLauncherInterceptor.java:25) ~[junit-platform-launcher-1.12.2.jar:1.12.2]
+	at org.junit.platform.launcher.core.InterceptingLauncher.execute(InterceptingLauncher.java:38) ~[junit-platform-launcher-1.12.2.jar:1.12.2]
+	at org.junit.platform.launcher.core.DelegatingLauncher.execute(DelegatingLauncher.java:47) ~[junit-platform-launcher-1.12.2.jar:1.12.2]
+	at org.apache.maven.surefire.junitplatform.LauncherAdapter.executeWithoutCancellationToken(LauncherAdapter.java:60) ~[surefire-junit-platform-3.5.6.jar:3.5.6]
+	at org.apache.maven.surefire.junitplatform.LauncherAdapter.execute(LauncherAdapter.java:52) ~[surefire-junit-platform-3.5.6.jar:3.5.6]
+	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.execute(JUnitPlatformProvider.java:203) ~[surefire-junit-platform-3.5.6.jar:3.5.6]
+	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.invokeAllTests(JUnitPlatformProvider.java:168) ~[surefire-junit-platform-3.5.6.jar:3.5.6]
+	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.invoke(JUnitPlatformProvider.java:136) ~[surefire-junit-platform-3.5.6.jar:3.5.6]
+	at org.apache.maven.surefire.booter.ForkedBooter.runSuitesInProcess(ForkedBooter.java:385) ~[surefire-booter-3.5.6.jar:3.5.6]
+	at org.apache.maven.surefire.booter.ForkedBooter.execute(ForkedBooter.java:162) ~[surefire-booter-3.5.6.jar:3.5.6]
+	at org.apache.maven.surefire.booter.ForkedBooter.run(ForkedBooter.java:507) ~[surefire-booter-3.5.6.jar:3.5.6]
+	at org.apache.maven.surefire.booter.ForkedBooter.main(ForkedBooter.java:495) ~[surefire-booter-3.5.6.jar:3.5.6]
+
+2026-11-19T14:14:32.338+08:00  INFO 29388 --- [smart-agent] [oundedElastic-3] com.smart.agent.run.AgentRunService      : tool_execution_summary toolKey=approval.query risk=L1 outcome=SUCCEEDED durationMillis=0 resultSizeBytes=218
+2026-11-19T14:14:32.351+08:00  INFO 29388 --- [smart-agent] [oundedElastic-3] com.smart.agent.run.AgentRunService      : tool_execution_summary toolKey=approval.query risk=L1 outcome=SUCCEEDED durationMillis=0 resultSizeBytes=218
+2026-11-19T14:14:32.365+08:00  INFO 29388 --- [smart-agent] [oundedElastic-3] com.smart.agent.run.AgentRunService      : tool_execution_summary toolKey=approval.query risk=L1 outcome=SUCCEEDED durationMillis=0 resultSizeBytes=218
+2026-11-19T14:14:32.530+08:00  INFO 29388 --- [smart-agent] [oundedElastic-1] com.smart.agent.run.AgentRunService      : tool_execution_summary toolKey=project.getOverview risk=L1 outcome=DENIED durationMillis=0 resultSizeBytes=0
+2026-11-19T14:14:32.550+08:00  INFO 29388 --- [smart-agent] [oundedElastic-1] com.smart.agent.run.AgentRunService      : tool_execution_summary toolKey=approval.query risk=L1 outcome=SUCCEEDED durationMillis=0 resultSizeBytes=218
+2026-11-19T14:14:32.565+08:00  INFO 29388 --- [smart-agent] [oundedElastic-3] com.smart.agent.run.AgentRunService      : tool_execution_summary toolKey=approval.query risk=L1 outcome=SUCCEEDED durationMillis=0 resultSizeBytes=218
+2026-11-19T14:14:32.601+08:00  INFO 29388 --- [smart-agent] [oundedElastic-3] com.smart.agent.run.AgentRunService      : tool_execution_summary toolKey=approval.query risk=L1 outcome=SUCCEEDED durationMillis=0 resultSizeBytes=218
+2026-11-19T14:14:32.618+08:00  INFO 29388 --- [smart-agent] [oundedElastic-3] com.smart.agent.run.AgentRunService      : tool_execution_summary toolKey=approval.getDetail risk=L1 outcome=SUCCEEDED durationMillis=0 resultSizeBytes=204
+2026-11-19T14:14:32.654+08:00  INFO 29388 --- [smart-agent] [oundedElastic-1] com.smart.agent.run.AgentRunService      : tool_execution_summary toolKey=project.query risk=L1 outcome=SUCCEEDED durationMillis=12 resultSizeBytes=197
+2026-11-19T14:14:32.877+08:00  INFO 29388 --- [smart-agent] [oundedElastic-3] com.smart.agent.run.AgentRunService      : tool_execution_summary toolKey=approval.query risk=L1 outcome=SUCCEEDED durationMillis=0 resultSizeBytes=218
+2026-11-19T14:14:32.892+08:00  INFO 29388 --- [smart-agent] [oundedElastic-1] com.smart.agent.run.AgentRunService      : tool_execution_summary toolKey=system.current_time risk=L0 outcome=SUCCEEDED durationMillis=0 resultSizeBytes=129
+2026-11-19T14:14:32.913+08:00  INFO 29388 --- [smart-agent] [oundedElastic-1] com.smart.agent.run.AgentRunService      : tool_execution_summary toolKey=approval.query risk=L1 outcome=SUCCEEDED durationMillis=0 resultSizeBytes=218
+2026-11-19T14:14:32.926+08:00  INFO 29388 --- [smart-agent] [oundedElastic-1] com.smart.agent.run.AgentRunService      : tool_execution_summary toolKey=approval.getDetail risk=L1 outcome=SUCCEEDED durationMillis=0 resultSizeBytes=204
+2026-11-19T14:14:32.950+08:00  INFO 29388 --- [smart-agent] [oundedElastic-3] com.smart.agent.run.AgentRunService      : tool_execution_summary toolKey=approval.query risk=L1 outcome=SUCCEEDED durationMillis=0 resultSizeBytes=218
+2026-11-19T14:14:32.962+08:00  INFO 29388 --- [smart-agent] [oundedElastic-3] com.smart.agent.run.AgentRunService      : tool_execution_summary toolKey=approval.query risk=L1 outcome=SUCCEEDED durationMillis=0 resultSizeBytes=218
+2026-11-19T14:14:33.043+08:00  INFO 29388 --- [smart-agent] [oundedElastic-1] com.smart.agent.run.AgentRunService      : tool_execution_summary toolKey=project.getOverview risk=L1 outcome=DENIED durationMillis=0 resultSizeBytes=0
+[ERROR] Tests run: 49, Failures: 20, Errors: 0, Skipped: 0, Time elapsed: 20.57 s <<< FAILURE! -- in com.smart.agent.chat.ChatControllerIT
+[ERROR] com.smart.agent.chat.ChatControllerIT.includesPreviousConversationMessagesInFollowingModelRequest -- Time elapsed: 0.130 s <<< FAILURE!
+org.opentest4j.AssertionFailedError: 
+
+Expecting actual:
+  ["����鿴��Ŀ XG0000001
+[trusted-routing: ��������Ŀ��ѯ��ֻ�ܵ��� project.query �� project.getArchiveDetail�����õ��� approval.* �� board.*����ʷ�е��������ݲ��ı䱾��·��]",
+    "[trusted-refresh-required: ���ֱ������µ��� project.query �� project.getArchiveDetail ��ȡʵʱ���ݣ����ø�����ʷ�ش�������Ѿ���ѯ��������������Ŀ���ߡ�]"]
+to contain exactly (and in same order):
+  ["����鿴��Ŀ XG0000001", "answer", "�����Ŀ������Щ������Ϣ"]
+but some elements were not found:
+  ["����鿴��Ŀ XG0000001", "answer", "�����Ŀ������Щ������Ϣ"]
+and others were not expected:
+  ["����鿴��Ŀ XG0000001
+[trusted-routing: ��������Ŀ��ѯ��ֻ�ܵ��� project.query �� project.getArchiveDetail�����õ��� approval.* �� board.*����ʷ�е��������ݲ��ı䱾��·��]",
+    "[trusted-refresh-required: ���ֱ������µ��� project.query �� project.getArchiveDetail ��ȡʵʱ���ݣ����ø�����ʷ�ش�������Ѿ���ѯ��������������Ŀ���ߡ�]"]
+
+	at com.smart.agent.chat.ChatControllerIT.includesPreviousConversationMessagesInFollowingModelRequest(ChatControllerIT.java:437)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+
+[ERROR] com.smart.agent.chat.ChatControllerIT.genericDetailFollowUpUsesLatestUserApprovalIntent -- Time elapsed: 0.063 s <<< FAILURE!
+java.lang.AssertionError: 
+
+Expecting all elements of:
+  ["approval.query", "approval.getDetail", "system.unsupported_capability"]
+to match given predicate but this element did not:
+  "system.unsupported_capability"
+	at com.smart.agent.chat.ChatControllerIT.genericDetailFollowUpUsesLatestUserApprovalIntent(ChatControllerIT.java:346)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+
+[ERROR] com.smart.agent.chat.ChatControllerIT.approvalDetailFollowUpIgnoresProjectNameInAssistantAnswer -- Time elapsed: 0.081 s <<< FAILURE!
+org.opentest4j.AssertionFailedError: 
+
+expected: REQUIRED
+ but was: AUTO
+	at com.smart.agent.chat.ChatControllerIT.approvalDetailFollowUpIgnoresProjectNameInAssistantAnswer(ChatControllerIT.java:329)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+
+[ERROR] com.smart.agent.chat.ChatControllerIT.approvalResultGenerationKeepsOnlyApprovalToolsOnTheSecondModelTurn -- Time elapsed: 0.042 s <<< FAILURE!
+java.lang.AssertionError: 
+
+Expecting any elements of:
+  ["{"type":"message_start","runId":"b1ce50af-ab5b-4a67-a5d4-5f02cce29d76","sequence":1,"traceId":"adb525f3-a246-41d9-9bbe-aff1cdad5c84","messageId":"879fa046-2c16-41d1-8a67-284ccd77cd6c","code":null,"text":null,"toolKey":null,"data":{}}",
+    "{"type":"status","runId":"b1ce50af-ab5b-4a67-a5d4-5f02cce29d76","sequence":2,"traceId":"adb525f3-a246-41d9-9bbe-aff1cdad5c84","messageId":null,"code":"ROUTING","text":null,"toolKey":null,"data":{}}",
+    "{"type":"status","runId":"b1ce50af-ab5b-4a67-a5d4-5f02cce29d76","sequence":3,"traceId":"adb525f3-a246-41d9-9bbe-aff1cdad5c84","messageId":null,"code":"PLANNING","text":null,"toolKey":null,"data":{}}",
+    "{"type":"status","runId":"b1ce50af-ab5b-4a67-a5d4-5f02cce29d76","sequence":4,"traceId":"adb525f3-a246-41d9-9bbe-aff1cdad5c84","messageId":null,"code":"GENERATING","text":null,"toolKey":null,"data":{}}",
+    "{"type":"ai_debug","runId":"b1ce50af-ab5b-4a67-a5d4-5f02cce29d76","sequence":5,"traceId":"adb525f3-a246-41d9-9bbe-aff1cdad5c84","messageId":null,"code":"MODEL_REQUEST","text":null,"toolKey":null,"data":{"turn":1,"stage":"MODEL_REQUEST","toolUseMode":"REQUIRED","allowedTools":["approval.query","approval.getDetail"],"messageCount":1,"evidenceCount":0}}",
+    "{"type":"ai_debug","runId":"b1ce50af-ab5b-4a67-a5d4-5f02cce29d76","sequence":6,"traceId":"adb525f3-a246-41d9-9bbe-aff1cdad5c84","messageId":null,"code":"MODEL_RESPONSE","text":null,"toolKey":null,"data":{"stage":"MODEL_RESPONSE","text":"answer","inputTokens":2,"outputTokens":3,"turn":1}}",
+    "{"type":"status","runId":"b1ce50af-ab5b-4a67-a5d4-5f02cce29d76","sequence":7,"traceId":"adb525f3-a246-41d9-9bbe-aff1cdad5c84","messageId":null,"code":"GENERATING","text":null,"toolKey":null,"data":{}}",
+    "{"type":"ai_debug","runId":"b1ce50af-ab5b-4a67-a5d4-5f02cce29d76","sequence":8,"traceId":"adb525f3-a246-41d9-9bbe-aff1cdad5c84","messageId":null,"code":"MODEL_REQUEST","text":null,"toolKey":null,"data":{"turn":2,"stage":"MODEL_REQUEST","toolUseMode":"REQUIRED","allowedTools":["approval.query","approval.getDetail"],"messageCount":2,"evidenceCount":0}}",
+    "{"type":"ai_debug","runId":"b1ce50af-ab5b-4a67-a5d4-5f02cce29d76","sequence":9,"traceId":"adb525f3-a246-41d9-9bbe-aff1cdad5c84","messageId":null,"code":"MODEL_RESPONSE","text":null,"toolKey":null,"data":{"stage":"MODEL_RESPONSE","text":"answer","inputTokens":2,"outputTokens":3,"turn":2}}",
+    "{"type":"status","runId":"b1ce50af-ab5b-4a67-a5d4-5f02cce29d76","sequence":10,"traceId":"adb525f3-a246-41d9-9bbe-aff1cdad5c84","messageId":null,"code":"GENERATING","text":null,"toolKey":null,"data":{}}",
+    "{"type":"ai_debug","runId":"b1ce50af-ab5b-4a67-a5d4-5f02cce29d76","sequence":11,"traceId":"adb525f3-a246-41d9-9bbe-aff1cdad5c84","messageId":null,"code":"MODEL_REQUEST","text":null,"toolKey":null,"data":{"turn":3,"stage":"MODEL_REQUEST","toolUseMode":"REQUIRED","allowedTools":["approval.query","approval.getDetail"],"messageCount":3,"evidenceCount":0}}",
+    "{"type":"ai_debug","runId":"b1ce50af-ab5b-4a67-a5d4-5f02cce29d76","sequence":12,"traceId":"adb525f3-a246-41d9-9bbe-aff1cdad5c84","messageId":null,"code":"MODEL_RESPONSE","text":null,"toolKey":null,"data":{"stage":"MODEL_RESPONSE","text":"answer","inputTokens":2,"outputTokens":3,"turn":3}}",
+    "{"type":"status","runId":"b1ce50af-ab5b-4a67-a5d4-5f02cce29d76","sequence":13,"traceId":"adb525f3-a246-41d9-9bbe-aff1cdad5c84","messageId":null,"code":"GENERATING","text":null,"toolKey":null,"data":{}}",
+    "{"type":"ai_debug","runId":"b1ce50af-ab5b-4a67-a5d4-5f02cce29d76","sequence":14,"traceId":"adb525f3-a246-41d9-9bbe-aff1cdad5c84","messageId":null,"code":"MODEL_REQUEST","text":null,"toolKey":null,"data":{"turn":4,"stage":"MODEL_REQUEST","toolUseMode":"REQUIRED","allowedTools":["approval.query","approval.getDetail"],"messageCount":4,"evidenceCount":0}}",
+    "{"type":"ai_debug","runId":"b1ce50af-ab5b-4a67-a5d4-5f02cce29d76","sequence":15,"traceId":"adb525f3-a246-41d9-9bbe-aff1cdad5c84","messageId":null,"code":"MODEL_RESPONSE","text":null,"toolKey":null,"data":{"stage":"MODEL_RESPONSE","text":"answer","inputTokens":2,"outputTokens":3,"turn":4}}",
+    "{"type":"status","runId":"b1ce50af-ab5b-4a67-a5d4-5f02cce29d76","sequence":16,"traceId":"adb525f3-a246-41d9-9bbe-aff1cdad5c84","messageId":null,"code":"GENERATING","text":null,"toolKey":null,"data":{}}",
+    "{"type":"ai_debug","runId":"b1ce50af-ab5b-4a67-a5d4-5f02cce29d76","sequence":17,"traceId":"adb525f3-a246-41d9-9bbe-aff1cdad5c84","messageId":null,"code":"MODEL_REQUEST","text":null,"toolKey":null,"data":{"turn":5,"stage":"MODEL_REQUEST","toolUseMode":"REQUIRED","allowedTools":["approval.query","approval.getDetail"],"messageCount":5,"evidenceCount":0}}",
+    "{"type":"ai_debug","runId":"b1ce50af-ab5b-4a67-a5d4-5f02cce29d76","sequence":18,"traceId":"adb525f3-a246-41d9-9bbe-aff1cdad5c84","messageId":null,"code":"MODEL_RESPONSE","text":null,"toolKey":null,"data":{"stage":"MODEL_RESPONSE","text":"answer","inputTokens":2,"outputTokens":3,"turn":5}}",
+    "{"type":"status","runId":"b1ce50af-ab5b-4a67-a5d4-5f02cce29d76","sequence":19,"traceId":"adb525f3-a246-41d9-9bbe-aff1cdad5c84","messageId":null,"code":"GENERATING","text":null,"toolKey":null,"data":{}}",
+    "{"type":"ai_debug","runId":"b1ce50af-ab5b-4a67-a5d4-5f02cce29d76","sequence":20,"traceId":"adb525f3-a246-41d9-9bbe-aff1cdad5c84","messageId":null,"code":"MODEL_REQUEST","text":null,"toolKey":null,"data":{"turn":6,"stage":"MODEL_REQUEST","toolUseMode":"REQUIRED","allowedTools":["approval.query","approval.getDetail"],"messageCount":6,"evidenceCount":0}}",
+    "{"type":"ai_debug","runId":"b1ce50af-ab5b-4a67-a5d4-5f02cce29d76","sequence":21,"traceId":"adb525f3-a246-41d9-9bbe-aff1cdad5c84","messageId":null,"code":"MODEL_RESPONSE","text":null,"toolKey":null,"data":{"stage":"MODEL_RESPONSE","text":"answer","inputTokens":2,"outputTokens":3,"turn":6}}",
+    "{"type":"error","runId":"b1ce50af-ab5b-4a67-a5d4-5f02cce29d76","sequence":0,"traceId":"adb525f3-a246-41d9-9bbe-aff1cdad5c84","messageId":null,"code":"AGENT_MODEL_TURN_LIMIT","text":"���β�ѯ������࣬����С��ѯ��Χ�����ԡ�","toolKey":null,"data":{}}"]
+to match given predicate but none did.
+	at com.smart.agent.chat.ChatControllerIT.approvalResultGenerationKeepsOnlyApprovalToolsOnTheSecondModelTurn(ChatControllerIT.java:217)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+
+[ERROR] com.smart.agent.chat.ChatControllerIT.emitsTrustedCitationBeforeAnswerDeltaAndPersistsIt -- Time elapsed: 0.037 s <<< FAILURE!
+java.lang.AssertionError: 
+[events=[{"type":"message_start","runId":"c13acc38-6e9e-4796-9a8a-55627eace9c2","sequence":1,"traceId":"5afad9d3-53f7-43b0-afcc-bd39dc8c4602","messageId":"8156829f-7841-42f0-ba75-a4cbee5a6926","code":null,"text":null,"toolKey":null,"data":{}}, {"type":"status","runId":"c13acc38-6e9e-4796-9a8a-55627eace9c2","sequence":2,"traceId":"5afad9d3-53f7-43b0-afcc-bd39dc8c4602","messageId":null,"code":"ROUTING","text":null,"toolKey":null,"data":{}}, {"type":"status","runId":"c13acc38-6e9e-4796-9a8a-55627eace9c2","sequence":3,"traceId":"5afad9d3-53f7-43b0-afcc-bd39dc8c4602","messageId":null,"code":"PLANNING","text":null,"toolKey":null,"data":{}}, {"type":"status","runId":"c13acc38-6e9e-4796-9a8a-55627eace9c2","sequence":4,"traceId":"5afad9d3-53f7-43b0-afcc-bd39dc8c4602","messageId":null,"code":"GENERATING","text":null,"toolKey":null,"data":{}}, {"type":"ai_debug","runId":"c13acc38-6e9e-4796-9a8a-55627eace9c2","sequence":5,"traceId":"5afad9d3-53f7-43b0-afcc-bd39dc8c4602","messageId":null,"code":"MODEL_REQUEST","text":null,"toolKey":null,"data":{"turn":1,"stage":"MODEL_REQUEST","toolUseMode":"AUTO","allowedTools":["board.compare","projectProfit.clarifyDate","costContract.clarifyDate","system.current_time","costContract.compare","board.query","projectProfit.compare","projectProfit.query","board.detail","costContract.query","system.unsupported_capability"],"messageCount":1,"evidenceCount":0}}, {"type":"ai_debug","runId":"c13acc38-6e9e-4796-9a8a-55627eace9c2","sequence":6,"traceId":"5afad9d3-53f7-43b0-afcc-bd39dc8c4602","messageId":null,"code":"MODEL_RESPONSE","text":null,"toolKey":null,"data":{"stage":"MODEL_RESPONSE","text":"answer","inputTokens":2,"outputTokens":3,"turn":1}}, {"type":"message_delta","runId":"c13acc38-6e9e-4796-9a8a-55627eace9c2","sequence":7,"traceId":"5afad9d3-53f7-43b0-afcc-bd39dc8c4602","messageId":null,"code":null,"text":"answer","toolKey":null,"data":{}}, {"type":"message_end","runId":"c13acc38-6e9e-4796-9a8a-55627eace9c2","sequence":0,"traceId":"5afad9d3-53f7-43b0-afcc-bd39dc8c4602","messageId":"7591e0b0-64a7-499b-92b9-94807dd053ff","code":null,"text":null,"toolKey":null,"data":{}}]] 
+Expecting actual:
+  -1
+to be greater than or equal to:
+  0
+
+	at com.smart.agent.chat.ChatControllerIT.emitsTrustedCitationBeforeAnswerDeltaAndPersistsIt(ChatControllerIT.java:554)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+
+[ERROR] com.smart.agent.chat.ChatControllerIT.doesNotEmitSuccessfulTerminalEventWhenAtomicCompletionPersistenceFails -- Time elapsed: 0.051 s <<< FAILURE!
+org.opentest4j.AssertionFailedError: 
+
+Expecting actual:
+  [USER, ASSISTANT]
+to contain exactly (and in same order):
+  [USER]
+but some elements were not expected:
+  [ASSISTANT]
+
+	at com.smart.agent.chat.ChatControllerIT.doesNotEmitSuccessfulTerminalEventWhenAtomicCompletionPersistenceFails(ChatControllerIT.java:766)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+
+[ERROR] com.smart.agent.chat.ChatControllerIT.streamsCompleteProjectArchiveWithAllowedSections -- Time elapsed: 0.039 s <<< FAILURE!
+java.lang.AssertionError: 
+
+Expecting any elements of:
+  ["{"type":"message_start","runId":"0bd1c2a9-a608-4da8-94f4-bef645c47c9a","sequence":1,"traceId":"2236fa58-2ba0-4bb8-91e4-8aebae095bce","messageId":"ce1eb050-efa8-4030-83b8-35524e2a0ae2","code":null,"text":null,"toolKey":null,"data":{}}",
+    "{"type":"status","runId":"0bd1c2a9-a608-4da8-94f4-bef645c47c9a","sequence":2,"traceId":"2236fa58-2ba0-4bb8-91e4-8aebae095bce","messageId":null,"code":"ROUTING","text":null,"toolKey":null,"data":{}}",
+    "{"type":"status","runId":"0bd1c2a9-a608-4da8-94f4-bef645c47c9a","sequence":3,"traceId":"2236fa58-2ba0-4bb8-91e4-8aebae095bce","messageId":null,"code":"PLANNING","text":null,"toolKey":null,"data":{}}",
+    "{"type":"status","runId":"0bd1c2a9-a608-4da8-94f4-bef645c47c9a","sequence":4,"traceId":"2236fa58-2ba0-4bb8-91e4-8aebae095bce","messageId":null,"code":"GENERATING","text":null,"toolKey":null,"data":{}}",
+    "{"type":"ai_debug","runId":"0bd1c2a9-a608-4da8-94f4-bef645c47c9a","sequence":5,"traceId":"2236fa58-2ba0-4bb8-91e4-8aebae095bce","messageId":null,"code":"MODEL_REQUEST","text":null,"toolKey":null,"data":{"turn":1,"stage":"MODEL_REQUEST","toolUseMode":"REQUIRED","allowedTools":["project.listAccessible","project.getOverview","project.getContracts","project.getArchiveDetail","project.query"],"messageCount":1,"evidenceCount":0}}",
+    "{"type":"ai_debug","runId":"0bd1c2a9-a608-4da8-94f4-bef645c47c9a","sequence":6,"traceId":"2236fa58-2ba0-4bb8-91e4-8aebae095bce","messageId":null,"code":"MODEL_RESPONSE","text":null,"toolKey":null,"data":{"stage":"MODEL_RESPONSE","text":"answer","inputTokens":2,"outputTokens":3,"turn":1}}",
+    "{"type":"status","runId":"0bd1c2a9-a608-4da8-94f4-bef645c47c9a","sequence":7,"traceId":"2236fa58-2ba0-4bb8-91e4-8aebae095bce","messageId":null,"code":"GENERATING","text":null,"toolKey":null,"data":{}}",
+    "{"type":"ai_debug","runId":"0bd1c2a9-a608-4da8-94f4-bef645c47c9a","sequence":8,"traceId":"2236fa58-2ba0-4bb8-91e4-8aebae095bce","messageId":null,"code":"MODEL_REQUEST","text":null,"toolKey":null,"data":{"turn":2,"stage":"MODEL_REQUEST","toolUseMode":"REQUIRED","allowedTools":["project.listAccessible","project.getOverview","project.getContracts","project.getArchiveDetail","project.query"],"messageCount":2,"evidenceCount":0}}",
+    "{"type":"ai_debug","runId":"0bd1c2a9-a608-4da8-94f4-bef645c47c9a","sequence":9,"traceId":"2236fa58-2ba0-4bb8-91e4-8aebae095bce","messageId":null,"code":"MODEL_RESPONSE","text":null,"toolKey":null,"data":{"stage":"MODEL_RESPONSE","text":"answer","inputTokens":2,"outputTokens":3,"turn":2}}",
+    "{"type":"status","runId":"0bd1c2a9-a608-4da8-94f4-bef645c47c9a","sequence":10,"traceId":"2236fa58-2ba0-4bb8-91e4-8aebae095bce","messageId":null,"code":"GENERATING","text":null,"toolKey":null,"data":{}}",
+    "{"type":"ai_debug","runId":"0bd1c2a9-a608-4da8-94f4-bef645c47c9a","sequence":11,"traceId":"2236fa58-2ba0-4bb8-91e4-8aebae095bce","messageId":null,"code":"MODEL_REQUEST","text":null,"toolKey":null,"data":{"turn":3,"stage":"MODEL_REQUEST","toolUseMode":"REQUIRED","allowedTools":["project.listAccessible","project.getOverview","project.getContracts","project.getArchiveDetail","project.query"],"messageCount":3,"evidenceCount":0}}",
+    "{"type":"ai_debug","runId":"0bd1c2a9-a608-4da8-94f4-bef645c47c9a","sequence":12,"traceId":"2236fa58-2ba0-4bb8-91e4-8aebae095bce","messageId":null,"code":"MODEL_RESPONSE","text":null,"toolKey":null,"data":{"stage":"MODEL_RESPONSE","text":"answer","inputTokens":2,"outputTokens":3,"turn":3}}",
+    "{"type":"status","runId":"0bd1c2a9-a608-4da8-94f4-bef645c47c9a","sequence":13,"traceId":"2236fa58-2ba0-4bb8-91e4-8aebae095bce","messageId":null,"code":"GENERATING","text":null,"toolKey":null,"data":{}}",
+    "{"type":"ai_debug","runId":"0bd1c2a9-a608-4da8-94f4-bef645c47c9a","sequence":14,"traceId":"2236fa58-2ba0-4bb8-91e4-8aebae095bce","messageId":null,"code":"MODEL_REQUEST","text":null,"toolKey":null,"data":{"turn":4,"stage":"MODEL_REQUEST","toolUseMode":"REQUIRED","allowedTools":["project.listAccessible","project.getOverview","project.getContracts","project.getArchiveDetail","project.query"],"messageCount":4,"evidenceCount":0}}",
+    "{"type":"ai_debug","runId":"0bd1c2a9-a608-4da8-94f4-bef645c47c9a","sequence":15,"traceId":"2236fa58-2ba0-4bb8-91e4-8aebae095bce","messageId":null,"code":"MODEL_RESPONSE","text":null,"toolKey":null,"data":{"stage":"MODEL_RESPONSE","text":"answer","inputTokens":2,"outputTokens":3,"turn":4}}",
+    "{"type":"status","runId":"0bd1c2a9-a608-4da8-94f4-bef645c47c9a","sequence":16,"traceId":"2236fa58-2ba0-4bb8-91e4-8aebae095bce","messageId":null,"code":"GENERATING","text":null,"toolKey":null,"data":{}}",
+    "{"type":"ai_debug","runId":"0bd1c2a9-a608-4da8-94f4-bef645c47c9a","sequence":17,"traceId":"2236fa58-2ba0-4bb8-91e4-8aebae095bce","messageId":null,"code":"MODEL_REQUEST","text":null,"toolKey":null,"data":{"turn":5,"stage":"MODEL_REQUEST","toolUseMode":"REQUIRED","allowedTools":["project.listAccessible","project.getOverview","project.getContracts","project.getArchiveDetail","project.query"],"messageCount":5,"evidenceCount":0}}",
+    "{"type":"ai_debug","runId":"0bd1c2a9-a608-4da8-94f4-bef645c47c9a","sequence":18,"traceId":"2236fa58-2ba0-4bb8-91e4-8aebae095bce","messageId":null,"code":"MODEL_RESPONSE","text":null,"toolKey":null,"data":{"stage":"MODEL_RESPONSE","text":"answer","inputTokens":2,"outputTokens":3,"turn":5}}",
+    "{"type":"status","runId":"0bd1c2a9-a608-4da8-94f4-bef645c47c9a","sequence":19,"traceId":"2236fa58-2ba0-4bb8-91e4-8aebae095bce","messageId":null,"code":"GENERATING","text":null,"toolKey":null,"data":{}}",
+    "{"type":"ai_debug","runId":"0bd1c2a9-a608-4da8-94f4-bef645c47c9a","sequence":20,"traceId":"2236fa58-2ba0-4bb8-91e4-8aebae095bce","messageId":null,"code":"MODEL_REQUEST","text":null,"toolKey":null,"data":{"turn":6,"stage":"MODEL_REQUEST","toolUseMode":"REQUIRED","allowedTools":["project.listAccessible","project.getOverview","project.getContracts","project.getArchiveDetail","project.query"],"messageCount":6,"evidenceCount":0}}",
+    "{"type":"ai_debug","runId":"0bd1c2a9-a608-4da8-94f4-bef645c47c9a","sequence":21,"traceId":"2236fa58-2ba0-4bb8-91e4-8aebae095bce","messageId":null,"code":"MODEL_RESPONSE","text":null,"toolKey":null,"data":{"stage":"MODEL_RESPONSE","text":"answer","inputTokens":2,"outputTokens":3,"turn":6}}",
+    "{"type":"error","runId":"0bd1c2a9-a608-4da8-94f4-bef645c47c9a","sequence":0,"traceId":"2236fa58-2ba0-4bb8-91e4-8aebae095bce","messageId":null,"code":"AGENT_MODEL_TURN_LIMIT","text":"���β�ѯ������࣬����С��ѯ��Χ�����ԡ�","toolKey":null,"data":{}}"]
+to match given predicate but none did.
+	at com.smart.agent.chat.ChatControllerIT.streamsCompleteProjectArchiveWithAllowedSections(ChatControllerIT.java:368)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+
+[ERROR] com.smart.agent.chat.ChatControllerIT.persistsSafeWebSearchProviderDurationAndSources -- Time elapsed: 0.050 s <<< FAILURE!
+org.assertj.core.error.AssertJMultipleFailuresError: 
+
+[List check single element] (1 failure)
+-- failure 1 --
+Expecting actual:
+  "{"debugVersion":2,"turn":1,"stage":"TOOL_RESULT","toolKey":"web.search","result":"{\"query\":\"����������\",\"searchedAt\":\"2026-09-11T17:00:00+08:00\",\"summary\":\"�������硣\",\"provider\":\"zhipu\",\"durationMillis\":10,\"sources\":[{\"title\":\"�������\",\"url\":\"https://weather.example/tianjin\",\"snippet\":\"��������\",\"publishedAt\":\"2026-09-11\"}]}"}"
+to contain:
+  [""provider":"zhipu"",
+    "durationMillis",
+    "�������",
+    "https://weather.example/tianjin"]
+but could not find:
+  [""provider":"zhipu""]
+ 
+at ChatControllerIT.lambda$persistsSafeWebSearchProviderDurationAndSources$41(ChatControllerIT.java:611)
+	at com.smart.agent.chat.ChatControllerIT.persistsSafeWebSearchProviderDurationAndSources(ChatControllerIT.java:610)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+
+[ERROR] com.smart.agent.chat.ChatControllerIT.streamsProjectToolAnswerAndPersistsAuditTrail -- Time elapsed: 0.030 s <<< FAILURE!
+java.lang.AssertionError: 
+
+Expecting actual:
+  "{"type":"error","runId":"f54935eb-d7ce-4524-9eba-b8292fcf1b93","sequence":0,"traceId":"523485dc-cdcd-4fd1-a42c-be3f8d817dd4","messageId":null,"code":"AGENT_PROJECT_MENU_FORBIDDEN","text":"��ǰ�˺Ż�û����Ŀ�Ĳ鿴Ȩ�ޣ���ʱ�޷�Ϊ���ѯ��������ϵ����Աȷ�ϲ���ͨ���Ȩ�޺����ԡ�","toolKey":null,"data":{}}"
+to contain:
+  "message_end" 
+	at com.smart.agent.chat.ChatControllerIT.streamsProjectToolAnswerAndPersistsAuditTrail(ChatControllerIT.java:416)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+
+[ERROR] com.smart.agent.chat.ChatControllerIT.cancellationInterruptsAnAlreadyStartedToolAndSuppressesItsResult -- Time elapsed: 2.021 s <<< FAILURE!
+org.opentest4j.AssertionFailedError: 
+
+Expecting value to be true but was false
+	at com.smart.agent.chat.ChatControllerIT.cancellationInterruptsAnAlreadyStartedToolAndSuppressesItsResult(ChatControllerIT.java:838)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+
+[ERROR] com.smart.agent.chat.ChatControllerIT.capsCitationsAtTwenty -- Time elapsed: 0.020 s <<< FAILURE!
+java.lang.AssertionError: 
+
+Expected size: 20 but was: 0 in:
+[]
+	at com.smart.agent.chat.ChatControllerIT.capsCitationsAtTwenty(ChatControllerIT.java:671)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+
+[ERROR] com.smart.agent.chat.ChatControllerIT.cancellationAfterToolReturnsButBeforeAuditSuppressesEveryLaterSideEffect -- Time elapsed: 4.334 s <<< FAILURE!
+org.opentest4j.AssertionFailedError: 
+
+Expecting value to be true but was false
+	at com.smart.agent.chat.ChatControllerIT.cancellationAfterToolReturnsButBeforeAuditSuppressesEveryLaterSideEffect(ChatControllerIT.java:881)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+
+[ERROR] com.smart.agent.chat.ChatControllerIT.executesMultipleToolsInArrivalOrderAndCountsEveryModelTurn -- Time elapsed: 0.018 s <<< FAILURE!
+java.lang.AssertionError: 
+
+Expected size: 2 but was: 1 in:
+["{"type":"tool_start","runId":"56249a2e-c379-49e4-8250-b01c3e4b8c45","sequence":9,"traceId":"96e9cbfc-310e-495b-a6be-94fc06126ab5","messageId":null,"code":null,"text":null,"toolKey":"project.getOverview","data":{}}"]
+	at com.smart.agent.chat.ChatControllerIT.executesMultipleToolsInArrivalOrderAndCountsEveryModelTurn(ChatControllerIT.java:651)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+
+[ERROR] com.smart.agent.chat.ChatControllerIT.offersSemanticProjectQueryForNaturalLanguageFiltersAndStatistics -- Time elapsed: 0.012 s <<< FAILURE!
+java.lang.AssertionError: 
+
+Expecting ArrayList:
+  ["system.current_time"]
+to contain:
+  ["project.query"]
+but could not find the following element(s):
+  ["project.query"]
+
+	at com.smart.agent.chat.ChatControllerIT.offersSemanticProjectQueryForNaturalLanguageFiltersAndStatistics(ChatControllerIT.java:489)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+
+[ERROR] com.smart.agent.chat.ChatControllerIT.requiresFreshProjectToolResultInsteadOfReusingHistoricalProjectCount -- Time elapsed: 0.038 s <<< FAILURE!
+org.opentest4j.AssertionFailedError: 
+
+expected: AUTO
+ but was: REQUIRED
+	at com.smart.agent.chat.ChatControllerIT.requiresFreshProjectToolResultInsteadOfReusingHistoricalProjectCount(ChatControllerIT.java:458)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+
+[ERROR] com.smart.agent.chat.ChatControllerIT.callbackAuditBudgetExpiryPersistsTimeoutInsteadOfLeavingGenerating -- Time elapsed: 0.156 s <<< FAILURE!
+org.opentest4j.AssertionFailedError: 
+
+expected: "AGENT_RUN_TIMEOUT"
+ but was: "AGENT_MODEL_FAILED"
+	at com.smart.agent.chat.ChatControllerIT.callbackAuditBudgetExpiryPersistsTimeoutInsteadOfLeavingGenerating(ChatControllerIT.java:808)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+
+[ERROR] com.smart.agent.chat.ChatControllerIT.approvalFollowUpKeepsApprovalToolsAndRefreshesData -- Time elapsed: 0.042 s <<< FAILURE!
+java.lang.AssertionError: 
+
+Expecting all elements of:
+  ["approval.query", "approval.getDetail", "system.unsupported_capability"]
+to match given predicate but this element did not:
+  "system.unsupported_capability"
+	at com.smart.agent.chat.ChatControllerIT.approvalFollowUpKeepsApprovalToolsAndRefreshesData(ChatControllerIT.java:165)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+
+[ERROR] com.smart.agent.chat.ChatControllerIT.ordinalApprovalFollowUpExplainsWhenUpgradedConversationHasNoSnapshot -- Time elapsed: 0.013 s <<< FAILURE!
+java.lang.AssertionError: 
+
+Expecting actual:
+  "{"type":"message_end","runId":"a024a5c2-6255-4916-a842-0be6881e4c28","sequence":0,"traceId":"64ecf8bd-55b4-4a7d-a176-ae022a894aa3","messageId":"76ea6343-1c84-4161-b285-01aaab36bc58","code":null,"text":null,"toolKey":null,"data":{}}"
+to contain:
+  "AGENT_APPROVAL_CONTEXT_MISSING" 
+	at com.smart.agent.chat.ChatControllerIT.ordinalApprovalFollowUpExplainsWhenUpgradedConversationHasNoSnapshot(ChatControllerIT.java:313)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+
+[ERROR] com.smart.agent.chat.ChatControllerIT.rejectsCompletedOnlyAnswerOverUtf8LimitBeforeDeltaOrPersistence -- Time elapsed: 0.015 s <<< FAILURE!
+org.opentest4j.AssertionFailedError: 
+
+Expecting actual:
+  [USER, ASSISTANT]
+to contain exactly (and in same order):
+  [USER]
+but some elements were not expected:
+  [ASSISTANT]
+
+	at com.smart.agent.chat.ChatControllerIT.rejectsCompletedOnlyAnswerOverUtf8LimitBeforeDeltaOrPersistence(ChatControllerIT.java:909)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+
+[ERROR] com.smart.agent.chat.ChatControllerIT.enforcesFiveToolCallLimit -- Time elapsed: 0.014 s <<< FAILURE!
+java.lang.AssertionError: 
+
+Expecting actual:
+  "{"type":"error","runId":"e8b190a2-ef09-4e95-868b-76d317959619","sequence":0,"traceId":"5c4384aa-2257-4d10-91ad-5262cfecb749","messageId":null,"code":"AGENT_PROJECT_MENU_FORBIDDEN","text":"��ǰ�˺Ż�û����Ŀ�Ĳ鿴Ȩ�ޣ���ʱ�޷�Ϊ���ѯ��������ϵ����Աȷ�ϲ���ͨ���Ȩ�޺����ԡ�","toolKey":null,"data":{}}"
+to contain:
+  "AGENT_TOOL_CALL_LIMIT" 
+	at com.smart.agent.chat.ChatControllerIT.enforcesFiveToolCallLimit(ChatControllerIT.java:627)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+
+[ERROR] Failures: 
+[ERROR]   ChatControllerIT.approvalDetailFollowUpIgnoresProjectNameInAssistantAnswer:329 
+expected: REQUIRED
+ but was: AUTO
+[ERROR]   ChatControllerIT.approvalFollowUpKeepsApprovalToolsAndRefreshesData:165 
+Expecting all elements of:
+  ["approval.query", "approval.getDetail", "system.unsupported_capability"]
+to match given predicate but this element did not:
+  "system.unsupported_capability"
+[ERROR]   ChatControllerIT.approvalResultGenerationKeepsOnlyApprovalToolsOnTheSecondModelTurn:217 
+Expecting any elements of:
+  ["{"type":"message_start","runId":"b1ce50af-ab5b-4a67-a5d4-5f02cce29d76","sequence":1,"traceId":"adb525f3-a246-41d9-9bbe-aff1cdad5c84","messageId":"879fa046-2c16-41d1-8a67-284ccd77cd6c","code":null,"text":null,"toolKey":null,"data":{}}",
+    "{"type":"status","runId":"b1ce50af-ab5b-4a67-a5d4-5f02cce29d76","sequence":2,"traceId":"adb525f3-a246-41d9-9bbe-aff1cdad5c84","messageId":null,"code":"ROUTING","text":null,"toolKey":null,"data":{}}",
+    "{"type":"status","runId":"b1ce50af-ab5b-4a67-a5d4-5f02cce29d76","sequence":3,"traceId":"adb525f3-a246-41d9-9bbe-aff1cdad5c84","messageId":null,"code":"PLANNING","text":null,"toolKey":null,"data":{}}",
+    "{"type":"status","runId":"b1ce50af-ab5b-4a67-a5d4-5f02cce29d76","sequence":4,"traceId":"adb525f3-a246-41d9-9bbe-aff1cdad5c84","messageId":null,"code":"GENERATING","text":null,"toolKey":null,"data":{}}",
+    "{"type":"ai_debug","runId":"b1ce50af-ab5b-4a67-a5d4-5f02cce29d76","sequence":5,"traceId":"adb525f3-a246-41d9-9bbe-aff1cdad5c84","messageId":null,"code":"MODEL_REQUEST","text":null,"toolKey":null,"data":{"turn":1,"stage":"MODEL_REQUEST","toolUseMode":"REQUIRED","allowedTools":["approval.query","approval.getDetail"],"messageCount":1,"evidenceCount":0}}",
+    "{"type":"ai_debug","runId":"b1ce50af-ab5b-4a67-a5d4-5f02cce29d76","sequence":6,"traceId":"adb525f3-a246-41d9-9bbe-aff1cdad5c84","messageId":null,"code":"MODEL_RESPONSE","text":null,"toolKey":null,"data":{"stage":"MODEL_RESPONSE","text":"answer","inputTokens":2,"outputTokens":3,"turn":1}}",
+    "{"type":"status","runId":"b1ce50af-ab5b-4a67-a5d4-5f02cce29d76","sequence":7,"traceId":"adb525f3-a246-41d9-9bbe-aff1cdad5c84","messageId":null,"code":"GENERATING","text":null,"toolKey":null,"data":{}}",
+    "{"type":"ai_debug","runId":"b1ce50af-ab5b-4a67-a5d4-5f02cce29d76","sequence":8,"traceId":"adb525f3-a246-41d9-9bbe-aff1cdad5c84","messageId":null,"code":"MODEL_REQUEST","text":null,"toolKey":null,"data":{"turn":2,"stage":"MODEL_REQUEST","toolUseMode":"REQUIRED","allowedTools":["approval.query","approval.getDetail"],"messageCount":2,"evidenceCount":0}}",
+    "{"type":"ai_debug","runId":"b1ce50af-ab5b-4a67-a5d4-5f02cce29d76","sequence":9,"traceId":"adb525f3-a246-41d9-9bbe-aff1cdad5c84","messageId":null,"code":"MODEL_RESPONSE","text":null,"toolKey":null,"data":{"stage":"MODEL_RESPONSE","text":"answer","inputTokens":2,"outputTokens":3,"turn":2}}",
+    "{"type":"status","runId":"b1ce50af-ab5b-4a67-a5d4-5f02cce29d76","sequence":10,"traceId":"adb525f3-a246-41d9-9bbe-aff1cdad5c84","messageId":null,"code":"GENERATING","text":null,"toolKey":null,"data":{}}",
+    "{"type":"ai_debug","runId":"b1ce50af-ab5b-4a67-a5d4-5f02cce29d76","sequence":11,"traceId":"adb525f3-a246-41d9-9bbe-aff1cdad5c84","messageId":null,"code":"MODEL_REQUEST","text":null,"toolKey":null,"data":{"turn":3,"stage":"MODEL_REQUEST","toolUseMode":"REQUIRED","allowedTools":["approval.query","approval.getDetail"],"messageCount":3,"evidenceCount":0}}",
+    "{"type":"ai_debug","runId":"b1ce50af-ab5b-4a67-a5d4-5f02cce29d76","sequence":12,"traceId":"adb525f3-a246-41d9-9bbe-aff1cdad5c84","messageId":null,"code":"MODEL_RESPONSE","text":null,"toolKey":null,"data":{"stage":"MODEL_RESPONSE","text":"answer","inputTokens":2,"outputTokens":3,"turn":3}}",
+    "{"type":"status","runId":"b1ce50af-ab5b-4a67-a5d4-5f02cce29d76","sequence":13,"traceId":"adb525f3-a246-41d9-9bbe-aff1cdad5c84","messageId":null,"code":"GENERATING","text":null,"toolKey":null,"data":{}}",
+    "{"type":"ai_debug","runId":"b1ce50af-ab5b-4a67-a5d4-5f02cce29d76","sequence":14,"traceId":"adb525f3-a246-41d9-9bbe-aff1cdad5c84","messageId":null,"code":"MODEL_REQUEST","text":null,"toolKey":null,"data":{"turn":4,"stage":"MODEL_REQUEST","toolUseMode":"REQUIRED","allowedTools":["approval.query","approval.getDetail"],"messageCount":4,"evidenceCount":0}}",
+    "{"type":"ai_debug","runId":"b1ce50af-ab5b-4a67-a5d4-5f02cce29d76","sequence":15,"traceId":"adb525f3-a246-41d9-9bbe-aff1cdad5c84","messageId":null,"code":"MODEL_RESPONSE","text":null,"toolKey":null,"data":{"stage":"MODEL_RESPONSE","text":"answer","inputTokens":2,"outputTokens":3,"turn":4}}",
+    "{"type":"status","runId":"b1ce50af-ab5b-4a67-a5d4-5f02cce29d76","sequence":16,"traceId":"adb525f3-a246-41d9-9bbe-aff1cdad5c84","messageId":null,"code":"GENERATING","text":null,"toolKey":null,"data":{}}",
+    "{"type":"ai_debug","runId":"b1ce50af-ab5b-4a67-a5d4-5f02cce29d76","sequence":17,"traceId":"adb525f3-a246-41d9-9bbe-aff1cdad5c84","messageId":null,"code":"MODEL_REQUEST","text":null,"toolKey":null,"data":{"turn":5,"stage":"MODEL_REQUEST","toolUseMode":"REQUIRED","allowedTools":["approval.query","approval.getDetail"],"messageCount":5,"evidenceCount":0}}",
+    "{"type":"ai_debug","runId":"b1ce50af-ab5b-4a67-a5d4-5f02cce29d76","sequence":18,"traceId":"adb525f3-a246-41d9-9bbe-aff1cdad5c84","messageId":null,"code":"MODEL_RESPONSE","text":null,"toolKey":null,"data":{"stage":"MODEL_RESPONSE","text":"answer","inputTokens":2,"outputTokens":3,"turn":5}}",
+    "{"type":"status","runId":"b1ce50af-ab5b-4a67-a5d4-5f02cce29d76","sequence":19,"traceId":"adb525f3-a246-41d9-9bbe-aff1cdad5c84","messageId":null,"code":"GENERATING","text":null,"toolKey":null,"data":{}}",
+    "{"type":"ai_debug","runId":"b1ce50af-ab5b-4a67-a5d4-5f02cce29d76","sequence":20,"traceId":"adb525f3-a246-41d9-9bbe-aff1cdad5c84","messageId":null,"code":"MODEL_REQUEST","text":null,"toolKey":null,"data":{"turn":6,"stage":"MODEL_REQUEST","toolUseMode":"REQUIRED","allowedTools":["approval.query","approval.getDetail"],"messageCount":6,"evidenceCount":0}}",
+    "{"type":"ai_debug","runId":"b1ce50af-ab5b-4a67-a5d4-5f02cce29d76","sequence":21,"traceId":"adb525f3-a246-41d9-9bbe-aff1cdad5c84","messageId":null,"code":"MODEL_RESPONSE","text":null,"toolKey":null,"data":{"stage":"MODEL_RESPONSE","text":"answer","inputTokens":2,"outputTokens":3,"turn":6}}",
+    "{"type":"error","runId":"b1ce50af-ab5b-4a67-a5d4-5f02cce29d76","sequence":0,"traceId":"adb525f3-a246-41d9-9bbe-aff1cdad5c84","messageId":null,"code":"AGENT_MODEL_TURN_LIMIT","text":"���β�ѯ������࣬����С��ѯ��Χ�����ԡ�","toolKey":null,"data":{}}"]
+to match given predicate but none did.
+[ERROR]   ChatControllerIT.callbackAuditBudgetExpiryPersistsTimeoutInsteadOfLeavingGenerating:808 
+expected: "AGENT_RUN_TIMEOUT"
+ but was: "AGENT_MODEL_FAILED"
+[ERROR]   ChatControllerIT.cancellationAfterToolReturnsButBeforeAuditSuppressesEveryLaterSideEffect:881 
+Expecting value to be true but was false
+[ERROR]   ChatControllerIT.cancellationInterruptsAnAlreadyStartedToolAndSuppressesItsResult:838 
+Expecting value to be true but was false
+[ERROR]   ChatControllerIT.capsCitationsAtTwenty:671 
+Expected size: 20 but was: 0 in:
+[]
+[ERROR]   ChatControllerIT.doesNotEmitSuccessfulTerminalEventWhenAtomicCompletionPersistenceFails:766 
+Expecting actual:
+  [USER, ASSISTANT]
+to contain exactly (and in same order):
+  [USER]
+but some elements were not expected:
+  [ASSISTANT]
+
+[ERROR]   ChatControllerIT.emitsTrustedCitationBeforeAnswerDeltaAndPersistsIt:554 [events=[{"type":"message_start","runId":"c13acc38-6e9e-4796-9a8a-55627eace9c2","sequence":1,"traceId":"5afad9d3-53f7-43b0-afcc-bd39dc8c4602","messageId":"8156829f-7841-42f0-ba75-a4cbee5a6926","code":null,"text":null,"toolKey":null,"data":{}}, {"type":"status","runId":"c13acc38-6e9e-4796-9a8a-55627eace9c2","sequence":2,"traceId":"5afad9d3-53f7-43b0-afcc-bd39dc8c4602","messageId":null,"code":"ROUTING","text":null,"toolKey":null,"data":{}}, {"type":"status","runId":"c13acc38-6e9e-4796-9a8a-55627eace9c2","sequence":3,"traceId":"5afad9d3-53f7-43b0-afcc-bd39dc8c4602","messageId":null,"code":"PLANNING","text":null,"toolKey":null,"data":{}}, {"type":"status","runId":"c13acc38-6e9e-4796-9a8a-55627eace9c2","sequence":4,"traceId":"5afad9d3-53f7-43b0-afcc-bd39dc8c4602","messageId":null,"code":"GENERATING","text":null,"toolKey":null,"data":{}}, {"type":"ai_debug","runId":"c13acc38-6e9e-4796-9a8a-55627eace9c2","sequence":5,"traceId":"5afad9d3-53f7-43b0-afcc-bd39dc8c4602","messageId":null,"code":"MODEL_REQUEST","text":null,"toolKey":null,"data":{"turn":1,"stage":"MODEL_REQUEST","toolUseMode":"AUTO","allowedTools":["board.compare","projectProfit.clarifyDate","costContract.clarifyDate","system.current_time","costContract.compare","board.query","projectProfit.compare","projectProfit.query","board.detail","costContract.query","system.unsupported_capability"],"messageCount":1,"evidenceCount":0}}, {"type":"ai_debug","runId":"c13acc38-6e9e-4796-9a8a-55627eace9c2","sequence":6,"traceId":"5afad9d3-53f7-43b0-afcc-bd39dc8c4602","messageId":null,"code":"MODEL_RESPONSE","text":null,"toolKey":null,"data":{"stage":"MODEL_RESPONSE","text":"answer","inputTokens":2,"outputTokens":3,"turn":1}}, {"type":"message_delta","runId":"c13acc38-6e9e-4796-9a8a-55627eace9c2","sequence":7,"traceId":"5afad9d3-53f7-43b0-afcc-bd39dc8c4602","messageId":null,"code":null,"text":"answer","toolKey":null,"data":{}}, {"type":"message_end","runId":"c13acc38-6e9e-4796-9a8a-55627eace9c2","sequence":0,"traceId":"5afad9d3-53f7-43b0-afcc-bd39dc8c4602","messageId":"7591e0b0-64a7-499b-92b9-94807dd053ff","code":null,"text":null,"toolKey":null,"data":{}}]] 
+Expecting actual:
+  -1
+to be greater than or equal to:
+  0
+
+[ERROR]   ChatControllerIT.enforcesFiveToolCallLimit:627 
+Expecting actual:
+  "{"type":"error","runId":"e8b190a2-ef09-4e95-868b-76d317959619","sequence":0,"traceId":"5c4384aa-2257-4d10-91ad-5262cfecb749","messageId":null,"code":"AGENT_PROJECT_MENU_FORBIDDEN","text":"��ǰ�˺Ż�û����Ŀ�Ĳ鿴Ȩ�ޣ���ʱ�޷�Ϊ���ѯ��������ϵ����Աȷ�ϲ���ͨ���Ȩ�޺����ԡ�","toolKey":null,"data":{}}"
+to contain:
+  "AGENT_TOOL_CALL_LIMIT" 
+[ERROR]   ChatControllerIT.executesMultipleToolsInArrivalOrderAndCountsEveryModelTurn:651 
+Expected size: 2 but was: 1 in:
+["{"type":"tool_start","runId":"56249a2e-c379-49e4-8250-b01c3e4b8c45","sequence":9,"traceId":"96e9cbfc-310e-495b-a6be-94fc06126ab5","messageId":null,"code":null,"text":null,"toolKey":"project.getOverview","data":{}}"]
+[ERROR]   ChatControllerIT.genericDetailFollowUpUsesLatestUserApprovalIntent:346 
+Expecting all elements of:
+  ["approval.query", "approval.getDetail", "system.unsupported_capability"]
+to match given predicate but this element did not:
+  "system.unsupported_capability"
+[ERROR]   ChatControllerIT.includesPreviousConversationMessagesInFollowingModelRequest:437 
+Expecting actual:
+  ["����鿴��Ŀ XG0000001
+[trusted-routing: ��������Ŀ��ѯ��ֻ�ܵ��� project.query �� project.getArchiveDetail�����õ��� approval.* �� board.*����ʷ�е��������ݲ��ı䱾��·��]",
+    "[trusted-refresh-required: ���ֱ������µ��� project.query �� project.getArchiveDetail ��ȡʵʱ���ݣ����ø�����ʷ�ش�������Ѿ���ѯ��������������Ŀ���ߡ�]"]
+to contain exactly (and in same order):
+  ["����鿴��Ŀ XG0000001", "answer", "�����Ŀ������Щ������Ϣ"]
+but some elements were not found:
+  ["����鿴��Ŀ XG0000001", "answer", "�����Ŀ������Щ������Ϣ"]
+and others were not expected:
+  ["����鿴��Ŀ XG0000001
+[trusted-routing: ��������Ŀ��ѯ��ֻ�ܵ��� project.query �� project.getArchiveDetail�����õ��� approval.* �� board.*����ʷ�е��������ݲ��ı䱾��·��]",
+    "[trusted-refresh-required: ���ֱ������µ��� project.query �� project.getArchiveDetail ��ȡʵʱ���ݣ����ø�����ʷ�ش�������Ѿ���ѯ��������������Ŀ���ߡ�]"]
+
+[ERROR]   ChatControllerIT.offersSemanticProjectQueryForNaturalLanguageFiltersAndStatistics:489 
+Expecting ArrayList:
+  ["system.current_time"]
+to contain:
+  ["project.query"]
+but could not find the following element(s):
+  ["project.query"]
+
+[ERROR]   ChatControllerIT.ordinalApprovalFollowUpExplainsWhenUpgradedConversationHasNoSnapshot:313 
+Expecting actual:
+  "{"type":"message_end","runId":"a024a5c2-6255-4916-a842-0be6881e4c28","sequence":0,"traceId":"64ecf8bd-55b4-4a7d-a176-ae022a894aa3","messageId":"76ea6343-1c84-4161-b285-01aaab36bc58","code":null,"text":null,"toolKey":null,"data":{}}"
+to contain:
+  "AGENT_APPROVAL_CONTEXT_MISSING" 
+[ERROR]   ChatControllerIT.persistsSafeWebSearchProviderDurationAndSources:610 
+[List check single element] (1 failure)
+-- failure 1 --
+Expecting actual:
+  "{"debugVersion":2,"turn":1,"stage":"TOOL_RESULT","toolKey":"web.search","result":"{\"query\":\"����������\",\"searchedAt\":\"2026-09-11T17:00:00+08:00\",\"summary\":\"�������硣\",\"provider\":\"zhipu\",\"durationMillis\":10,\"sources\":[{\"title\":\"�������\",\"url\":\"https://weather.example/tianjin\",\"snippet\":\"��������\",\"publishedAt\":\"2026-09-11\"}]}"}"
+to contain:
+  [""provider":"zhipu"",
+    "durationMillis",
+    "�������",
+    "https://weather.example/tianjin"]
+but could not find:
+  [""provider":"zhipu""]
+ 
+at ChatControllerIT.lambda$persistsSafeWebSearchProviderDurationAndSources$41(ChatControllerIT.java:611)
+[ERROR]   ChatControllerIT.rejectsCompletedOnlyAnswerOverUtf8LimitBeforeDeltaOrPersistence:909 
+Expecting actual:
+  [USER, ASSISTANT]
+to contain exactly (and in same order):
+  [USER]
+but some elements were not expected:
+  [ASSISTANT]
+
+[ERROR]   ChatControllerIT.requiresFreshProjectToolResultInsteadOfReusingHistoricalProjectCount:458 
+expected: AUTO
+ but was: REQUIRED
+[ERROR]   ChatControllerIT.streamsCompleteProjectArchiveWithAllowedSections:368 
+Expecting any elements of:
+  ["{"type":"message_start","runId":"0bd1c2a9-a608-4da8-94f4-bef645c47c9a","sequence":1,"traceId":"2236fa58-2ba0-4bb8-91e4-8aebae095bce","messageId":"ce1eb050-efa8-4030-83b8-35524e2a0ae2","code":null,"text":null,"toolKey":null,"data":{}}",
+    "{"type":"status","runId":"0bd1c2a9-a608-4da8-94f4-bef645c47c9a","sequence":2,"traceId":"2236fa58-2ba0-4bb8-91e4-8aebae095bce","messageId":null,"code":"ROUTING","text":null,"toolKey":null,"data":{}}",
+    "{"type":"status","runId":"0bd1c2a9-a608-4da8-94f4-bef645c47c9a","sequence":3,"traceId":"2236fa58-2ba0-4bb8-91e4-8aebae095bce","messageId":null,"code":"PLANNING","text":null,"toolKey":null,"data":{}}",
+    "{"type":"status","runId":"0bd1c2a9-a608-4da8-94f4-bef645c47c9a","sequence":4,"traceId":"2236fa58-2ba0-4bb8-91e4-8aebae095bce","messageId":null,"code":"GENERATING","text":null,"toolKey":null,"data":{}}",
+    "{"type":"ai_debug","runId":"0bd1c2a9-a608-4da8-94f4-bef645c47c9a","sequence":5,"traceId":"2236fa58-2ba0-4bb8-91e4-8aebae095bce","messageId":null,"code":"MODEL_REQUEST","text":null,"toolKey":null,"data":{"turn":1,"stage":"MODEL_REQUEST","toolUseMode":"REQUIRED","allowedTools":["project.listAccessible","project.getOverview","project.getContracts","project.getArchiveDetail","project.query"],"messageCount":1,"evidenceCount":0}}",
+    "{"type":"ai_debug","runId":"0bd1c2a9-a608-4da8-94f4-bef645c47c9a","sequence":6,"traceId":"2236fa58-2ba0-4bb8-91e4-8aebae095bce","messageId":null,"code":"MODEL_RESPONSE","text":null,"toolKey":null,"data":{"stage":"MODEL_RESPONSE","text":"answer","inputTokens":2,"outputTokens":3,"turn":1}}",
+    "{"type":"status","runId":"0bd1c2a9-a608-4da8-94f4-bef645c47c9a","sequence":7,"traceId":"2236fa58-2ba0-4bb8-91e4-8aebae095bce","messageId":null,"code":"GENERATING","text":null,"toolKey":null,"data":{}}",
+    "{"type":"ai_debug","runId":"0bd1c2a9-a608-4da8-94f4-bef645c47c9a","sequence":8,"traceId":"2236fa58-2ba0-4bb8-91e4-8aebae095bce","messageId":null,"code":"MODEL_REQUEST","text":null,"toolKey":null,"data":{"turn":2,"stage":"MODEL_REQUEST","toolUseMode":"REQUIRED","allowedTools":["project.listAccessible","project.getOverview","project.getContracts","project.getArchiveDetail","project.query"],"messageCount":2,"evidenceCount":0}}",
+    "{"type":"ai_debug","runId":"0bd1c2a9-a608-4da8-94f4-bef645c47c9a","sequence":9,"traceId":"2236fa58-2ba0-4bb8-91e4-8aebae095bce","messageId":null,"code":"MODEL_RESPONSE","text":null,"toolKey":null,"data":{"stage":"MODEL_RESPONSE","text":"answer","inputTokens":2,"outputTokens":3,"turn":2}}",
+    "{"type":"status","runId":"0bd1c2a9-a608-4da8-94f4-bef645c47c9a","sequence":10,"traceId":"2236fa58-2ba0-4bb8-91e4-8aebae095bce","messageId":null,"code":"GENERATING","text":null,"toolKey":null,"data":{}}",
+    "{"type":"ai_debug","runId":"0bd1c2a9-a608-4da8-94f4-bef645c47c9a","sequence":11,"traceId":"2236fa58-2ba0-4bb8-91e4-8aebae095bce","messageId":null,"code":"MODEL_REQUEST","text":null,"toolKey":null,"data":{"turn":3,"stage":"MODEL_REQUEST","toolUseMode":"REQUIRED","allowedTools":["project.listAccessible","project.getOverview","project.getContracts","project.getArchiveDetail","project.query"],"messageCount":3,"evidenceCount":0}}",
+    "{"type":"ai_debug","runId":"0bd1c2a9-a608-4da8-94f4-bef645c47c9a","sequence":12,"traceId":"2236fa58-2ba0-4bb8-91e4-8aebae095bce","messageId":null,"code":"MODEL_RESPONSE","text":null,"toolKey":null,"data":{"stage":"MODEL_RESPONSE","text":"answer","inputTokens":2,"outputTokens":3,"turn":3}}",
+    "{"type":"status","runId":"0bd1c2a9-a608-4da8-94f4-bef645c47c9a","sequence":13,"traceId":"2236fa58-2ba0-4bb8-91e4-8aebae095bce","messageId":null,"code":"GENERATING","text":null,"toolKey":null,"data":{}}",
+    "{"type":"ai_debug","runId":"0bd1c2a9-a608-4da8-94f4-bef645c47c9a","sequence":14,"traceId":"2236fa58-2ba0-4bb8-91e4-8aebae095bce","messageId":null,"code":"MODEL_REQUEST","text":null,"toolKey":null,"data":{"turn":4,"stage":"MODEL_REQUEST","toolUseMode":"REQUIRED","allowedTools":["project.listAccessible","project.getOverview","project.getContracts","project.getArchiveDetail","project.query"],"messageCount":4,"evidenceCount":0}}",
+    "{"type":"ai_debug","runId":"0bd1c2a9-a608-4da8-94f4-bef645c47c9a","sequence":15,"traceId":"2236fa58-2ba0-4bb8-91e4-8aebae095bce","messageId":null,"code":"MODEL_RESPONSE","text":null,"toolKey":null,"data":{"stage":"MODEL_RESPONSE","text":"answer","inputTokens":2,"outputTokens":3,"turn":4}}",
+    "{"type":"status","runId":"0bd1c2a9-a608-4da8-94f4-bef645c47c9a","sequence":16,"traceId":"2236fa58-2ba0-4bb8-91e4-8aebae095bce","messageId":null,"code":"GENERATING","text":null,"toolKey":null,"data":{}}",
+    "{"type":"ai_debug","runId":"0bd1c2a9-a608-4da8-94f4-bef645c47c9a","sequence":17,"traceId":"2236fa58-2ba0-4bb8-91e4-8aebae095bce","messageId":null,"code":"MODEL_REQUEST","text":null,"toolKey":null,"data":{"turn":5,"stage":"MODEL_REQUEST","toolUseMode":"REQUIRED","allowedTools":["project.listAccessible","project.getOverview","project.getContracts","project.getArchiveDetail","project.query"],"messageCount":5,"evidenceCount":0}}",
+    "{"type":"ai_debug","runId":"0bd1c2a9-a608-4da8-94f4-bef645c47c9a","sequence":18,"traceId":"2236fa58-2ba0-4bb8-91e4-8aebae095bce","messageId":null,"code":"MODEL_RESPONSE","text":null,"toolKey":null,"data":{"stage":"MODEL_RESPONSE","text":"answer","inputTokens":2,"outputTokens":3,"turn":5}}",
+    "{"type":"status","runId":"0bd1c2a9-a608-4da8-94f4-bef645c47c9a","sequence":19,"traceId":"2236fa58-2ba0-4bb8-91e4-8aebae095bce","messageId":null,"code":"GENERATING","text":null,"toolKey":null,"data":{}}",
+    "{"type":"ai_debug","runId":"0bd1c2a9-a608-4da8-94f4-bef645c47c9a","sequence":20,"traceId":"2236fa58-2ba0-4bb8-91e4-8aebae095bce","messageId":null,"code":"MODEL_REQUEST","text":null,"toolKey":null,"data":{"turn":6,"stage":"MODEL_REQUEST","toolUseMode":"REQUIRED","allowedTools":["project.listAccessible","project.getOverview","project.getContracts","project.getArchiveDetail","project.query"],"messageCount":6,"evidenceCount":0}}",
+    "{"type":"ai_debug","runId":"0bd1c2a9-a608-4da8-94f4-bef645c47c9a","sequence":21,"traceId":"2236fa58-2ba0-4bb8-91e4-8aebae095bce","messageId":null,"code":"MODEL_RESPONSE","text":null,"toolKey":null,"data":{"stage":"MODEL_RESPONSE","text":"answer","inputTokens":2,"outputTokens":3,"turn":6}}",
+    "{"type":"error","runId":"0bd1c2a9-a608-4da8-94f4-bef645c47c9a","sequence":0,"traceId":"2236fa58-2ba0-4bb8-91e4-8aebae095bce","messageId":null,"code":"AGENT_MODEL_TURN_LIMIT","text":"���β�ѯ������࣬����С��ѯ��Χ�����ԡ�","toolKey":null,"data":{}}"]
+to match given predicate but none did.
+[ERROR]   ChatControllerIT.streamsProjectToolAnswerAndPersistsAuditTrail:416 
+Expecting actual:
+  "{"type":"error","runId":"f54935eb-d7ce-4524-9eba-b8292fcf1b93","sequence":0,"traceId":"523485dc-cdcd-4fd1-a42c-be3f8d817dd4","messageId":null,"code":"AGENT_PROJECT_MENU_FORBIDDEN","text":"��ǰ�˺Ż�û����Ŀ�Ĳ鿴Ȩ�ޣ���ʱ�޷�Ϊ���ѯ��������ϵ����Աȷ�ϲ���ͨ���Ȩ�޺����ԡ�","toolKey":null,"data":{}}"
+to contain:
+  "message_end" 
+[ERROR] Tests run: 59, Failures: 20, Errors: 0, Skipped: 0
+[ERROR] Failed to execute goal org.apache.maven.plugins:maven-surefire-plugin:3.5.6:test (default-test) on project smart-agent: There are test failures.
+[ERROR] 
+[ERROR] See F:\project\gongcheng\agent\target\surefire-reports for the individual test results.
+[ERROR] See dump files (if any exist) [date].dump, [date]-jvmRun[N].dump and [date].dumpstream.
+[ERROR] -> [Help 1]
+[ERROR] 
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR] 
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException

@@ -33,6 +33,7 @@ class ChatConfiguration {
             ObjectProvider<com.smart.agent.attachment.AttachmentService> attachmentService,
             com.smart.agent.context.ConversationContextService conversationContextService,
             QueryIntentResolver queryIntentResolver,
+            com.smart.agent.routing.ModelIntentRouter modelIntentRouter,
             PendingClarificationService pendingClarificationService,
             ObjectProvider<com.smart.agent.question.QuestionRecordService> questionRecords) {
         DynamicModelRegistry registry = modelRegistry.getIfAvailable();
@@ -43,6 +44,7 @@ class ChatConfiguration {
                     attachmentService.getIfAvailable(), attachmentPublicBaseUrl, conversationContextService,
                     queryIntentResolver, pendingClarificationService);
             orchestrator.setQuestionRecords(questionRecords.getIfAvailable());
+            orchestrator.setModelIntentRouter(modelIntentRouter);
             return orchestrator;
         }
         ChatOrchestrator orchestrator = new ChatOrchestrator(
@@ -51,6 +53,7 @@ class ChatConfiguration {
                 attachmentService.getIfAvailable(), attachmentPublicBaseUrl, conversationContextService,
                 queryIntentResolver, pendingClarificationService);
         orchestrator.setQuestionRecords(questionRecords.getIfAvailable());
+        orchestrator.setModelIntentRouter(modelIntentRouter);
         return orchestrator;
     }
 

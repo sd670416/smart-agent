@@ -101,6 +101,7 @@ class ChatControllerIT {
 
     @BeforeEach
     void createConversation() {
+        orchestrator.setMaxAnswerBytes(0);
         runRepository.clear();
         scenarioModelGateway.reset();
         testProjectBusinessClient.reset();
@@ -895,6 +896,7 @@ class ChatControllerIT {
 
     @Test
     void rejectsCompletedOnlyAnswerOverUtf8LimitBeforeDeltaOrPersistence() {
+        orchestrator.setMaxAnswerBytes(64 * 1024);
         List<String> events = stream("oversized-completed", Set.of(), Set.of());
 
         assertThat(events).noneMatch(event -> event.contains("message_delta"));
@@ -903,8 +905,36 @@ class ChatControllerIT {
                 "tenant-1", "user-1", conversationId).getFirst();
         assertThat(run.status()).isEqualTo(AgentRunStatus.FAILED);
         assertThat(conversationService.find("tenant-1", "user-1", conversationId).messages())
-                .extracting(com.smart.agent.conversation.Message::role)
-                .containsExactly(com.smart.agent.conversation.Message.Role.USER);
+                .noneMatch(message -> message.content().contains("x".repeat(64 * 1024 + 1)));
+    }
+
+    @Test
+    void unlimitedAnswersAllowCompletedAndStreamedTextBeyondOldLimit() {
+        orchestrator.setMaxAnswerBytes(0);
+        for (String question : List.of("oversized-completed", "oversized-streamed")) {
+            List<String> events = stream(question, Set.of(), Set.of());
+            assertThat(events).noneMatch(event -> event.contains("AGENT_ANSWER_TOO_LARGE"));
+            assertThat(events).anyMatch(event -> event.contains("message_delta"));
+        }
+    }
+
+    @Test
+    void configuredLimitCountsUtf8BytesInStreamedAndCompletedAnswers() {
+        orchestrator.setMaxAnswerBytes(5);
+        for (String question : List.of("utf8-completed", "utf8-streamed")) {
+            List<String> events = stream(question, Set.of(), Set.of());
+            assertThat(events.getLast()).contains("AGENT_ANSWER_TOO_LARGE");
+        }
+    }
+
+    @Test
+    void configuredLimitAllowsExactUtf8Boundary() {
+        orchestrator.setMaxAnswerBytes(6);
+        for (String question : List.of("utf8-completed", "utf8-streamed")) {
+            List<String> events = stream(question, Set.of(), Set.of());
+            assertThat(events).noneMatch(event -> event.contains("AGENT_ANSWER_TOO_LARGE"));
+            assertThat(events).anyMatch(event -> event.contains("message_delta"));
+        }
     }
 
     private List<String> stream(String question, Set<String> permissions, Set<String> projectIds) {
@@ -1338,6 +1368,17 @@ class ChatControllerIT {
                 }
                 if (question.equals("oversized-completed")) {
                     return Flux.just(new ModelEvent.Completed("x".repeat(64 * 1024 + 1), 1, 1));
+                }
+                if (question.equals("oversized-streamed")) {
+                    return Flux.just(new ModelEvent.TextDelta("x".repeat(64 * 1024 + 1)),
+                            new ModelEvent.Completed("", 1, 1));
+                }
+                if (question.equals("utf8-completed")) {
+                    return Flux.just(new ModelEvent.Completed("\u4e2d\u6587", 1, 1));
+                }
+                if (question.equals("utf8-streamed")) {
+                    return Flux.just(new ModelEvent.TextDelta("\u4e2d"), new ModelEvent.TextDelta("\u6587"),
+                            new ModelEvent.Completed("", 1, 1));
                 }
                 if (question.contains("project-1") && request.redactedConversationMessages().size() == 1
                         && request.allowedToolSpecifications().stream()

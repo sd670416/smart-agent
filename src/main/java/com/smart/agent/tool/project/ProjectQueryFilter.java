@@ -15,6 +15,11 @@ public record ProjectQueryFilter(String logic, List<ProjectQueryCondition> condi
         if (operator == null) return null;
         String value = operator.trim().toLowerCase(java.util.Locale.ROOT);
         return switch (value) {
+            case "isnotnull" -> "isNotNull";
+            case "isnull" -> "isNull";
+            case "notin" -> "notIn";
+            case "startswith" -> "startsWith";
+            case "endswith" -> "endsWith";
             case ">=" -> "gte";
             case "<=" -> "lte";
             case ">" -> "gt";

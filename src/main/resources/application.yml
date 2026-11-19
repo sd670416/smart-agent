@@ -24,6 +24,9 @@ management:
       exposure:
         include: health,info,prometheus
 agent:
+  chat:
+    # UTF-8 bytes; 0 disables the application answer length limit.
+    max-answer-bytes: ${AGENT_CHAT_MAX_ANSWER_BYTES:0}
   time-zone: ${AGENT_TIME_ZONE:Asia/Shanghai}
   web-search:
     enabled: ${AGENT_WEB_SEARCH_ENABLED:false}

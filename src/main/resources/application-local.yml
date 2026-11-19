@@ -1,9 +1,9 @@
 spring:
   # smart-agent 独立数据库，请按本机实际地址修改。
   datasource:
-    url: jdbc:mysql://localhost:3306/smart_agent?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+    url: jdbc:mysql://192.168.1.200:3305/smart_agent?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
     username: root
-    password: root
+    password: pst@0315
 
   data:
     redis:

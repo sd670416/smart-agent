@@ -13,9 +13,12 @@ public class ApprovalQueryTool implements AgentTool<ApprovalQueryInput, Approval
     @Override public Class<ApprovalQueryInput> inputType() { return ApprovalQueryInput.class; }
     @Override public String requiredPermission() { return ""; }
     @Override public ToolRisk risk() { return ToolRisk.L1; }
-    @Override public String description() { return "查询当前用户有权查看的待办、已办或我发起审批，支持筛选、分页、统计和详情前的流程定位"; }
+    @Override public String description() { return "查询当前用户有权查看的待办、已办或我发起审批，支持筛选、分页、统计和详情前的流程定位；personKeywords支持指定多人当前待办数量、平均等待时长和已办平均处理时长统计"; }
     @Override public String argumentsSchemaJson() {
         return "{\"type\":\"object\",\"properties\":{"
+                + "\"personKeywords\":{\"type\":\"array\",\"items\":{\"type\":\"string\"},\"description\":\"人员统计模式：一次传入1至20位人员姓名或账号，例如['张三','李四']；同时返回各人当前待办数量、待办平均等待时长、已办平均处理时长。与personKeyword、select、filter、groupBy、aggregations、orderBy、processType互斥。不按流程去重，按任务计算；结果位于groups\"},"
+                + "\"processedFrom\":{\"type\":\"string\",\"description\":\"人员统计已办完成时间下限，含，yyyy-MM-dd或yyyy-MM-dd HH:mm:ss；省略表示不限。只影响已办平均处理时长\"},"
+                + "\"processedTo\":{\"type\":\"string\",\"description\":\"人员统计已办完成时间上限，日期含当天，精确时间不含该时刻；省略表示不限。不改变当前待办统计\"},"
                 + "\"scope\":{\"type\":\"string\",\"description\":\"scope只允许TODO、PROCESSED、STARTED，不能填写SELF或ALL；分别表示待办、已办、我发起，默认TODO\"},"
                 + "\"visibility\":{\"type\":\"string\",\"description\":\"visibility只允许SELF或ALL；分别表示本人或全部，默认SELF\"},"
                 + "\"personKeyword\":{\"type\":\"string\"},\"page\":{\"type\":\"integer\"},"

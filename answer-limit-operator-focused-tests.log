@@ -1,0 +1,31 @@
+14:16:16.102 [main] WARN org.springframework.context.annotation.AnnotationConfigApplicationContext -- Exception encountered during context initialization - cancelling refresh attempt: org.springframework.beans.factory.BeanCreationException: Error creating bean with name 'chatOrchestrator': Injection of autowired dependencies failed
+14:16:16.892 [main] INFO org.springframework.boot.test.context.SpringBootTestContextBootstrapper -- Found @SpringBootConfiguration com.smart.agent.SmartAgentApplication for test class com.smart.agent.chat.ChatControllerIT
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::               (v3.5.16)
+
+2026-11-19T14:16:17.391+08:00  INFO 15464 --- [smart-agent] [           main] com.smart.agent.chat.ChatControllerIT    : Starting ChatControllerIT using Java 21.0.6 with PID 15464 (started by 34248 in F:\project\gongcheng\agent)
+2026-11-19T14:16:17.392+08:00  INFO 15464 --- [smart-agent] [           main] com.smart.agent.chat.ChatControllerIT    : No active profile set, falling back to 1 default profile: "local"
+2026-11-19T14:16:19.834+08:00  INFO 15464 --- [smart-agent] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Multiple Spring Data modules found, entering strict repository configuration mode
+2026-11-19T14:16:19.839+08:00  INFO 15464 --- [smart-agent] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data Redis repositories in DEFAULT mode.
+2026-11-19T14:16:20.095+08:00  INFO 15464 --- [smart-agent] [           main] .RepositoryConfigurationExtensionSupport : Spring Data Redis - Could not safely identify store assignment for repository candidate interface com.smart.agent.model.audit.ModelCallLogRepository; If you want this repository to be a Redis repository, consider annotating your entities with one of these annotations: org.springframework.data.redis.core.RedisHash (preferred), or consider extending one of the following types with your repository: org.springframework.data.keyvalue.repository.KeyValueRepository
+2026-11-19T14:16:20.098+08:00  INFO 15464 --- [smart-agent] [           main] .RepositoryConfigurationExtensionSupport : Spring Data Redis - Could not safely identify store assignment for repository candidate interface com.smart.agent.model.config.ModelTestLogRepository; If you want this repository to be a Redis repository, consider annotating your entities with one of these annotations: org.springframework.data.redis.core.RedisHash (preferred), or consider extending one of the following types with your repository: org.springframework.data.keyvalue.repository.KeyValueRepository
+2026-11-19T14:16:20.101+08:00  INFO 15464 --- [smart-agent] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 211 ms. Found 0 Redis repository interfaces.
+2026-11-19T14:16:21.114+08:00  INFO 15464 --- [smart-agent] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 0 (http)
+2026-11-19T14:16:21.142+08:00  INFO 15464 --- [smart-agent] [           main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+2026-11-19T14:16:21.143+08:00  INFO 15464 --- [smart-agent] [           main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/10.1.55]
+2026-11-19T14:16:21.263+08:00  INFO 15464 --- [smart-agent] [           main] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
+2026-11-19T14:16:21.265+08:00  INFO 15464 --- [smart-agent] [           main] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 3857 ms
+2026-11-19T14:16:24.060+08:00  INFO 15464 --- [smart-agent] [           main] c.s.a.model.ModelGatewayConfiguration    : AIģ������: mode=openai-compatible, baseUrl=https://api.iruidong.com/v1, chatModel=glm-5.3, connectTimeout=PT10S, readTimeout=PT2M, apiKeyPresent=true
+2026-11-19T14:16:26.819+08:00  INFO 15464 --- [smart-agent] [           main] o.s.b.a.e.web.EndpointLinksResolver      : Exposing 2 endpoints beneath base path '/actuator'
+2026-11-19T14:16:27.026+08:00  INFO 15464 --- [smart-agent] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port 63050 (http) with context path '/'
+2026-11-19T14:16:27.056+08:00  INFO 15464 --- [smart-agent] [           main] com.smart.agent.chat.ChatControllerIT    : Started ChatControllerIT in 10.018 seconds (process running for 13.838)
+2026-11-19T14:16:27.648+08:00  INFO 15464 --- [smart-agent] [o-auto-1-exec-1] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring DispatcherServlet 'dispatcherServlet'
+2026-11-19T14:16:27.648+08:00  INFO 15464 --- [smart-agent] [o-auto-1-exec-1] o.s.web.servlet.DispatcherServlet        : Initializing Servlet 'dispatcherServlet'
+2026-11-19T14:16:27.650+08:00  INFO 15464 --- [smart-agent] [o-auto-1-exec-1] o.s.web.servlet.DispatcherServlet        : Completed initialization in 1 ms

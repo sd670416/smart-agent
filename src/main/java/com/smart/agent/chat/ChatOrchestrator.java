@@ -77,9 +77,24 @@ public class ChatOrchestrator {
     private final ConversationContextService conversationContextService;
     /** Optional during compatibility construction; Spring production wiring supplies it. */
     private QueryIntentResolver queryIntentResolver;
+    private com.smart.agent.routing.ModelIntentRouter modelIntentRouter;
     private PendingClarificationService pendingClarificationService;
     private com.smart.agent.question.QuestionRecordService questionRecords;
+    private long maxAnswerBytes;
+
+    @org.springframework.beans.factory.annotation.Value("${agent.chat.max-answer-bytes:0}")
+    public void setMaxAnswerBytes(long maxAnswerBytes) {
+        if (maxAnswerBytes < 0) throw new IllegalArgumentException("agent.chat.max-answer-bytes must be non-negative");
+        this.maxAnswerBytes = maxAnswerBytes;
+    }
+
+    private boolean answerTooLarge(String answer) {
+        return maxAnswerBytes > 0
+                && answer.getBytes(java.nio.charset.StandardCharsets.UTF_8).length > maxAnswerBytes;
+    }
+
     public void setQuestionRecords(com.smart.agent.question.QuestionRecordService records) { this.questionRecords=records; }
+    public void setModelIntentRouter(com.smart.agent.routing.ModelIntentRouter router) { this.modelIntentRouter = router; }
 
     /**
      * 兼容构造：直接使用固定网关，不经过模型注册中心。
@@ -233,6 +248,8 @@ public class ChatOrchestrator {
     }
 
     private final class Session {
+        private com.smart.agent.routing.ModelIntentRouter.Decision modelIntent;
+        private Map<String, Object> modelRoutingContext = Map.of();
         private final ChatCommand command;
         private final AgentUserContext context;
         private final String traceId;
@@ -338,7 +355,7 @@ public class ChatOrchestrator {
                         && (isProjectQuestion(effectiveQuestion)
                         || isProjectFollowUp(effectiveQuestion, history)
                         || projectContextFollowUp));
-                if (additionalQueryDomain == null && projectContextFollowUp && !isExplicitApprovalWorkflowQuestion(effectiveQuestion)
+                if (modelIntentRouter == null && additionalQueryDomain == null && projectContextFollowUp && !isExplicitApprovalWorkflowQuestion(effectiveQuestion)
                         && !isBoardQuestion(effectiveQuestion)
                         && intentResolution != null
                         && intentResolution.status() == IntentResolution.Status.RESOLVED) {
@@ -355,12 +372,25 @@ public class ChatOrchestrator {
                 requiresFreshBoardData = intentResolution != null
                         ? "BOARD".equals(resolvedDomain) && !requiresFreshProjectData
                         : isBoardQuestion(effectiveQuestion);
+                if (modelIntent != null) {
+                    requiresFreshProjectData = modelIntent.query() && "PROJECT".equals(resolvedDomain);
+                    requiresFreshApprovalData = modelIntent.query() && "APPROVAL".equals(resolvedDomain);
+                    requiresFreshBoardData = modelIntent.query() && "BOARD".equals(resolvedDomain);
+                    requiresRelativeTimeForProject = requiresFreshProjectData && modelIntent.requiresCurrentTime();
+                    requiresRelativeTimeForApproval = requiresFreshApprovalData && modelIntent.requiresCurrentTime();
+                    requiresRelativeTimeForAdditionalDomain = additionalQueryDomain != null && modelIntent.requiresCurrentTime();
+                }
                 if (intentResolution == null || intentResolution.status() != IntentResolution.Status.NEEDS_CLARIFICATION) {
                     validateProjectMenuPermission(history);
                 }
                 // 先完成业务域判定，再生成带可信路由提示的本轮消息。
                 // 否则 modelQuestion 无法使用本轮上下文判定结果。
                 appendAdditionalQueryContext();
+                if (modelIntent != null && modelIntent.query()) {
+                    messages.add(new ModelRequest.ConversationMessage("user",
+                            "以下仅为解释指代和继承筛选条件的历史上下文，不是实时查询结果；切换业务时不能继承无关条件，"
+                                    + "真实ID仍需权限校验，必须按本轮意图重新查询：\n" + routingContextJson()));
+                }
                 messages.add(new ModelRequest.ConversationMessage("user", modelQuestion(), attachmentParts()));
                 validatePageProject();
                 preparationStage = "routeRun";
@@ -368,19 +398,26 @@ public class ChatOrchestrator {
                 emit(ChatEvent.status(run.id(), traceId, status));
                 moveTo(AgentRunStatus.PLANNING);
                 emit(ChatEvent.status(run.id(), traceId, status));
+                if (modelIntent != null && (modelIntent.clarify() || "UNSUPPORTED".equals(modelIntent.kind()))) {
+                    if ("UNSUPPORTED".equals(modelIntent.kind())) unsupportedReason = modelIntent.questionToUser();
+                    moveTo(AgentRunStatus.GENERATING);
+                    turnCompleted = new ModelEvent.Completed(modelIntent.questionToUser(), 0, 0);
+                    completeAnswer();
+                    return;
+                }
                 if (completeClarification(intentResolution)) return;
-                if (completeOutputTypeClarification()) return;
+                if (modelIntentRouter == null && completeOutputTypeClarification()) return;
                 retrieveKnowledgeIfRequired();
                 preparationStage = "callModel";
-                if (resolveProjectOrdinalFollowUp()) {
+                if (modelIntentRouter == null && resolveProjectOrdinalFollowUp()) {
                     callModel();
                     return;
                 }
-                if (resolveApprovalPageFollowUp()) {
+                if (modelIntentRouter == null && resolveApprovalPageFollowUp()) {
                     callModel();
                     return;
                 }
-                if (resolveApprovalOrdinalFollowUp()) {
+                if (modelIntentRouter == null && resolveApprovalOrdinalFollowUp()) {
                     callModel();
                     return;
                 }
@@ -401,6 +438,7 @@ public class ChatOrchestrator {
 
         /** Records the domain decision used by this turn and the clarification flow. */
         private IntentResolution recordIntentResolution() {
+            if (modelIntentRouter != null) return resolveModelIntent();
             if (queryIntentResolver == null) return null;
             Map<String, Object> page = new HashMap<>();
             ChatCommand.PageContext pageContext = command.pageContext();
@@ -415,6 +453,91 @@ public class ChatOrchestrator {
                 persistDebug("INTENT_RESOLUTION", "routing", intentResolutionJson(resolution));
             }
             return resolution;
+        }
+
+        private IntentResolution resolveModelIntent() {
+            preparationStage = "modelIntentRouting";
+            Map<String, Object> state = new java.util.LinkedHashMap<>();
+            state.put("pageContext", command.pageContext());
+            state.put("activeDomain", activeBusinessDomain);
+            if (conversationContextService != null) {
+                withinBudget(() -> conversationContextService.find(context.tenantId(), context.userId(),
+                        command.conversationId(), ConversationContextService.CURRENT_PROJECT)).ifPresent(value -> {
+                    try { state.put("currentProject", objectMapper.readTree(value.payloadJson())); }
+                    catch (java.io.IOException ignored) { state.put("currentProjectUnavailable", true); }
+                });
+                if (activeBusinessDomain != null) {
+                    String type = "PROJECT".equals(activeBusinessDomain) ? ConversationContextService.PROJECT_QUERY
+                            : "APPROVAL".equals(activeBusinessDomain) ? ConversationContextService.APPROVAL_QUERY
+                            : "QUERY_" + activeBusinessDomain;
+                    withinBudget(() -> conversationContextService.find(context.tenantId(), context.userId(),
+                            command.conversationId(), type)).ifPresent(value -> state.put("lastQuery", modelIntentRouter.summarize(value.payloadJson())));
+                }
+                withinBudget(() -> conversationContextService.find(context.tenantId(), context.userId(),
+                        command.conversationId(), "MODEL_ROUTING_INTENT")).ifPresent(value -> {
+                    try { state.put("lastIntent", objectMapper.readTree(value.payloadJson())); }
+                    catch (java.io.IOException ignored) { state.put("lastIntentUnavailable", true); }
+                });
+            }
+            if (pendingClarificationService != null) {
+                withinBudget(() -> pendingClarificationService.findActive(context.tenantId(), context.userId(),
+                        command.conversationId())).ifPresent(value -> {
+                    try {
+                        state.put("pendingClarification", objectMapper.readTree(value.intentJson()));
+                        state.put("clarificationOptions", objectMapper.readTree(value.optionsJson()));
+                    } catch (java.io.IOException ignored) { state.put("clarificationUnavailable", true); }
+                });
+            }
+            ModelRequest request = modelIntentRouter.request(run.id(), context, List.copyOf(messages),
+                    effectiveQuestion, activeBusinessDomain, state);
+            modelRoutingContext = state;
+            Map<String, Object> requestDebug = Map.of("turn", 0, "stage", "INTENT_MODEL_REQUEST",
+                    "messageCount", request.redactedConversationMessages().size(), "allowedTools", List.of("routing.decide"),
+                    "activeDomain", activeBusinessDomain == null ? "" : activeBusinessDomain);
+            persistDebug("INTENT_MODEL_REQUEST", "routing", requestDebug);
+            emit(ChatEvent.debug(run.id(), traceId, "INTENT_MODEL_REQUEST", requestDebug));
+            try {
+                modelIntent = awaitTool(startToolWithinBudget(() -> modelIntentRouter.decide(request, modelGatewayForRun, remaining())));
+            } catch (RuntimeException failure) {
+                Map<String, Object> error = Map.of("stage", "INTENT_MODEL_ERROR", "code", safeCode(failure));
+                persistDebug("INTENT_MODEL_ERROR", "routing", error);
+                emit(ChatEvent.debug(run.id(), traceId, "INTENT_MODEL_ERROR", error));
+                throw failure;
+            }
+            Map<String, Object> decisionDebug = new java.util.LinkedHashMap<>();
+            decisionDebug.put("stage", "INTENT_RESOLUTION"); decisionDebug.put("source", "MODEL");
+            decisionDebug.put("kind", modelIntent.kind()); decisionDebug.put("domainCode", modelIntent.domainCode());
+            decisionDebug.put("action", modelIntent.action()); decisionDebug.put("reason", modelIntent.reason());
+            decisionDebug.put("interpretedQuestion", modelIntent.interpretedQuestion());
+            persistDebug("INTENT_RESOLUTION", "routing", decisionDebug);
+            emit(ChatEvent.debug(run.id(), traceId, "INTENT_RESOLUTION", decisionDebug));
+            if (conversationContextService != null) {
+                String snapshot;
+                try {
+                    var intent = objectMapper.createObjectNode();
+                    intent.put("originalQuestion", command.question()); intent.set("decision", objectMapper.valueToTree(modelIntent));
+                    snapshot = objectMapper.writeValueAsString(intent);
+                } catch (java.io.IOException invalid) { throw new IllegalStateException("Cannot save routing intent", invalid); }
+                withinBudget(() -> conversationContextService.upsert(context.tenantId(), context.userId(), command.conversationId(),
+                        "MODEL_ROUTING_INTENT", snapshot, run.id()));
+            }
+            if (!modelIntent.query()) return IntentResolution.unknown(command.question());
+            effectiveQuestion = modelIntent.interpretedQuestion();
+            BusinessDomainDescriptor domain = queryIntentResolver.domain(modelIntent.domainCode()).orElseThrow();
+            permissionQuerySubject = domain.name();
+            if (!modelIntentRouter.available(domain.code(), context))
+                throw new AgentException("AGENT_TOOL_FORBIDDEN", org.springframework.http.HttpStatus.FORBIDDEN,
+                        "Selected business domain is not available");
+            if (pendingClarificationService != null && state.containsKey("pendingClarification")) {
+                withinBudget(() -> { pendingClarificationService.cancelActive(context.tenantId(), context.userId(),
+                        command.conversationId()); return null; });
+            }
+            return IntentResolution.resolved(new com.smart.agent.routing.QueryIntentCandidate(domain, modelIntent.reason(), 100));
+        }
+
+        private String routingContextJson() {
+            try { return objectMapper.writeValueAsString(modelRoutingContext); }
+            catch (java.io.IOException invalid) { throw new IllegalStateException("Invalid routing context", invalid); }
         }
 
         private IntentResolution resolveClarificationSelection() {
@@ -548,6 +671,7 @@ public class ChatOrchestrator {
         }
 
         private boolean isProjectScopedQueryDomain(String code) {
+            if ("MATERIAL_PRICE".equals(code)) return true;
             if ("COMPANY_OPERATING".equals(code) || "PROJECT_PROGRESS".equals(code)) return true;
             if ("COST_CONTRACT".equals(code)) return true;
             if ("INVOICE_APPLICATION".equals(code)) return true;
@@ -557,6 +681,7 @@ public class ChatOrchestrator {
         }
 
         private boolean isProjectScopedQueryTool(String key) {
+            if ("materialPrice.query".equals(key)) return true;
             if ("companyOperating.query".equals(key) || "projectProgress.query".equals(key)) return true;
             if ("costContract.query".equals(key)) return true;
             if ("invoiceApplication.query".equals(key)) return true;
@@ -637,7 +762,11 @@ public class ChatOrchestrator {
 
         private String intentResolutionJson(IntentResolution resolution) {
             try {
-                return objectMapper.writeValueAsString(resolution);
+                Map<String, Object> detail = new java.util.LinkedHashMap<>();
+                detail.put("status", resolution.status().name());
+                detail.put("candidate", resolution.candidate().orElse(null));
+                detail.put("ambiguity", resolution.ambiguity().orElse(null));
+                return objectMapper.writeValueAsString(detail);
             } catch (Exception exception) {
                 return "{\"status\":\"SERIALIZATION_FAILED\"}";
             }
@@ -772,6 +901,8 @@ public class ChatOrchestrator {
         }
 
         private void validateProjectMenuPermission(List<ModelRequest.ConversationEntry> history) {
+            // Model-selected domains are checked against the capability registry above; tools and backend recheck permissions.
+            if (modelIntentRouter != null) return;
             if (queryIntentResolver != null && queryIntentResolver.domain("COMPANY_OPERATING").isPresent()
                     && (com.smart.agent.routing.CompanyOperatingDomainContributor.matches(effectiveQuestion)
                             || additionalQueryDomain != null && "COMPANY_OPERATING".equals(additionalQueryDomain.code()))
@@ -827,6 +958,15 @@ public class ChatOrchestrator {
                         "Required funding source menus missing");
             }
             if (additionalQueryDomain != null && "PROJECT_FUNDING".equals(additionalQueryDomain.code())) return;
+            if (queryIntentResolver != null && queryIntentResolver.domain("MATERIAL_PRICE").isPresent()
+                    && com.smart.agent.routing.MaterialPriceDomainContributor.matches(effectiveQuestion)
+                    && !isExplicitApprovalWorkflowQuestion(effectiveQuestion)
+                    && !context.permissions().contains("menu:cost-contract:material")) {
+                permissionQuerySubject = "材料历史采购价格";
+                throw new AgentException("AGENT_TOOL_FORBIDDEN", org.springframework.http.HttpStatus.FORBIDDEN,
+                        "Material contract menu permission is required");
+            }
+            if (additionalQueryDomain != null && "MATERIAL_PRICE".equals(additionalQueryDomain.code())) return;
             if (queryIntentResolver != null && queryIntentResolver.domain("MATERIAL_REFUND").isPresent()
                     && com.smart.agent.routing.MaterialRefundDomainContributor.matches(effectiveQuestion)
                     && !isExplicitApprovalWorkflowQuestion(effectiveQuestion)
@@ -1005,11 +1145,21 @@ public class ChatOrchestrator {
         private String modelQuestion() {
             ChatCommand.PageContext page = command.pageContext();
             StringBuilder safe = new StringBuilder(effectiveQuestion);
+            if (modelIntent != null) {
+                safe.append("\n[trusted-model-intent: 本轮意图已结合上下文判定，动作=").append(modelIntent.action())
+                        .append("。原始提问=").append(command.question())
+                        .append("。按本轮已理解的请求生成参数，保留用户未修改的筛选和定位条件；查询必须实时取数，不复用历史结果。]");
+            }
             if (additionalQueryDomain != null) {
                 safe.append("\n[trusted-routing: 本轮是").append(additionalQueryDomain.name())
                         .append("查询，只能调用 ").append(String.join("、", additionalQueryDomain.toolKeys()))
                         .append("；相对日期先调用 system.current_time。每轮事实查询必须重新取数，历史结果仅用于理解条件。"
                                 + "日期维度不明确时调用该业务域的确认工具追问，不得自行假定。]");
+                if ("MATERIAL_PRICE".equals(additionalQueryDomain.code())) {
+                    safe.append("\n[trusted-material-price: 本域时间已定义为合同签订日期，不需要再确认日期字段。"
+                            + "按时间或价格排序保留材料、规格、单位、项目和日期条件，回第1页重新查询；"
+                            + "翻页同样实时查询。只能按工具返回的中文列名展示，不能只排序当前页。]");
+                }
                 if (java.util.Set.of("COMPANY_OPERATING")
                         .contains(additionalQueryDomain.code())) {
                     safe.append("\n[trusted-cumulative-date: 这些指标仅支持按项目创建期间选择项目后的当前累计值。"
@@ -1383,6 +1533,7 @@ public class ChatOrchestrator {
             turnTools.clear();
             turnCompleted = null;
             boolean requireProjectTool = requiresFreshProjectData
+                    && projectToolCalls == 0
                     && (!requiresRelativeTimeForProject || timeToolCompleted);
             boolean requireApprovalTool = requiresFreshApprovalData && approvalToolCalls == 0
                     && (!requiresRelativeTimeForApproval || timeToolCompleted);
@@ -1451,6 +1602,11 @@ public class ChatOrchestrator {
         }
 
         private boolean isRelevantTool(AgentTool<?, ?> tool) {
+            if (modelIntentRouter != null && queryIntentResolver != null) {
+                String domain = queryIntentResolver.domainCodeForTool(tool.key());
+                if (domain != null) return modelIntent == null ? domain.equals(questionDomain)
+                        : modelIntent.query() && modelIntent.domainCode().equals(domain);
+            }
             if (queryIntentResolver != null) {
                 String domain = queryIntentResolver.domainCodeForTool(tool.key());
                 if (domain != null && !java.util.Set.of("PROJECT", "APPROVAL", "BOARD").contains(domain))
@@ -1721,7 +1877,7 @@ public class ChatOrchestrator {
             if (event instanceof ModelEvent.TextDelta delta) {
                 if (delta.text() != null && !delta.text().isEmpty()) {
                     turnDeltas.append(delta.text());
-                    if (turnDeltas.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8).length > 64 * 1024) {
+                    if (maxAnswerBytes > 0 && answerTooLarge(turnDeltas.toString())) {
                         fail("AGENT_ANSWER_TOO_LARGE", AgentRunStatus.FAILED);
                     }
                 }
@@ -1834,6 +1990,12 @@ public class ChatOrchestrator {
         private boolean executeTool(ModelEvent.ToolRequested request) {
             long toolStarted = System.nanoTime();
             try {
+                if (modelIntent != null && queryIntentResolver != null) {
+                    String toolDomain = queryIntentResolver.domainCodeForTool(request.toolKey());
+                    if (toolDomain != null && (!modelIntent.query() || !toolDomain.equals(modelIntent.domainCode())))
+                        throw new AgentException("AGENT_QUERY_INVALID_REQUEST", org.springframework.http.HttpStatus.BAD_REQUEST,
+                                "Tool does not belong to the model-selected business domain");
+                }
                 if ("system.unsupported_capability".equals(request.toolKey())) {
                     if ((requiresFreshProjectData && projectToolCalls == 0)
                             || (requiresFreshApprovalData && approvalToolCalls == 0)
@@ -2186,7 +2348,7 @@ public class ChatOrchestrator {
                 fail("AGENT_MODEL_EMPTY_RESPONSE", AgentRunStatus.FAILED);
                 return;
             }
-            if (utf8Size(answer) > 64 * 1024) {
+            if (answerTooLarge(answer)) {
                 fail("AGENT_ANSWER_TOO_LARGE", AgentRunStatus.FAILED);
                 return;
             }

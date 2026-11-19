@@ -22,6 +22,13 @@ public class QueryIntentResolver {
         String normalized = question == null ? "" : question.trim().toLowerCase(Locale.ROOT);
         if (normalized.isBlank()) return IntentResolution.unknown(question);
         boolean workflow = ConstructionContractDomainContributor.isWorkflowQuery(normalized);
+        if (!workflow && registry.findDomain(MaterialPriceDomainContributor.CODE).isPresent()
+                && MaterialPriceDomainContributor.matches(normalized)) {
+            if (userContext == null || !userContext.permissions().contains(MaterialPriceDomainContributor.PERMISSION))
+                return IntentResolution.unknown(question);
+            return IntentResolution.resolved(new QueryIntentCandidate(
+                    registry.findDomain(MaterialPriceDomainContributor.CODE).orElseThrow(), "材料历史采购价格", 100));
+        }
         if (!workflow && registry.findDomain(CompanyOperatingDomainContributor.CODE).isPresent()
                 && (CompanyOperatingDomainContributor.matches(normalized) || CompanyOperatingDomainContributor.CODE.equals(activeDomain)
                         && CompanyOperatingDomainContributor.isCompanyReference(normalized))) {
@@ -160,6 +167,12 @@ public class QueryIntentResolver {
     private int score(BusinessDomainDescriptor domain, String question,
             Map<String, ?> pageContext, String activeDomain) {
         int score = 0;
+        if (registry.findDomain(MaterialPriceDomainContributor.CODE).isPresent()
+                && MaterialPriceDomainContributor.matches(question)) {
+            if (ConstructionContractDomainContributor.isWorkflowQuery(question))
+                return "APPROVAL".equals(domain.code()) ? 100 : 0;
+            return MaterialPriceDomainContributor.CODE.equals(domain.code()) ? 100 : 0;
+        }
         if (registry.findDomain(CompanyOperatingDomainContributor.CODE).isPresent()
                 && (CompanyOperatingDomainContributor.matches(question) || question.contains("自持公司") && ConstructionContractDomainContributor.isWorkflowQuery(question))) {
             if (ConstructionContractDomainContributor.isWorkflowQuery(question)) return "APPROVAL".equals(domain.code()) ? 100 : 0;

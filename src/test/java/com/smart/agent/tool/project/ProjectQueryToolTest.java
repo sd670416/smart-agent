@@ -13,6 +13,23 @@ import org.junit.jupiter.api.Test;
 
 class ProjectQueryToolTest {
     @Test
+    void preservesCanonicalOperatorsIncludingNestedNullFilters() throws Exception {
+        ProjectQueryInput input = new ObjectMapper().readValue("""
+                {"filter":{"conditions":[
+                  {"field":"finalContractAmount","operator":"isNotNull"},
+                  {"field":"finalContractAmount","operator":"ISNULL"},
+                  {"field":"projectStatus","operator":"notIn","value":["1"]},
+                  {"field":"projectName","operator":"startswith","value":"A"},
+                  {"field":"projectName","operator":"endsWith","value":"B"}],
+                  "groups":[{"conditions":[{"field":"finalContractAmount","operator":"isnotnull"}]}]}}
+                """, ProjectQueryInput.class);
+        assertThat(input.filter().conditions()).extracting(ProjectQueryCondition::operator)
+                .containsExactly("isNotNull", "isNull", "notIn", "startsWith", "endsWith");
+        assertThat(input.filter().groups().getFirst().conditions().getFirst().operator())
+                .isEqualTo("isNotNull");
+    }
+
+    @Test
     void projectContractAmountNamesMeanFinalContractAmountAndNotBudget() {
         ProjectQueryInput input = new ProjectQueryInput(
                 List.of("合同额", "合同金额", "最终合同金额", "最终合同额", "项目合同额"),

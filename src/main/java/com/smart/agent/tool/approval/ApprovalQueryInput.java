@@ -13,7 +13,16 @@ public record ApprovalQueryInput(String scope, String visibility, String personK
                                  List<String> select, Map<String, Object> filter,
                                  List<String> groupBy, List<Map<String, Object>> aggregations,
                                  List<Map<String, Object>> orderBy, Integer page,
-                                 Integer pageSize, String recordMode, String processType) {
+                                 Integer pageSize, String recordMode, String processType,
+                                 List<String> personKeywords, String processedFrom, String processedTo) {
+    public ApprovalQueryInput(String scope, String visibility, String personKeyword,
+                              List<String> select, Map<String, Object> filter,
+                              List<String> groupBy, List<Map<String, Object>> aggregations,
+                              List<Map<String, Object>> orderBy, Integer page,
+                              Integer pageSize, String recordMode, String processType) {
+        this(scope, visibility, personKeyword, select, filter, groupBy, aggregations,
+                orderBy, page, pageSize, recordMode, processType, null, null, null);
+    }
     private static final Pattern AGGREGATION_ALIAS =
             Pattern.compile("^[a-zA-Z][a-zA-Z0-9_]{0,63}$");
 
