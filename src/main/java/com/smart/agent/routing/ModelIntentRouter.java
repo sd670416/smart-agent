@@ -100,6 +100,7 @@ public class ModelIntentRouter {
         try {
             JsonNode source = mapper.readTree(payload);
             var summary = mapper.createObjectNode();
+            if (source.has("toolKey")) summary.set("toolKey", source.get("toolKey"));
             if (source.has("arguments")) summary.set("arguments", source.get("arguments"));
             JsonNode result = source.path("result");
             var resultSummary = summary.putObject("result");
@@ -107,7 +108,23 @@ public class ModelIntentRouter {
                 if (result.has(key)) resultSummary.set(key, result.get(key));
             JsonNode rows = result.has("rows") ? result.path("rows") : result.path("items");
             var references = resultSummary.putArray("references");
-            if (rows.isArray()) for (int i = 0; i < Math.min(rows.size(), 100); i++) {
+            boolean operationComparison = "projectOperation.compare".equals(source.path("toolKey").asText());
+            if (operationComparison) {
+                for (JsonNode filter : result.path("appliedFilters")) {
+                    if (!filter.path("projects").isArray()) continue;
+                    for (JsonNode project : filter.path("projects")) {
+                        if (references.size() >= 5) break;
+                        int position = references.size() + 1;
+                        var reference = references.addObject().put("positionInComparison", position);
+                        for (String key : List.of("projectId", "projectName", "projectCode", "column"))
+                            if (project.path(key).isTextual()) reference.put(key, limit(project.path(key).asText(), 180));
+                    }
+                    if (filter.has("baselineProjectId")) resultSummary.set("baselineProjectId", filter.get("baselineProjectId"));
+                    if (filter.has("baselineProjectName")) resultSummary.set("baselineProjectName", filter.get("baselineProjectName"));
+                    break;
+                }
+            }
+            if (!operationComparison && rows.isArray()) for (int i = 0; i < Math.min(rows.size(), 100); i++) {
                 JsonNode row = rows.get(i);
                 var reference = references.addObject(); reference.put("positionInPage", i + 1);
                 row.fields().forEachRemaining(field -> {

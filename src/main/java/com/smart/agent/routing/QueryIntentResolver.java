@@ -22,6 +22,21 @@ public class QueryIntentResolver {
         String normalized = question == null ? "" : question.trim().toLowerCase(Locale.ROOT);
         if (normalized.isBlank()) return IntentResolution.unknown(question);
         boolean workflow = ConstructionContractDomainContributor.isWorkflowQuery(normalized);
+        if (!workflow && "PROJECT_OPERATION".equals(activeDomain)
+                && normalized.matches(".*(再加|增加.*项目|去掉|移除|删除.*项目|为基准|换基准|第二个项目|第一个项目).*" )
+                && !normalized.matches(".*(改查|切换).*" ) && registry.findDomain("PROJECT_OPERATION").isPresent())
+            return IntentResolution.resolved(new QueryIntentCandidate(registry.findDomain("PROJECT_OPERATION").orElseThrow(), "项目经营比较追问", 110));
+        if (!workflow && ProjectOperationDomainContributor.matches(normalized) && registry.findDomain("PROJECT_OPERATION").isPresent()
+                && !PartnerHistoryDomainContributor.matches(normalized))
+            return IntentResolution.resolved(new QueryIntentCandidate(registry.findDomain("PROJECT_OPERATION").orElseThrow(), "项目产值与回款分析", 110));
+        if (!workflow && "PARTNER_HISTORY".equals(activeDomain)
+                && normalized.matches(".*(第一[份条]|第[0-9一二三四五六七八九十]+[份条]|下一页|上一页|只看.*签约|结算明细|付款明细|收票明细|合计合作).*" )
+                && !normalized.matches(".*(改查|切换|查一下待办|我的待办).*"))
+            return IntentResolution.resolved(new QueryIntentCandidate(registry.findDomain("PARTNER_HISTORY").orElseThrow(), "合作历史追问", 110));
+        if (!workflow && PartnerHistoryDomainContributor.matches(normalized) && registry.findDomain("PARTNER_HISTORY").isPresent())
+            return IntentResolution.resolved(new QueryIntentCandidate(registry.findDomain("PARTNER_HISTORY").orElseThrow(), "合作方历史", 110));
+        if (!workflow && ProjectRiskDomainContributor.matches(normalized) && registry.findDomain("PROJECT_RISK").isPresent())
+            return IntentResolution.resolved(new QueryIntentCandidate(registry.findDomain("PROJECT_RISK").orElseThrow(), "项目风险或工期", 110));
         if (!workflow && registry.findDomain(MaterialPriceDomainContributor.CODE).isPresent()
                 && MaterialPriceDomainContributor.matches(normalized)) {
             if (userContext == null || !userContext.permissions().contains(MaterialPriceDomainContributor.PERMISSION))
@@ -60,10 +75,12 @@ public class QueryIntentResolver {
         if (!workflow && registry.findDomain(ProjectProfitDomainContributor.CODE).isPresent() && ProjectProfitDomainContributor.matches(normalized)) {
             boolean inheritedMetric = ProjectProfitDomainContributor.CODE.equals(activeDomain)
                     && !ProjectProfitDomainContributor.hasExplicitMetric(normalized);
-            if (userContext == null || !(inheritedMetric
+            boolean defaultRanking = ProjectProfitDomainContributor.isRanking(normalized)
+                    && !ProjectProfitDomainContributor.hasExplicitMetric(normalized);
+            if (userContext == null || !(userContext.permissions().contains("ai:query:unrestricted") || (inheritedMetric
                     ? userContext.permissions().containsAll(ProjectProfitDomainContributor.permissions("budget"))
                             || userContext.permissions().containsAll(ProjectProfitDomainContributor.permissions("actual"))
-                    : userContext.permissions().containsAll(ProjectProfitDomainContributor.permissions(ProjectProfitDomainContributor.metric(normalized)))))
+                    : userContext.permissions().containsAll(ProjectProfitDomainContributor.permissions(defaultRanking ? "budget" : ProjectProfitDomainContributor.metric(normalized))))))
                 return IntentResolution.unknown(question);
             return IntentResolution.resolved(new QueryIntentCandidate(registry.findDomain(ProjectProfitDomainContributor.CODE).orElseThrow(), "项目利润", 100));
         }

@@ -286,6 +286,10 @@ public class ChatOrchestrator {
         private JsonNode projectClarificationArguments;
         private String progressDateSelection;
         private JsonNode comparisonClarificationArguments;
+        private JsonNode previousProfitRankingArguments;
+        private JsonNode previousOperationComparisonArguments;
+        private JsonNode operationComparisonClarificationArguments;
+        private Integer operationComparisonProjectIndex;
         private List<KnowledgeCitation> citations = List.of();
         private final StringBuilder turnDeltas = new StringBuilder();
         private final List<ModelEvent.ToolRequested> turnTools = new ArrayList<>();
@@ -621,12 +625,38 @@ public class ChatOrchestrator {
                     String id = selection.optionId().substring("project:".length());
                     if (!context.projectIds().contains(id)) throw new AgentException("AGENT_TOOL_PROJECT_FORBIDDEN",
                             org.springframework.http.HttpStatus.FORBIDDEN, "Selected project is no longer permitted");
-                    var confirmed = (com.fasterxml.jackson.databind.node.ObjectNode) intent.path("queryArguments").deepCopy();
-                    confirmed.put("projectId", id);
-                    confirmed.remove(java.util.List.of("projectCode", "projectName", "projectNameMatch"));
-                    projectClarificationArguments = confirmed;
+                    if (OperationComparisonContextSupport.TOOL.equals(intent.path("queryToolKey").asText())) {
+                        if (!"PROJECT_OPERATION".equals(domainCode)) throw clarificationFailure();
+                        operationComparisonClarificationArguments = OperationComparisonContextSupport.confirmProject(intent, id, context.projectIds());
+                    } else {
+                        var confirmed = (com.fasterxml.jackson.databind.node.ObjectNode) intent.path("queryArguments").deepCopy();
+                        confirmed.put("projectId", id);
+                        confirmed.remove(java.util.List.of("projectCode", "projectName", "projectNameMatch"));
+                        projectClarificationArguments = confirmed;
+                    }
                     effectiveQuestion += "\n[用户确认的真实项目ID=" + id + "，按已确认项目和原查询条件查询"
                             + queryIntentResolver.domain(domainCode).orElseThrow().name() + "]";
+                }
+                if ("OPERATION_BASELINE_REFERENCE".equals(intent.path("ambiguityType").asText())) {
+                    if (!"PROJECT_OPERATION".equals(domainCode) || !selection.optionId().startsWith("baseline:")
+                            || !intent.path("queryArguments").isObject()) throw clarificationFailure();
+                    operationComparisonClarificationArguments = OperationComparisonContextSupport.confirmBaseline(
+                            intent, selection.optionId().substring("baseline:".length()), context.projectIds());
+                    effectiveQuestion += "\n[已确认比较基准及完整条件=" + operationComparisonClarificationArguments + "，重新比较]";
+                }
+                if (java.util.Set.of("PARTNER_TYPE", "PARTNER_REFERENCE").contains(intent.path("ambiguityType").asText())) {
+                    if (!"PARTNER_HISTORY".equals(domainCode) || !intent.path("queryArguments").isObject()) throw clarificationFailure();
+                    var confirmed = (com.fasterxml.jackson.databind.node.ObjectNode) intent.path("queryArguments").deepCopy();
+                    if ("PARTNER_TYPE".equals(intent.path("ambiguityType").asText())) {
+                        if (!java.util.Set.of("partnerType:CUSTOMER", "partnerType:SUPPLIER").contains(selection.optionId())) throw clarificationFailure();
+                        confirmed.put("partnerType", selection.optionId().substring("partnerType:".length()));
+                    } else {
+                        if (!selection.optionId().startsWith("partner:")) throw clarificationFailure();
+                        confirmed.put("partnerId", selection.optionId().substring("partner:".length()));confirmed.remove("partnerName");
+                    }
+                    confirmed.remove(java.util.List.of("contractId", "recordId"));confirmed.put("page",1);
+                    projectClarificationArguments = confirmed;
+                    effectiveQuestion += "\n[已确认合作方条件=" + confirmed + "，重新调用partnerHistory.query]";
                 }
                 if ("COMPARISON_PROJECT_REFERENCE".equals(intent.path("ambiguityType").asText())) {
                     if (!java.util.Set.of("PROJECT_RECEIPTS", "CONSTRUCTION_CONTRACT", "PROJECT_OUTPUT", "PAYMENT_REQUEST", "OTHER_PAYMENT_REQUEST", "PROJECT_REIMBURSE", "MATERIAL_REFUND", "COST_CONTRACT", "BUDGET_COST", "PROJECT_FUNDING", "PROJECT_PROFIT").contains(domainCode) || !intent.path("queryArguments").isObject())
@@ -671,6 +701,7 @@ public class ChatOrchestrator {
         }
 
         private boolean isProjectScopedQueryDomain(String code) {
+            if ("PARTNER_HISTORY".equals(code) || "PROJECT_RISK".equals(code) || "PROJECT_OPERATION".equals(code)) return true;
             if ("MATERIAL_PRICE".equals(code)) return true;
             if ("COMPANY_OPERATING".equals(code) || "PROJECT_PROGRESS".equals(code)) return true;
             if ("COST_CONTRACT".equals(code)) return true;
@@ -681,11 +712,12 @@ public class ChatOrchestrator {
         }
 
         private boolean isProjectScopedQueryTool(String key) {
+            if ("partnerHistory.query".equals(key) || "projectRisk.query".equals(key) || "projectOperation.query".equals(key)) return true;
             if ("materialPrice.query".equals(key)) return true;
             if ("companyOperating.query".equals(key) || "projectProgress.query".equals(key)) return true;
             if ("costContract.query".equals(key)) return true;
             if ("invoiceApplication.query".equals(key)) return true;
-            if ("projectFunding.query".equals(key) || "budgetCost.query".equals(key) || "projectProfit.query".equals(key)) return true;
+            if ("projectFunding.query".equals(key) || "budgetCost.query".equals(key) || "projectProfit.query".equals(key) || "projectProfit.rank".equals(key)) return true;
             return "materialRefund.query".equals(key) || "projectReimburse.query".equals(key) || "otherPaymentRequest.query".equals(key) || "paymentRequest.query".equals(key) || "constructionContract.query".equals(key) || "projectOutput.query".equals(key) || "paymentRegistration.query".equals(key)
                     || "otherIncomeRegistration.query".equals(key) || "projectReceipts.query".equals(key);
         }
@@ -714,7 +746,14 @@ public class ChatOrchestrator {
                 storedIntent.put("activeBusinessDomain", activeBusinessDomain);
                 storedIntent.put("ambiguityType", prompt.ambiguityType());
                 storedIntent.put("options", prompt.options());
-                if (("PROJECT_REFERENCE".equals(prompt.ambiguityType()) || "COMPANY_REFERENCE".equals(prompt.ambiguityType())) && projectClarificationArguments != null)
+                if (operationComparisonClarificationArguments != null
+                        && ("PROJECT_REFERENCE".equals(prompt.ambiguityType()) || "OPERATION_BASELINE_REFERENCE".equals(prompt.ambiguityType()))) {
+                    storedIntent.put("queryToolKey", OperationComparisonContextSupport.TOOL);
+                    storedIntent.put("queryArguments", operationComparisonClarificationArguments);
+                    if (operationComparisonProjectIndex != null) storedIntent.put("comparisonProjectIndex", operationComparisonProjectIndex);
+                }
+                if (("PROJECT_REFERENCE".equals(prompt.ambiguityType()) || "COMPANY_REFERENCE".equals(prompt.ambiguityType()))
+                        && projectClarificationArguments != null && operationComparisonClarificationArguments == null)
                     storedIntent.put("queryArguments", projectClarificationArguments);
                 if ("COMPARISON_PROJECT_REFERENCE".equals(prompt.ambiguityType()) && comparisonClarificationArguments != null)
                     storedIntent.put("queryArguments", comparisonClarificationArguments);
@@ -879,6 +918,9 @@ public class ChatOrchestrator {
         }
 
         private String profitMetricForQuestion() {
+            if (com.smart.agent.routing.ProjectProfitDomainContributor.isRanking(effectiveQuestion)
+                    && !com.smart.agent.routing.ProjectProfitDomainContributor.hasExplicitMetric(effectiveQuestion)
+                    && !"PROJECT_PROFIT".equals(activeBusinessDomain)) return "budget";
             if (comparisonClarificationArguments != null && comparisonClarificationArguments.path("current").hasNonNull("metric"))
                 return comparisonClarificationArguments.path("current").path("metric").asText();
             if (projectClarificationArguments != null && projectClarificationArguments.hasNonNull("metric"))
@@ -893,7 +935,7 @@ public class ChatOrchestrator {
                     String metric = arguments.hasNonNull("metric") ? arguments.path("metric").asText()
                             : arguments.path("current").path("metric").asText("both");
                     com.smart.agent.routing.ProjectProfitDomainContributor.permissions(metric);
-                    return metric;
+                    return metric.startsWith("budgetProfit") ? "budget" : metric.startsWith("actualProfit") ? "actual" : metric;
                 } catch (java.io.IOException exception) {
                     throw new IllegalStateException("Invalid profit query context", exception);
                 }
@@ -922,13 +964,15 @@ public class ChatOrchestrator {
                 throw new AgentException("AGENT_TOOL_FORBIDDEN",org.springframework.http.HttpStatus.FORBIDDEN,"Required cost contract source menus missing");
             }
             if (additionalQueryDomain != null && "COST_CONTRACT".equals(additionalQueryDomain.code())) return;
+            if (additionalQueryDomain != null && java.util.Set.of("PARTNER_HISTORY", "PROJECT_RISK", "PROJECT_OPERATION").contains(additionalQueryDomain.code())) return;
             if (queryIntentResolver != null && queryIntentResolver.domain("PROJECT_PROFIT").isPresent()
                     && (com.smart.agent.routing.ProjectProfitDomainContributor.matches(effectiveQuestion)
                             || additionalQueryDomain != null && "PROJECT_PROFIT".equals(additionalQueryDomain.code()))
                     && !isExplicitApprovalWorkflowQuestion(effectiveQuestion)
+                    && !context.permissions().contains("ai:query:unrestricted")
                     && !context.permissions().containsAll(com.smart.agent.routing.ProjectProfitDomainContributor.permissions(
                             profitMetricForQuestion()))) {
-                permissionQuerySubject = "项目利润统计所需的全部来源";
+                permissionQuerySubject = "项目利润及盈利排名所需的数据";
                 throw new AgentException("AGENT_TOOL_FORBIDDEN", org.springframework.http.HttpStatus.FORBIDDEN, "Required profit source menus missing");
             }
             if (additionalQueryDomain != null && "PROJECT_PROFIT".equals(additionalQueryDomain.code())) return;
@@ -1176,11 +1220,26 @@ public class ChatOrchestrator {
                             + "不把当前合并预算称为历史期间预算，最终回复使用中文业务名称。]");
                 }
                 if ("PROJECT_PROFIT".equals(additionalQueryDomain.code())) {
+                    safe.append("\n[trusted-profit-ranking: 盈利/利润/利润率排名、最高最低或前N项目使用projectProfit.rank。"
+                            + "未指定指标默认budgetProfitRate、desc、topN20；必须说明按预算利润率从高到低前20个。"
+                            + "排名日期仅CURRENT，不套用普通利润查询的projectCreateDate，不用clarifyDate引导改查创建日期。"
+                            + "排名追问沿用metric/direction/topN/pageSize/lossOnly和项目条件，下一页只加page；改条件回第1页。"
+                            + "按金额时沿用预算或实际类型切换budgetProfit/actualProfit，按率切换对应Rate；只看亏损设置lossOnly。"
+                            + "读取rankingDescription及不可排名数量原因，隐藏项目ID等技术列；total不是全量项目数。"
+                            + "普通单项目利润分项仍query，两组比较仍compare，明确切换业务时不强制继续排名。]");
                     safe.append("\n[trusted-current-profit-date: 利润仅支持按项目创建范围选择项目后的当前累计数据。"
                             + "期间利润、历史快照、同比环比仍不支持；日期含义不明确先clarifyDate说明并确认替代查询。"
                             + "明确比较两组项目当前利润或利润率时使用projectProfit.compare，两组同一metric，未明确组别先追问。"
                             + "budget预算利润、actual实际收支利润、both两者；各组全量汇总后计算利润率，差值使用百分点，不计算利润率增长率。"
                             + "亏损保留，零分母不可比较；金额负基数结合调整理解。比较行不是项目列表，按组项目详情需重新query。]");
+                }
+                if ("PROJECT_OPERATION".equals(additionalQueryDomain.code())) {
+                    safe.append("\n[trusted-operation-comparison: 多项目经营横向比较使用projectOperation.compare，普通单项目产值与回款用query。"
+                            + "比较2至5个不同项目，projects保持用户顺序，以真实projectId定位；未指定基准取第一个项目并告知用户。"
+                            + "后端返回指标行×项目列，rows不是项目列表，total不是项目数；按appliedFilters.projects定位项目。"
+                            + "追加或删除项目、改基准传完整projects重查；只改基准/指标时保留原列表；删除基准需先追问新的基准。"
+                            + "矩阵按columns中文标签展示，差额是各项目减基准，率差用百分点；缺失、无权限、不适用按原因展示，不补0。"
+                            + "仅CURRENT，无历史/期间/同比能力，不套项目创建日期。明确切换利润两组比较或产值单比较走各自原工具。]");
                 }
                 if ("PROJECT_FUNDING".equals(additionalQueryDomain.code())) {
                     safe.append("\n[trusted-current-funding-date: 付款与垫资仅支持按项目创建范围选择项目后的当前累计数据。"
@@ -1234,6 +1293,37 @@ public class ChatOrchestrator {
                 try {
                     JsonNode savedQuery = objectMapper.readTree(snapshot.payloadJson());
                     JsonNode arguments = savedQuery.path("arguments");
+                    boolean operationComparison = "PROJECT_OPERATION".equals(additionalQueryDomain.code())
+                            && OperationComparisonContextSupport.TOOL.equals(savedQuery.path("toolKey").asText());
+                    if (operationComparison) {
+                        previousOperationComparisonArguments = arguments.deepCopy();
+                        messages.add(new ModelRequest.ConversationMessage("user",
+                                "[trusted-operation-comparison-context: 上次完整比较条件=" + arguments
+                                        + "；真实项目列映射、基准及指标=" + savedQuery.path("result").path("appliedFilters")
+                                        + "。只用于条件与指代。第二个项目按projects顺序定位，不能把第二个指标行当项目。"
+                                        + "增删项目或切换基准都重新调用projectOperation.compare；删掉基准后先确认新基准，不能任意替换。"
+                                        + "需要单项目产值回款时改用query且只传其支持参数，不能把projects数组送query。]"));
+                    }
+                    if (!operationComparison && java.util.Set.of("PARTNER_HISTORY", "PROJECT_RISK", "PROJECT_OPERATION").contains(additionalQueryDomain.code())) {
+                        var references=objectMapper.createArrayNode();int position=0;
+                        for(JsonNode row:savedQuery.path("result").path("rows")){
+                            position++;if(!context.projectIds().contains(row.path("projectId").asText()))continue;
+                            var ref=references.addObject().put("pagePosition",position);
+                            for(String key:java.util.List.of("projectId","projectCode","projectName","partnerId","partnerName","contractId","contractType","recordId","id"))
+                                if(row.hasNonNull(key))ref.set(key,row.get(key));
+                        }
+                        messages.add(new ModelRequest.ConversationMessage("user","[trusted-analysis-references: 上次列表真实定位="+references
+                                +"。仅用于第N条指代，使用真实合同ID或来源单据ID实时重查；合作方变更清除旧contractId/recordId。风险证据不是完整业务表单，缺失或未接入维度必须说明，不能当无风险。]"));
+                    }
+                    if ("PROJECT_PROFIT".equals(additionalQueryDomain.code())
+                            && "projectProfit.rank".equals(savedQuery.path("toolKey").asText())) {
+                        previousProfitRankingArguments = arguments.deepCopy();
+                        messages.add(new ModelRequest.ConversationMessage("user",
+                                "[trusted-profit-ranking-context: 上次是盈利排名，条件=" + arguments
+                                        + "。只用于理解追问，不是当前数据。下一页/改金额/倒序/只看亏损重新调用projectProfit.rank；"
+                                        + "不得将其metric当作普通query的budget/actual/both。原统计说明="
+                                        + savedQuery.path("result").path("appliedFilters") + "]"));
+                    }
                     messages.add(new ModelRequest.ConversationMessage("user",
                             "[trusted-query-context: 上一次" + additionalQueryDomain.name() + "查询条件=" + arguments
                                     + "。仅用于追问时继承用户未更改的筛选条件和分页；当前提问明确的新条件优先。"
@@ -2021,6 +2111,36 @@ public class ChatOrchestrator {
                 }
                 if (isProjectScopedQueryTool(request.toolKey()) && projectClarificationArguments != null)
                     input = projectClarificationArguments.deepCopy();
+                if (OperationComparisonContextSupport.TOOL.equals(request.toolKey())) {
+                    if (operationComparisonClarificationArguments != null) input = operationComparisonClarificationArguments.deepCopy();
+                    else if (previousOperationComparisonArguments != null
+                            && effectiveQuestion.matches(".*(再加|增加|去掉|移除|删掉|删除|基准|改成|改为|只比较|只看|继续).*")) {
+                        input = OperationComparisonContextSupport.inheritArguments(input, previousOperationComparisonArguments);
+                        ClarificationPrompt baseline = OperationComparisonContextSupport.baselineChoice(input, previousOperationComparisonArguments, context.projectIds());
+                        if (baseline != null) {
+                            operationComparisonClarificationArguments = input.deepCopy();
+                            operationComparisonProjectIndex = null;
+                            completeClarificationPrompt(baseline);
+                            return false;
+                        }
+                    }
+                }
+                if ("projectProfit.rank".equals(request.toolKey())) {
+                    var rankingInput = (com.fasterxml.jackson.databind.node.ObjectNode) input;
+                    if (previousProfitRankingArguments != null
+                            && effectiveQuestion.matches(".*(下一页|上一页|下页|上页|改按|改成|倒序|升序|降序|从低到高|从高到低|只看|每页|继续).*")) {
+                        previousProfitRankingArguments.fields().forEachRemaining(entry -> {
+                            if (!rankingInput.hasNonNull(entry.getKey())) rankingInput.set(entry.getKey(), entry.getValue());
+                        });
+                        if (effectiveQuestion.matches(".*(下一页|下页).*"))
+                            rankingInput.put("page", previousProfitRankingArguments.path("page").asInt(1) + 1);
+                        else if (effectiveQuestion.matches(".*(上一页|上页).*"))
+                            rankingInput.put("page", Math.max(1, previousProfitRankingArguments.path("page").asInt(1) - 1));
+                        else rankingInput.put("page", 1);
+                    }
+                    input = objectMapper.valueToTree(objectMapper.treeToValue(rankingInput,
+                            com.smart.agent.tool.profit.ranking.ProjectProfitRankingInput.class));
+                }
                 if (java.util.Set.of("projectProgress.query", "companyOperating.query", "costContract.query", "projectFunding.query",
                         "budgetCost.query", "projectProfit.query").contains(request.toolKey()) && progressDateSelection != null) {
                     var confirmed = (com.fasterxml.jackson.databind.node.ObjectNode) input;
@@ -2124,9 +2244,18 @@ public class ChatOrchestrator {
                 if (additionalQueryDomain != null && additionalQueryDomain.ownsTool(request.toolKey())
                         && !clarificationResult && conversationContextService != null) {
                     JsonNode effectiveArguments = input.deepCopy();
+                    if (OperationComparisonContextSupport.TOOL.equals(request.toolKey())
+                            && result instanceof com.smart.agent.tool.project.ProjectQueryResult queryResult) {
+                        effectiveArguments = OperationComparisonContextSupport.canonicalArguments(objectMapper, input, queryResult, context.projectIds());
+                    }
                     if (isProjectScopedQueryTool(request.toolKey())
                             && result instanceof com.smart.agent.tool.project.ProjectQueryResult queryResult) {
                         for (var filter : queryResult.appliedFilters()) {
+                            if ("partnerHistory.query".equals(request.toolKey()) && filter.get("partnerId") instanceof String partnerId
+                                    && !partnerId.isBlank()) {
+                                var canonical=(com.fasterxml.jackson.databind.node.ObjectNode)effectiveArguments;
+                                canonical.put("partnerId",partnerId);canonical.remove("partnerName");
+                            }
                             if ("companyOperating.query".equals(request.toolKey()) && "companyId".equals(filter.get("field"))
                                     && "eq".equals(filter.get("op")) && filter.get("value") instanceof String companyId) {
                                 var canonical = (com.fasterxml.jackson.databind.node.ObjectNode) effectiveArguments;
@@ -2152,7 +2281,7 @@ public class ChatOrchestrator {
                             }
                         }
                     }
-                    String snapshot = objectMapper.writeValueAsString(Map.of("arguments", effectiveArguments, "result", result));
+                    String snapshot = objectMapper.writeValueAsString(Map.of("toolKey", request.toolKey(), "arguments", effectiveArguments, "result", result));
                     withinBudget(() -> conversationContextService.upsert(context.tenantId(), context.userId(),
                             command.conversationId(), additionalQueryContextType(), snapshot, run.id()));
                 }
@@ -2166,6 +2295,14 @@ public class ChatOrchestrator {
                     String renderingRequirement = request.toolKey().startsWith("project.")
                             ? "项目明细表格必须完整展示工具 columns 中的全部列，尤其不得省略审批状态列。"
                             : "必须完整展示工具返回的业务字段。";
+                    if ("projectProfit.rank".equals(request.toolKey())) renderingRequirement =
+                            "按中文业务列展示排名，隐藏projectId、dataNotes等技术定位字段；必须说明appliedFilters中的rankingDescription，"
+                            + "说明不可排名数量及业务原因；total是TopN范围条数，不是全部匹配项目数。比例已是百分数，不再乘100。";
+                    if (java.util.Set.of("partnerHistory.query","projectRisk.query","projectOperation.query").contains(request.toolKey()))
+                        renderingRequirement="按工具columns中文标签展示业务表格，隐藏技术ID、状态编码及原始元数据；缺失和未评估原因用业务语言说明，不能补0或说无风险。来源依据只展示业务编号、名称和原因，不冒充完整表单。";
+                    if (OperationComparisonContextSupport.TOOL.equals(request.toolKey())) renderingRequirement =
+                            "按columns业务标签展示指标行×项目列的比较矩阵，明确appliedFilters.baselineProjectName为基准，差额为各项目减基准，比例差用百分点。"
+                            + "缺失或无权格显示原因，不补0；不得把指标行当项目列表。隐藏真实ID及状态编码，不能拿total当项目数量。";
                     messages.add(new ModelRequest.ConversationMessage("user",
                             "[trusted-tool-result: 业务工具已经返回本轮最新数据。请立即依据刚返回的结果用中文回答用户，"
                                     + renderingRequirement
@@ -2203,7 +2340,11 @@ public class ChatOrchestrator {
                     emit(ChatEvent.toolResult(run.id(), traceId, request.toolKey()));
                 }
                 if (result instanceof ClarificationPrompt prompt) {
-                    if ("PROJECT_REFERENCE".equals(prompt.ambiguityType()) || "COMPANY_REFERENCE".equals(prompt.ambiguityType())) projectClarificationArguments = input.deepCopy();
+                    if (OperationComparisonContextSupport.TOOL.equals(request.toolKey()) && "PROJECT_REFERENCE".equals(prompt.ambiguityType())) {
+                        operationComparisonClarificationArguments = input.deepCopy();
+                        operationComparisonProjectIndex = OperationComparisonContextSupport.clarificationIndex(prompt, input);
+                        projectClarificationArguments = null;
+                    } else if ("PROJECT_REFERENCE".equals(prompt.ambiguityType()) || "COMPANY_REFERENCE".equals(prompt.ambiguityType())) projectClarificationArguments = input.deepCopy();
                     if ("COMPARISON_PROJECT_REFERENCE".equals(prompt.ambiguityType())) comparisonClarificationArguments = input.deepCopy();
                     completeClarificationPrompt(prompt);
                     return false;
@@ -2574,6 +2715,9 @@ public class ChatOrchestrator {
         }
 
         private String permissionSubjectForTool(String toolKey, JsonNode input) {
+            if ("projectOperation.query".equals(toolKey)) return "项目产值与回款数据";
+            if ("partnerHistory.query".equals(toolKey)) return "合作历史及所查询的合同、结算或票据数据";
+            if ("projectRisk.query".equals(toolKey)) return "项目风险与工期数据";
             if ("project.getContracts".equals(toolKey)) return "施工合同";
             if ("project.getArchiveDetail".equals(toolKey)) return "项目档案";
             if ("approval.query".equals(toolKey)) {
