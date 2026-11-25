@@ -56,8 +56,8 @@ import java.util.concurrent.Callable;
 
 public class ChatOrchestrator {
     private static final Logger log = LoggerFactory.getLogger(ChatOrchestrator.class);
-    static final int MAX_MODEL_TURNS = 6;
-    static final int MAX_TOOL_CALLS = 5;
+    static final int MAX_MODEL_TURNS = 12;
+    static final int MAX_TOOL_CALLS = 20;
     static final int MAX_CITATIONS = 20;
     static final int MAX_HISTORY_MESSAGES = 20;
     static final int MAX_HISTORY_BYTES = 32 * 1024;
@@ -752,7 +752,7 @@ public class ChatOrchestrator {
                     storedIntent.put("queryArguments", operationComparisonClarificationArguments);
                     if (operationComparisonProjectIndex != null) storedIntent.put("comparisonProjectIndex", operationComparisonProjectIndex);
                 }
-                if (("PROJECT_REFERENCE".equals(prompt.ambiguityType()) || "COMPANY_REFERENCE".equals(prompt.ambiguityType()))
+                if (java.util.Set.of("PROJECT_REFERENCE", "COMPANY_REFERENCE", "PARTNER_REFERENCE", "PARTNER_TYPE").contains(prompt.ambiguityType())
                         && projectClarificationArguments != null && operationComparisonClarificationArguments == null)
                     storedIntent.put("queryArguments", projectClarificationArguments);
                 if ("COMPARISON_PROJECT_REFERENCE".equals(prompt.ambiguityType()) && comparisonClarificationArguments != null)
@@ -2344,7 +2344,7 @@ public class ChatOrchestrator {
                         operationComparisonClarificationArguments = input.deepCopy();
                         operationComparisonProjectIndex = OperationComparisonContextSupport.clarificationIndex(prompt, input);
                         projectClarificationArguments = null;
-                    } else if ("PROJECT_REFERENCE".equals(prompt.ambiguityType()) || "COMPANY_REFERENCE".equals(prompt.ambiguityType())) projectClarificationArguments = input.deepCopy();
+                    } else if (java.util.Set.of("PROJECT_REFERENCE", "COMPANY_REFERENCE", "PARTNER_REFERENCE", "PARTNER_TYPE").contains(prompt.ambiguityType())) projectClarificationArguments = input.deepCopy();
                     if ("COMPARISON_PROJECT_REFERENCE".equals(prompt.ambiguityType())) comparisonClarificationArguments = input.deepCopy();
                     completeClarificationPrompt(prompt);
                     return false;

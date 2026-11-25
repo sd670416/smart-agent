@@ -371,6 +371,7 @@ public class OpenAiCompatibleModelGateway implements ModelGateway {
             Set<String> requiredProperties,
             SupportedSchemaNode items,
             boolean additionalProperties,
+            Set<JsonNode> enumValues,
             JsonSchemaElement modelSchema) {
 
         private static final int MAX_DEPTH = 8;
@@ -380,11 +381,11 @@ public class OpenAiCompatibleModelGateway implements ModelGateway {
             requireObject(node);
             if (depth > MAX_DEPTH) throw new IllegalArgumentException();
             if (node.isEmpty()) {
-                return new SupportedSchemaNode("any", Map.of(), Set.of(), null, true,
+                return new SupportedSchemaNode("any", Map.of(), Set.of(), null, true, Set.of(),
                         JsonRawSchema.from("{}"));
             }
             rejectUnknownFields(node, Set.of(
-                    "type", "description", "properties", "required", "additionalProperties", "items"));
+                    "type", "description", "properties", "required", "additionalProperties", "items", "enum"));
             String type = node.path("type").asText();
             String description = optionalDescription(node.path("description"));
             return switch (type) {
@@ -414,7 +415,7 @@ public class OpenAiCompatibleModelGateway implements ModelGateway {
             boolean additional = additionalProperties(node.path("additionalProperties"));
             builder.additionalProperties(additional);
             return new SupportedSchemaNode("object", Map.copyOf(properties), Set.copyOf(required), null,
-                    additional, builder.build());
+                    additional, Set.of(), builder.build());
         }
 
         private static SupportedSchemaNode arrayNode(JsonNode node, String description, int depth) {
@@ -424,17 +425,26 @@ public class OpenAiCompatibleModelGateway implements ModelGateway {
             SupportedSchemaNode items = from(itemNode, depth + 1);
             JsonArraySchema.Builder builder = JsonArraySchema.builder().items(items.modelSchema);
             if (description != null) builder.description(description);
-            return new SupportedSchemaNode("array", Map.of(), Set.of(), items, false, builder.build());
+            return new SupportedSchemaNode("array", Map.of(), Set.of(), items, false, Set.of(), builder.build());
         }
 
         private static SupportedSchemaNode primitiveNode(JsonNode node, String type) {
-            rejectFieldsForType(node, Set.of("type", "description"));
-            return new SupportedSchemaNode(type, Map.of(), Set.of(), null, false,
+            rejectFieldsForType(node, Set.of("type", "description", "enum"));
+            Set<JsonNode> enumValues = new HashSet<>();
+            if (node.has("enum")) {
+                JsonNode values = node.get("enum");
+                if (!values.isArray() || values.isEmpty()) throw new IllegalArgumentException();
+                for (JsonNode value : values) {
+                    if (!matchesType(value, type) || !enumValues.add(value)) throw new IllegalArgumentException();
+                }
+            }
+            return new SupportedSchemaNode(type, Map.of(), Set.of(), null, false, Set.copyOf(enumValues),
                     JsonRawSchema.from(node.toString()));
         }
 
         private boolean accepts(JsonNode value, int depth) {
             if (depth > MAX_DEPTH || !matchesType(value, type)) return false;
+            if (!enumValues.isEmpty() && !enumValues.contains(value)) return false;
             if ("any".equals(type)) return true;
             if ("array".equals(type)) {
                 if (value.size() > MAX_ARRAY_ITEMS) return false;

@@ -24,7 +24,7 @@ public class PartnerHistoryQueryTool implements AgentTool<PartnerHistoryQueryInp
                 + "只计审批完成业务。甲方回款只含对应施工合同的回款登记，不含其他收入；开票列是审批完成开票申请金额。"
                 + "供应商覆盖材料、劳务、机械、专包四类合同，材料账款已作退货退款净额调整，不得二次扣减。"
                 + "签约日期只选择合同，返回这些合同当前累计账款，不是期间资金发生额。没有日期默认当前累计。"
-                + "姓名精确匹配，同名先确认真实合作方ID；类型不明确先确认甲方还是供应商；不以项目或列表序号代替合作方ID。"
+                + "合作方名称先按原话做包含匹配搜索，不擅自删掉名称中的供应商、劳务等文字；唯一候选自动按真实ID查询，多个候选先确认；类型不明确先确认甲方还是供应商；不以项目或列表序号代替合作方ID。"
                 + "summary是全量合计，不能对分页列表自己求总数；缺来源权限或数据的null显示原因，不当作0。"
                 + "按columns中文标签用Markdown表格展示，metricStatuses仅辅助解释，不能输出内部字段名/权限编码/SQL。"
                 + "详情仅返回实际业务单据定位及金额，不代替审批表单，也不办理或修改记录。";
@@ -34,7 +34,7 @@ public class PartnerHistoryQueryTool implements AgentTool<PartnerHistoryQueryInp
                 {"type":"object","properties":{
                   "partnerType":{"type":"string","description":"CUSTOMER甲方或SUPPLIER供应商；未明确先追问"},
                   "partnerId":{"type":"string","description":"已确认的真实合作方ID；使用ID后不再传partnerName"},
-                  "partnerName":{"type":"string","description":"精确合作方名称，同名必须先选具体单位"},
+                  "partnerName":{"type":"string","description":"用户提供的合作方名称或部分名称，保留原话中的名称文字；先包含搜索，多个候选先确认具体单位"},
                   "contractType":{"type":"string","description":"仅供应商：1材料、2劳务、3机械、4专包；不填查四类，需四类合同权限；甲方不填"},
                   "contractId":{"type":"string","description":"真实合同ID，用于查看所选合同，不是列表序号"},
                   "recordId":{"type":"string","description":"真实结算/付款/票据主单ID，只用于对应明细mode，不是合同ID"},
@@ -69,7 +69,7 @@ public class PartnerHistoryQueryTool implements AgentTool<PartnerHistoryQueryInp
         if (!"partners".equals(resolved.mode()) && resolved.partnerId() == null && resolved.partnerName() != null) {
             ProjectQueryResult candidates = client.query(context, resolved.lookup());
             if (candidates.total() != null && candidates.total() > 1) {
-                return new ClarificationPrompt("存在同名合作单位，请根据编号确认具体单位：", "PARTNER_REFERENCE",
+                return new ClarificationPrompt("找到多家名称匹配的合作单位，请确认要查询哪一家；若未列出，请补充更完整的名称：", "PARTNER_REFERENCE",
                         candidates.rows().stream().limit(5).map(p -> new ClarificationPrompt.Option("partner:" + p.get("partnerId"),
                                 p.get("partnerName") + "（编号：" + p.get("partnerCode") + "）", DOMAIN)).toList());
             }

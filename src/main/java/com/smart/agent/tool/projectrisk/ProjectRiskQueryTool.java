@@ -19,7 +19,7 @@ public class ProjectRiskQueryTool implements AgentTool<ProjectRiskQueryInput,Obj
           "projectId":{"type":"string","description":"真实项目ID"},"projectCode":{"type":"string","description":"精确项目编号"},"projectName":{"type":"string","description":"精确名称，同名先确认"},
           "dimensions":{"type":"array","items":{"type":"string"},"description":"COST成本、PAYMENT付款、RECEIVABLE回款、INVOICE开票、SUPPLIER_INVOICE收票、PROGRESS进度、QUALITY质量、SAFETY安全；省略查全部八维，明确问某类时仅选对应维度"},
           "level":{"type":"string","description":"HIGH高、MEDIUM中、LOW低、NONE未触发；省略全部含未评估"},
-          "mode":{"type":"string","description":"detail明细默认，summary全量汇总，evidence评估依据，siteFacts工期事实"},
+          "mode":{"type":"string","description":"经营风险总览或有哪些风险优先仅调用一次summary：包含全量总数、分类及等级统计、最多20条重点风险与判断依据；无需再逐等级查询或读取全部分页。detail用于明确明细请求，evidence评估依据，siteFacts仅用于明确工期事实请求"},
           "dateMode":{"type":"string","description":"仅CURRENT"},"dateField":{"type":"string","description":"暂不支持历史日期"},"startDate":{"type":"string"},"endDate":{"type":"string"},
           "page":{"type":"integer","description":"1开始"},"pageSize":{"type":"integer","description":"1至100，默认20"}
         },"additionalProperties":false}
